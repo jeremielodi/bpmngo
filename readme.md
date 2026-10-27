@@ -22,72 +22,11 @@ GoFlow is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 ### BPMN 2.0 Support
 
-| Element | Status |
-|---|---|
-| Start Event: none, message, signal, timer (`timeDate`, `timeCycle` as ISO 8601 `R[n]/[start/]duration[/end]` or cron; armed on deploy, replaced by each new version) | ✅ |
-| End Event | ✅ |
-| Service Task (External Worker) | ✅ |
-| User Task (with assignee / candidateGroups) | ✅ |
-| Script Task (`zeebe:script` FEEL expression, or a job worker) | ✅ |
-| Messages with Camunda 8 semantics: `zeebe:subscription` correlation keys, time to live (buffered messages), `messageId` deduplication, once per process, message start events (one active instance per key) | ✅ |
-| Call Activity: `zeebe:calledElement` (processId as FEEL, `propagateAllChildVariables`, `propagateAllParentVariables`), input/output mappings, Camunda 7 `camunda:in`/`camunda:out`; uncaught errors and escalations rise to the call activity; the called instance is terminated with its call activity | ✅ |
-| Exclusive Gateway (XOR) | ✅ |
-| Inclusive Gateway (OR) | ✅ |
-| Parallel Gateway (AND) | ✅ |
-| Event-based Gateway | ✅ |
-| Intermediate Timer Catch Event | ✅ |
-| Intermediate Message Catch Event | ✅ |
-| Intermediate Signal Catch Event | ✅ |
-| Boundary Timer / Message / Signal / Conditional Event (interrupting and non-interrupting) | ✅ |
-| Boundary Error / Escalation Event | ✅ |
-| Embedded Sub-Process (nested, with boundary events) | ✅ |
-| Event Sub-Process (timer, message, signal, error, escalation, conditional; interrupting or not) | ✅ |
-| Manual / Send / Receive Task; an untyped task passes straight through (as in Camunda 8; versions deployed before keep it as a user task) | ✅ |
-| Intermediate Throw Event (none, signal, escalation, compensation, link) and Link Catch Event | ✅ |
-| Intermediate Conditional Catch Event | ✅ |
-| End Event: terminate, error, signal, escalation, compensation, message (worked by a job worker) | ✅ |
-| Compensation (boundary + handler, throw with optional `activityRef`, nested into completed sub-processes) | ✅ |
-| Multi-instance on any activity (every task type, embedded sub-process, call activity), parallel or sequential: `zeebe:loopCharacteristics` (inputCollection, inputElement, outputCollection, outputElement), loop cardinality, completion condition (`numberOf*Instances`), boundary events on the whole loop | ✅ |
-| Variable scopes: local variables per sub-process, multi-instance iteration and activity (input mappings), propagation to the nearest scope that has the variable, output mappings evaluated in the activity scope, `SetVariables` with `local` | ✅ |
-| Business Rule Task (DMN decision table) | ✅ |
-
-Timers (every timer event) take `timeDuration` (ISO 8601, calendar units included: `P1M`, `P1DT2H`), `timeDate` (with offset, `@Zone`/`[Zone]` or local) and `timeCycle` (`R[n]/[start/]duration[/end]` or a Spring cron expression, `L`/`W`/`#` included), or a FEEL expression evaluated against the instance variables when armed; cycles repeat on non-interrupting boundary events and event sub-processes.
-
-Conditional events are re-evaluated as soon as a variable of their instance changes (a database trigger notifies the engine, as Camunda 7 evaluates on each variable write; Camunda 8 has no conditional events). Known limit of the BPMN coverage: compensation runs its handlers all at once (it reaches into completed embedded sub-processes without a handler of their own, as in Camunda 8; there is no compensation event sub-process).
+Every supported element (events, tasks, gateways, sub-processes, multi-instance, compensation, timers…) is listed in [BPMN 2.0 Support](docs/bpmn-support.md).
 
 ### Engine Features
 
-| Feature | Status |
-|---|---|
-| Process definition versioning | ✅ |
-| Process variables (JSONB) | ✅ |
-| FEEL expressions: native interpreter (`FEEL_MODE`, shadow by default) alongside the legacy FEEL-to-CEL path | ✅ |
-| External task worker pattern (fetchAndLock) | ✅ |
-| Job retries with exponential back-off | ✅ |
-| Incident management: failed jobs, unhandled errors, and any failure on an element (condition, script, input collection, called process, timer…) as an incident on it; resolving it runs the element again (`POST /v2/incidents/:id/resolution`, gRPC `ResolveIncident`) | ✅ |
-| Timer scheduler (SKIP LOCKED) | ✅ |
-| Message correlation (`POST /engine-rest/message`) | ✅ |
-| Signal broadcast (`POST /engine-rest/signal`) | ✅ |
-| DMN decision engine (decision tables, standalone evaluation) | ✅ |
-| Multi-tenancy (per-user tenant isolation) | ✅ |
-| JWT authentication + RBAC | ✅ |
-| OIDC bearer-token auth (optional, alongside JWT) | ✅ |
-| Zeebe-style extensions (task headers, I/O mapping, FEEL assignee, form key) | ✅ |
-| Forms (deploy + serve form schemas) | ✅ |
-| Process instance modification ("Move Token") | ✅ |
-| Previous step (send a token back to its earlier wait state) | ✅ |
-| Audit trail (`audit_logs`, one row per state transition) | ✅ |
-| Token-history replay (derived from the audit trail, see below) | ✅ |
-| History API (process + activity instances) | ⚠️ basic — see [gaps](docs/comparison.md#comparison-to-camunda-7--camunda-8) |
-| SSE real-time events (`/events/tasks`) | ✅ |
-| WebSocket real-time events (`/ws/tasks`) | ✅ |
-| React frontend (Operate + Tasklist-lite) | ✅ |
-| Docker / Docker Compose deployment | ✅ |
-| Horizontal scaling: several instances behind nginx, PgBouncer, read replica, background archiving (see [Operations](docs/operations.md#horizontal-scaling)) | ✅ |
-| Postgres high availability: Patroni cluster, synchronous replication, automatic failover through HAProxy (see [Operations](docs/operations.md#postgres-high-availability)) | ✅ |
-| Backups (`pg_dump`, standalone or through the cluster) with a restore check | ✅ |
-| gRPC / native Zeebe protocol | ✅ all 19 RPCs of the zeebe-node 8.3 client protocol (`MigrateProcessInstance`/`UpdateJobTimeout` from newer Zeebe versions not yet) |
-| Partitioned write path, Camunda 8 style (`WRITE_PATH=partitioned`, see [below](docs/architecture.md#partitioned-write-path)) | ✅ |
+Versioning, FEEL, job workers, incidents, DMN, multi-tenancy, authentication, audit trail, real-time events, scaling, high availability, gRPC… are listed in [Engine Features](docs/engine-features.md).
 
 ---
 
@@ -129,37 +68,7 @@ A `/modeler` page also lets you author and deploy BPMN diagrams directly in-brow
 
 Every request goes through the same parser/engine/runtime and lands in the same PostgreSQL database. What the deployment chooses (`WRITE_PATH`) is *where* each command runs: right where it arrives (`direct`, the default), or — like Camunda 8 — on the one GoFlow instance owning the Kafka partition of its process instance (`partitioned`).
 
-```
-                  ┌──────────────────────────────────────────────────────────────┐
-                  │              REST (v1 + v2) API / gRPC gateway               │
-                  └──────────────────────────────────────────────────────────────┘
-                                                 │  every command that changes an instance
-                                                 ▼  (internal/cmdbus)
-                     WRITE_PATH=direct (default)        WRITE_PATH=partitioned
-                                 │                                   │
-                                 │                    ┌─────────────────────────────┐
-                                 │                    │  Kafka / Redpanda, topic    │
-                                 │                    │  partition-commands, keyed  │
-                                 │                    │  by process instance        │
-                                 │                    └─────────────────────────────┘
-                                 │                                   │
-                                 │                    ┌─────────────────────────────┐
-                                 │                    │  owner of the partition:    │
-                                 │                    │  one GoFlow instance, one   │
-                                 │                    │  command at a time; reply   │
-                                 │                    │  sent back to the caller    │
-                                 │                    └─────────────────────────────┘
-                                 ▼                                   ▼
-                  ┌──────────────────────────────────────────────────────────────┐
-                  │        the same command handlers: Parser -> Engine ->        │
-                  │                    Runtime.executeNode()                     │
-                  └──────────────────────────────────────────────────────────────┘
-                                                 ▼
-                  ┌──────────────────────────────────────────────────────────────┐
-                  │     PostgreSQL 16 — single server, Patroni HA cluster,       │
-                  │      or Citus (per-instance tables sharded over workers)     │
-                  └──────────────────────────────────────────────────────────────┘
-```
+![GoFlow process command flow: commands go straight to the command handlers (WRITE_PATH=direct) or through the Kafka partition owner (WRITE_PATH=partitioned), then to PostgreSQL](docs/GoFlow_process_command_flow.png)
 
 Design decisions and the partitioned write path: [docs/architecture.md](docs/architecture.md).
 
@@ -169,6 +78,8 @@ Design decisions and the partitioned write path: [docs/architecture.md](docs/arc
 
 - [Switching from Camunda 7 / Camunda 8](docs/switching-from-camunda.md) — what an application already on Camunda changes, client by client
 - [Comparison to Camunda 7 / Camunda 8](docs/comparison.md) — what's covered and what isn't
+- [BPMN 2.0 Support](docs/bpmn-support.md) — every supported BPMN element, timers, conditional events, known limits
+- [Engine Features](docs/engine-features.md) — everything besides BPMN elements: FEEL, jobs, incidents, DMN, auth, scaling, HA, gRPC
 - [API Reference](docs/api.md) — REST (`/engine-rest`, `/v2`), events, audit trail, every filter
 - [Java client](docs/java-client.md) — a remote Java application over REST, the Camunda 7 External Task Client or the Camunda 8 Java client, with tested examples
 - [Architecture](docs/architecture.md) — design decisions, partitioned write path
