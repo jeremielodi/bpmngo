@@ -17,7 +17,7 @@
  */
 import { execSync, spawn } from 'child_process';
 import * as path from 'path';
-import { BpmnGoClient, sleep } from './client';
+import { BpmnGoClient, sleep, SKIPPED_EXIT_CODE } from './client';
 
 const BASE_URL = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
 const noTimers = process.argv.includes('--no-timers');
@@ -149,6 +149,9 @@ async function main() {
     '52_camunda7_worker.test.ts',
     '53_step_back.test.ts',
     '54_java_clients.test.ts',
+    '55_gateway_default_flows.test.ts',
+    '56_instance_lifecycle_and_variables.test.ts',
+    '57_ops_and_legacy_routes.test.ts',
   ];
 
   const exitCodes: number[] = [];
@@ -158,12 +161,18 @@ async function main() {
   }
 
   // 5. Final summary
-  const failed = exitCodes.filter(c => c !== 0).length;
+  const failedSuites = suites.filter((_, i) => exitCodes[i] !== 0 && exitCodes[i] !== SKIPPED_EXIT_CODE);
+  const skippedSuites = suites.filter((_, i) => exitCodes[i] === SKIPPED_EXIT_CODE);
+  const failed = failedSuites.length;
+  const ran = suites.length - skippedSuites.length;
   console.log('\n' + '═'.repeat(60));
   if (failed === 0) {
-    console.log(`  ✅  All ${suites.length} suites passed`);
+    console.log(`  ✅  All ${ran} suites that ran passed`);
   } else {
-    console.log(`  ❌  ${failed} / ${suites.length} suites had failures`);
+    console.log(`  ❌  ${failed} / ${ran} suites had failures: ${failedSuites.join(', ')}`);
+  }
+  if (skippedSuites.length > 0) {
+    console.log(`  ⏭️   ${skippedSuites.length} skipped (not run, not passed): ${skippedSuites.join(', ')}`);
   }
   console.log('═'.repeat(60) + '\n');
 

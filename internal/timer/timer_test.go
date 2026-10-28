@@ -113,7 +113,9 @@ func TestCycles(t *testing.T) {
 }
 
 func TestCron(t *testing.T) {
+	prev := time.Local
 	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = prev })
 	from := mustDate(t, "2026-01-30T10:15:30Z") // a Friday
 	cases := []struct{ expr, want string }{
 		{"0 0 * * * *", "2026-01-30T11:00:00Z"},

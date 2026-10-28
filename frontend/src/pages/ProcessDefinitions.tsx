@@ -247,14 +247,20 @@ function PermissionsModal({ processKey, onClose }: { processKey: string; onClose
     <Modal open onClose={onClose} title={`Permissions: ${processKey}`}>
       <div className="space-y-4">
         <p className="text-xs text-gray-500">
-          No grants means this process is open to any authenticated user. Adding a grant restricts it —
-          only listed users/roles (plus anyone with manage-deploy access) can view or start it.
+          A new process belongs to whoever deployed it. Only the users/roles listed here (plus anyone
+          with manage-deploy access) can view or start it. The last grant cannot be revoked.
         </p>
+
+        {revokeMut.isError && (
+          <p className="text-xs text-red-600">
+            {(revokeMut.error as any)?.response?.data?.message ?? 'Revoke failed'}
+          </p>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-6"><Spinner className="w-5 h-5 text-blue-500" /></div>
         ) : permissions.length === 0 ? (
-          <p className="text-sm text-gray-400">Unrestricted — open to everyone.</p>
+          <p className="text-sm text-gray-400">No grants (deployed before grants existed) — open to everyone.</p>
         ) : (
           <div className="space-y-1">
             {permissions.map(p => (
@@ -265,7 +271,12 @@ function PermissionsModal({ processKey, onClose }: { processKey: string; onClose
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge value="default" label={p.permission} />
-                  <button onClick={() => revokeMut.mutate(p.id)} className="text-gray-400 hover:text-red-500">
+                  <button
+                    onClick={() => revokeMut.mutate(p.id)}
+                    disabled={permissions.length === 1}
+                    title={permissions.length === 1 ? 'The last grant cannot be revoked' : 'Revoke'}
+                    className="text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:hover:text-gray-400 disabled:cursor-not-allowed"
+                  >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

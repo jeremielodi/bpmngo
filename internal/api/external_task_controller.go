@@ -86,7 +86,8 @@ type FailureRequest struct {
 	ErrorMessage string `json:"errorMessage"`
 	ErrorCode    string `json:"errorCode"`
 	Retries      int    `json:"retries"`
-	RetryTimeout int    `json:"retryTimeout"`
+	RetryTimeout int64  `json:"retryTimeout"` // ms, Camunda 7
+	RetryBackOff int64  `json:"retryBackOff"` // ms, Camunda 8 (POST /v2/jobs/:id/failure)
 }
 
 // normalizeVariables converts both simple and typed formats to simple map[string]interface{}
@@ -199,11 +200,16 @@ func (ctrl *ExternalTaskController) HandleFailure(c *fiber.Ctx) error {
 	// incident) as in Camunda 8 — service.FailJob's own convention.
 	newRetries := req.Retries
 
+	backoff := req.RetryTimeout
+	if backoff == 0 {
+		backoff = req.RetryBackOff
+	}
 	result, err := runtime.FailJob(c.Context(), ctrl.db, runtime.FailJobArgs{
 		JobID:            jobID,
 		RetriesRemaining: newRetries,
 		ErrorMessage:     req.ErrorMessage,
 		ErrorCode:        req.ErrorCode,
+		RetryBackoffMs:   backoff,
 	})
 	if errors.Is(err, service.ErrJobNotFound) {
 		return c.Status(404).JSON(fiber.Map{"title": "Not Found", "message": "job not found"})

@@ -151,7 +151,7 @@ func DeployResources(db *sqlx.DB, deploymentName string, tenantID string, resour
 
 		processKeys, err := extractProcessKeys(bpmnBytes)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %s: %v", ErrInvalidResource, res.Filename, err)
 		}
 
 		if requestingUserID != uuid.Nil {
@@ -209,6 +209,15 @@ func DeployResources(db *sqlx.DB, deploymentName string, tenantID string, resour
 				return nil, fmt.Errorf("invalid definition id returned for %s: %w", procKey, err)
 			}
 
+			// A new process belongs to whoever deployed it: MANAGE for them
+			// alone (and the CAN_MANAGE_DEPLOY_PROCESS holders); others are
+			// granted access afterwards.
+			if version == 1 && requestingUserID != uuid.Nil {
+				if _, err := repository.NewProcessPermissionRepository(db).Create(procKey, "user", requestingUserID, "MANAGE"); err != nil {
+					return nil, fmt.Errorf("failed to grant the deployer MANAGE on %s: %w", procKey, err)
+				}
+			}
+
 			if err := ArmStartTimers(db, procKey, defUUID, graph); err != nil {
 				log.Printf("deploy %s: arming timer start events: %v", procKey, err)
 			}
@@ -224,7 +233,8 @@ func DeployResources(db *sqlx.DB, deploymentName string, tenantID string, resour
 
 func extractProcessKeys(xmlBytes []byte) ([]string, error) {
 	type Process struct {
-		ID string `xml:"id,attr"`
+		ID         string `xml:"id,attr"`
+		Executable string `xml:"isExecutable,attr"`
 	}
 	type Definitions struct {
 		Processes []Process `xml:"process"`
@@ -236,9 +246,16 @@ func extractProcessKeys(xmlBytes []byte) ([]string, error) {
 	if len(def.Processes) == 0 {
 		return nil, fmt.Errorf("no process elements found in BPMN")
 	}
-	keys := make([]string, len(def.Processes))
-	for i, p := range def.Processes {
-		keys[i] = p.ID
+	// A process marked isExecutable="false" (a participant only modelled
+	// in a collaboration) is not deployed, as in Camunda.
+	var keys []string
+	for _, p := range def.Processes {
+		if !strings.EqualFold(strings.TrimSpace(p.Executable), "false") {
+			keys = append(keys, p.ID)
+		}
+	}
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no executable process found in BPMN")
 	}
 	return keys, nil
 }

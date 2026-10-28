@@ -372,8 +372,61 @@ async function run() {
           assert(countResp.data.count === 2, `expected count 2, got: ${JSON.stringify(countResp.data)}`);
         },
       },
+      {
+        name: '[G] /audit/task/:taskId and /audit/date-range: ordered task trace, bounds, grants',
+        async fn() {
+          const ok = { validateStatus: () => true };
+          const from = new Date(Date.now() - 5000).toISOString();
+          const inst = await client.startProcess('OperateProcess', { requester: 'audit-g' });
+          const instanceId = inst.processInstanceId ?? inst.id;
+          const taskA = await client.waitForTask('taskA', instanceId, 10000);
+          await client.claimTask(taskA.id, 'alice');
+          await client.completeTask(taskA.id, {});
+          await client.waitForTask('taskB', instanceId, 10000); // still live: the raw log is there
+
+          const trace = (await client.api.get(`/engine-rest/audit/task/${taskA.id}`)).data;
+          const actions = (trace.logs as AuditLogEntry[]).map(l => l.action);
+          const pos = (a: string) => actions.indexOf(a);
+          assert(pos('TASK_CREATED') >= 0 && pos('TASK_CLAIMED') > pos('TASK_CREATED') && pos('TASK_COMPLETED') > pos('TASK_CLAIMED'),
+            `task trace must be created, claimed, completed in order: ${actions}`);
+          assert(trace.count === actions.length && (trace.logs as AuditLogEntry[]).every(l => l.taskId === taskA.id), 'only this task\'s entries');
+          assert((await client.api.get('/engine-rest/audit/task/not-a-uuid', ok)).status === 400, 'malformed task id: 400');
+
+          // date-range: covers this run, and only its period.
+          const to = new Date(Date.now() + 5000).toISOString();
+          const range = (await client.api.post('/engine-rest/audit/date-range', { start: from, end: to })).data;
+          assert((range.logs as AuditLogEntry[]).some(l => l.taskId === taskA.id), 'the range must include this run');
+          const before = (await client.api.post('/engine-rest/audit/date-range', { start: '2000-01-01T00:00:00Z', end: '2000-01-02T00:00:00Z' })).data;
+          assert(before.count === 0, `nothing in 2000, got ${before.count}`);
+          for (const body of [{}, { start: to, end: from }, { start: from }]) {
+            const bad = await client.api.post('/engine-rest/audit/date-range', body, ok);
+            assert(bad.status === 400, `invalid bounds ${JSON.stringify(body)}: expected 400, got ${bad.status}`);
+          }
+
+          // Restricted process, user without a grant: neither route shows it.
+          const run = Date.now().toString(36);
+          const email = `audit22-${run}@goflow.com`;
+          await client.api.post('/users', { email, full_name: email, password: 'password123' });
+          const grantee = await client.api.post('/users', { email: `audit22g-${run}@goflow.com`, full_name: 'g', password: 'password123' });
+          await client.api.post('/engine-rest/process-definition/key/OperateProcess/permissions', { granteeType: 'user', granteeId: grantee.data.user.id, permission: 'VIEW' });
+          try {
+            const outsider = new BpmnGoClient();
+            await outsider.login(email, 'password123');
+            assert((await outsider.api.get(`/engine-rest/audit/task/${taskA.id}`, ok)).status === 404, 'task trace without a grant: 404');
+            const seen = (await outsider.api.post('/engine-rest/audit/date-range', { start: from, end: to })).data.logs as AuditLogEntry[];
+            assert(!seen.some(l => l.processInstanceId === instanceId), 'date-range must hide entries of a process without a grant');
+          } finally {
+            // Remove the grant added here; the deployer's stays.
+            const perms = (await client.api.get('/engine-rest/process-definition/key/OperateProcess/permissions')).data.permissions as any[];
+            for (const p of perms.filter(p => p.granteeId === grantee.data.user.id)) {
+              await client.api.delete(`/engine-rest/process-definition/key/OperateProcess/permissions/${p.id}`);
+            }
+          }
+          await client.api.delete(`/engine-rest/process-instance/${instanceId}`, ok);
+        },
+      },
     ],
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

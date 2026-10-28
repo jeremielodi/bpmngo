@@ -413,7 +413,7 @@ func (pc *ProcessInstanceController) StartProcess(c *fiber.Ctx) error {
 	normalizedVars := normalizeVariables(body.Variables)
 
 	// Load definition and graph using repository
-	def, err := pc.processRepo.FindLatestProcessDefinitionByKey(processKey)
+	def, err := pc.processRepo.FindLatestProcessDefinitionByKeyForTenant(processKey, common.GetTenantId(c))
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{
 			"title":   "Not Found",
@@ -474,10 +474,20 @@ func (pc *ProcessInstanceController) CompleteTask(c *fiber.Ctx) error {
 		})
 	}
 
+	// As on the Camunda 7 task routes: a task of an instance the caller
+	// cannot VIEW does not exist for it.
+	task, ferr := repository.NewTaskRepository(pc.db, nil).FindTaskByID(taskID)
+	if ferr != nil || !pc.checkInstanceAccess(c, task.ProcessInstanceID, "VIEW") {
+		return c.Status(404).JSON(fiber.Map{"title": "Not Found", "message": "task not found"})
+	}
+
 	// Normalize variables (supports both simple and typed formats)
 	normalizedVars := normalizeVariables(req.Variables)
 
 	err = runtime.CompleteUserTask(c.Context(), pc.db, taskID, normalizedVars)
+	if errors.Is(err, runtime.ErrUserTaskNotFound) {
+		return c.Status(404).JSON(fiber.Map{"title": "Not Found", "message": "task not found"})
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"title":   "Error",
@@ -516,11 +526,20 @@ func (pc *ProcessInstanceController) StartProcessAsync(c *fiber.Ctx) error {
 		}
 	}
 
+	// Checked here: once queued, a start for an unknown key fails silently.
+	if _, err := pc.processRepo.FindLatestProcessDefinitionByKeyForTenant(processKey, common.GetTenantId(c)); err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"title":   "Not Found",
+			"message": "process definition not found",
+		})
+	}
+
 	normalizedVars := normalizeVariables(body.Variables)
 
 	job := worker.Job{
 		Type:       "start_process",
 		ProcessKey: processKey,
+		TenantID:   common.GetTenantId(c),
 		Variables:  normalizedVars,
 	}
 
@@ -748,6 +767,12 @@ func (pc *ProcessInstanceController) EndProcess(c *fiber.Ctx) error {
 
 	err = cmdbus.Do(c.Context(), cmdbus.Key(instanceID), cmdEndInstance,
 		endArgs{InstanceID: instanceID, Variables: normalizedVars}, nil)
+	if errors.Is(err, service.ErrProcessInstanceNotFound) {
+		return c.Status(404).JSON(fiber.Map{
+			"type":    "NotFound",
+			"message": "Process instance not found or already ended",
+		})
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"type":    "InternalError",
@@ -813,7 +838,8 @@ func (pc *ProcessInstanceController) GetProcessState(c *fiber.Ctx) error {
 		"status":           instance.Status,
 		"startedAt":        instance.StartedAt,
 		"activeExecutions": len(executions),
-		"ended":            false,
+		// A closed instance stays here until the archiver moves it.
+		"ended": instance.Status == "completed" || instance.Status == "terminated",
 	})
 }
 
@@ -863,7 +889,13 @@ func (pc *ProcessInstanceController) StopProcessWithReason(c *fiber.Ctx) error {
 	}
 
 	err = cmdbus.Do(c.Context(), cmdbus.Key(instanceID), cmdStopInstance,
-		stopArgs{InstanceID: instanceID, Variables: normalizeVariables(stopVariables)}, nil)
+		stopArgs{InstanceID: instanceID, Reason: req.Reason, Variables: normalizeVariables(stopVariables)}, nil)
+	if errors.Is(err, service.ErrProcessInstanceNotFound) {
+		return c.Status(404).JSON(fiber.Map{
+			"type":    "NotFound",
+			"message": "Process instance not found or already ended",
+		})
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"type":    "InternalError",

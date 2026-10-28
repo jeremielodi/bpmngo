@@ -176,17 +176,7 @@ func (r *UserRepository) Login(login models.UserLoginModel) (models.User, error)
 	return user, nil
 }
 
-// HasAccess, IsAllow etc. remain as you already wrote them
-func (u *UserRepository) HasAccess(userUuid string, formUuid string) (bool, error) {
-	const sql = `
-		  SELECT count(uuid) as nbr
-	  FROM public.user_form
-	  WHERE userUuid=$1 AND formUuid=$2
-		`
-	result := models.NewAllowPlayload()
-	err := u.db.Get(result, sql, userUuid, formUuid)
-	return result.Nbr > 0, err
-}
+// IsAllow etc. remain as you already wrote them
 
 func (u *UserRepository) IsAllow(actionId *int, userUuid *string) (bool, error) {
 	const sql = `

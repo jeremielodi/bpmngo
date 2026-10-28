@@ -36,7 +36,7 @@ async function run() {
           const cookDone = client.pollExternalTask('cook_pasta', async () => ({
             pastaReady: true,
             cookedAt: new Date().toISOString(),
-          }), 20000);
+          }), 20000, instanceId);
 
           const saladTask = await client.waitForTask('prepare_salad', instanceId, 10000);
           assert(saladTask.candidateGroup === 'kitchen', 'expected candidateGroup "kitchen"');
@@ -63,7 +63,7 @@ async function run() {
           const instanceId = inst.processInstanceId ?? inst.id;
 
           // Complete cook_pasta immediately
-          await client.pollExternalTask('cook_pasta', async () => ({ pastaReady: true }), 15000);
+          await client.pollExternalTask('cook_pasta', async () => ({ pastaReady: true }), 15000, instanceId);
 
           // eat_meal must NOT appear yet — salad not done
           await sleep(2000);
@@ -101,7 +101,7 @@ async function run() {
           assert(!prematureEat, 'eat_meal should NOT appear before pasta is done');
 
           // Now complete cook_pasta
-          await client.pollExternalTask('cook_pasta', async () => ({ pastaReady: true }), 15000);
+          await client.pollExternalTask('cook_pasta', async () => ({ pastaReady: true }), 15000, instanceId);
 
           // Now join fires
           const eatTask = await client.waitForTask('eat_meal', instanceId, 10000);
@@ -115,4 +115,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

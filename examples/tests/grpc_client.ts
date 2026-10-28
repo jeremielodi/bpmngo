@@ -15,7 +15,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 
 const PROTO_PATH = path.join(__dirname, '..', '..', 'internal', 'zeebegrpc', 'proto', 'gateway.proto');
-const GRPC_ADDR = '127.0.0.1:26500';
+export const GRPC_ADDR = process.env.GRPC_ADDR ?? '127.0.0.1:26500';
 
 // The gateway refuses calls without valid credentials (see
 // internal/zeebegrpc/auth.go). The suites authenticate as the seeded

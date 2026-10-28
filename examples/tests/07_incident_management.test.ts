@@ -14,7 +14,7 @@
  *   D) Delete incident → incident disappears from open list
  */
 import * as path from 'path';
-import { BpmnGoClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep, waitUntil } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '07_support_ticket.bpmn');
 const client = new BpmnGoClient();
@@ -49,10 +49,9 @@ async function run() {
             retryTimeout: 0,
           });
 
-          // Wait for incident to appear
-          await sleep(500);
-          const res = await client.api.get(`/engine-rest/incident?processInstanceId=${instanceId}`);
-          const incidents = res.data as any[];
+          const incidents = await waitUntil(
+            async () => (await client.api.get(`/engine-rest/incident?processInstanceId=${instanceId}`)).data as any[],
+            list => list.length > 0, 10000, 'the incident');
           assert(incidents.length > 0, `expected at least 1 incident, got ${incidents.length}`);
           const incident = incidents[0];
           assert(incident.state === 'open', `expected state=open, got ${incident.state}`);
@@ -177,4 +176,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

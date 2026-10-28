@@ -817,6 +817,22 @@ func (r *EngineRepository) LockJob(jobID uuid.UUID, workerID string, lockDuratio
 
 // repository/engine_repository.go
 
+// FindLatestProcessDefinitionByKeyForTenant: see the ProcessRepository
+// method of that name ("" = no tenant: any version).
+func (r *EngineRepository) FindLatestProcessDefinitionByKeyForTenant(processKey, tenant string) (*models.ProcessDefinition, error) {
+	if tenant == "" {
+		return r.FindLatestProcessDefinitionByKey(processKey)
+	}
+	var def models.ProcessDefinition
+	if err := r.db.Get(&def, latestForTenantSQL, processKey, tenant); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("process definition not found for key: %s", processKey)
+		}
+		return nil, err
+	}
+	return &def, nil
+}
+
 func (r *EngineRepository) FindLatestProcessDefinitionByKey(processKey string) (*models.ProcessDefinition, error) {
 	var def models.ProcessDefinition
 	query := `

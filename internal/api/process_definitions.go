@@ -81,8 +81,12 @@ func (processDef ProcessDefinitionController) DeployBPMN(c *fiber.Ctx) error {
 		deploymentName = fileHeaders[0].Filename
 	}
 	tenantID := c.FormValue("tenant-id") // optional; defaults to the caller's own tenant
+	callerTenant := common.GetTenantId(c)
 	if tenantID == "" {
-		tenantID = common.GetTenantId(c)
+		tenantID = callerTenant
+	}
+	if callerTenant != "" && tenantID != callerTenant {
+		return c.Status(403).JSON(fiber.Map{"error": "you can only deploy to your own tenant"})
 	}
 
 	// 4. Read each uploaded file into a RawResource.
@@ -166,7 +170,7 @@ func (ctrl *ProcessDefinitionController) ListDefinitions(c *fiber.Ctx) error {
 	var err error
 
 	if key != "" && latestOnly {
-		def, e := ctrl.processRepo.FindLatestProcessDefinitionByKey(key)
+		def, e := ctrl.processRepo.FindLatestProcessDefinitionByKeyForTenant(key, tenantID)
 		if e != nil || (tenantID != "" && def.TenantID != nil && *def.TenantID != tenantID) {
 			return c.Status(404).JSON(fiber.Map{"message": "not found"})
 		}
@@ -259,8 +263,9 @@ func (ctrl *ProcessDefinitionController) GetActiveTokenCounts(c *fiber.Ctx) erro
 		WHERE pd.process_key = $1
 		  AND pi.status IN ('running', 'suspended')
 		  AND e.status IN ('active', 'waiting')
+		  AND ($2 = '' OR pi.tenant_id = $2)
 		GROUP BY e.current_element_id
-	`, key)
+	`, key, common.GetTenantId(c))
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"message": "failed to load token counts", "error": err.Error()})
 	}
@@ -301,7 +306,8 @@ func (ctrl *ProcessDefinitionController) GetInstancePositions(c *fiber.Ctx) erro
 		WHERE pd.process_key = $1
 		  AND pi.status IN ('running', 'suspended')
 		  AND e.status IN ('active', 'waiting')
-	`, key)
+		  AND ($2 = '' OR pi.tenant_id = $2)
+	`, key, common.GetTenantId(c))
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"message": "failed to load instance positions", "error": err.Error()})
 	}

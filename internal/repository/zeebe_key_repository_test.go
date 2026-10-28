@@ -15,37 +15,27 @@ func newMockZeebeKeyRepo(t *testing.T) (*ZeebeKeyRepository, sqlmock.Sqlmock) {
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() {
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("unmet expectations: %v", err)
+		}
+		db.Close()
+	})
 	sqlxDB := sqlx.NewDb(db, "postgres")
 	return NewZeebeKeyRepository(sqlxDB), mock
 }
 
-func TestGetOrAssignKey_FirstAssignment(t *testing.T) {
+// A second call for the same resource must return the SAME key, not fail or
+// assign a new one — this is what lets a client hand a job key from
+// ActivateJobs back to CompleteJob/FailJob later. That guarantee lives in
+// the SQL (an upsert that RETURNs the stored key on conflict; DO NOTHING
+// would return no row), so the statement shape is what is checked here.
+// The conflict itself needs a real database: see the gRPC e2e suites.
+func TestGetOrAssignKey(t *testing.T) {
 	repo, mock := newMockZeebeKeyRepo(t)
 	resourceID := uuid.New()
 
-	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO public.zeebe_keys")).
-		WithArgs("job", resourceID).
-		WillReturnRows(sqlmock.NewRows([]string{"key"}).AddRow(int64(1)))
-
-	key, err := repo.GetOrAssignKey("job", resourceID)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if key != 1 {
-		t.Errorf("expected key 1, got %d", key)
-	}
-}
-
-// Regression: a second call for the same resource must return the SAME
-// key, not fail or assign a new one — this is what lets a client hand a
-// job key from ActivateJobs back to CompleteJob/FailJob later, including
-// after the row already exists from a prior call.
-func TestGetOrAssignKey_ConflictReturnsExistingKey(t *testing.T) {
-	repo, mock := newMockZeebeKeyRepo(t)
-	resourceID := uuid.New()
-
-	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO public.zeebe_keys")).
+	mock.ExpectQuery(`INSERT INTO public\.zeebe_keys .*ON CONFLICT \(resource_type, resource_id\)\s+DO UPDATE .*RETURNING key`).
 		WithArgs("job", resourceID).
 		WillReturnRows(sqlmock.NewRows([]string{"key"}).AddRow(int64(42)))
 
@@ -54,7 +44,7 @@ func TestGetOrAssignKey_ConflictReturnsExistingKey(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if key != 42 {
-		t.Errorf("expected the existing key 42 to be returned on conflict, got %d", key)
+		t.Errorf("expected key 42, got %d", key)
 	}
 }
 

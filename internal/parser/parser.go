@@ -415,6 +415,7 @@ type ScriptTask struct {
 }
 type ExclusiveGateway struct {
 	ID       string   `xml:"id,attr"`
+	Default  string   `xml:"default,attr"` // flow taken when no condition is true
 	Incoming []string `xml:"incoming"`
 	Outgoing []string `xml:"outgoing"`
 }
@@ -427,6 +428,7 @@ type ParallelGateway struct {
 
 type InclusiveGateway struct {
 	ID       string   `xml:"id,attr"`
+	Default  string   `xml:"default,attr"`
 	Incoming []string `xml:"incoming"`
 	Outgoing []string `xml:"outgoing"`
 }

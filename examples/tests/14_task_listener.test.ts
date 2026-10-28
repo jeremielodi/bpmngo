@@ -19,7 +19,9 @@
  *      filter excludes events from processes the client didn't ask for.
  */
 import * as path from 'path';
-import { BpmnGoClient, TaskSSEClient, runSuite, assert, sleep } from './client';
+import * as fs from 'fs';
+import FormData from 'form-data';
+import { BASE_URL, BpmnGoClient, TaskSSEClient, runSuite, assert, sleep, waitUntil } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '14_task_listener.bpmn');
 const PIZZA_BPMN = path.join(__dirname, 'bpmn', '01_pizza_delivery.bpmn');
@@ -170,8 +172,72 @@ async function run() {
         },
       },
 
+      // ── WebSocket: same events as SSE ────────────────────────────────────────
+      {
+        name: '[WebSocket] /ws/tasks?token= delivers TASK_CREATED then TASK_COMPLETED',
+        async fn() {
+          const token = (client as any).token as string;
+          const url = BASE_URL.replace(/^http/, 'ws') + `/ws/tasks?token=${encodeURIComponent(token)}`;
+          const received: any[] = [];
+          const ws = new WebSocket(url);
+          await new Promise<void>((resolve, reject) => {
+            ws.onopen = () => resolve();
+            ws.onerror = () => reject(new Error('WebSocket did not open'));
+          });
+          ws.onmessage = m => { try { received.push(JSON.parse(String(m.data))); } catch { /* not JSON */ } };
+          try {
+            const inst = await client.startProcess('TaskListenerProcess', {});
+            const instanceId = inst.processInstanceId ?? inst.id;
+            const created = await waitUntil(async () => received.find(e => e.eventType === 'TASK_CREATED' && e.processInstanceId === instanceId),
+              e => !!e, 10000, 'TASK_CREATED over the WebSocket');
+            await client.completeTask(created.taskId);
+            await waitUntil(async () => received.find(e => e.eventType === 'TASK_COMPLETED' && e.taskId === created.taskId),
+              e => !!e, 10000, 'TASK_COMPLETED over the WebSocket');
+            await client.api.delete(`/engine-rest/process-instance/${instanceId}`, { validateStatus: () => true });
+          } finally {
+            ws.close();
+          }
+        },
+      },
+
+      // ── Streams respect per-process grants ──────────────────────────────────
+      {
+        name: '[Grants] A subscriber without VIEW on a process receives none of its task events',
+        async fn() {
+          const run = Date.now().toString(36);
+          const key = `Restricted14_${run}`;
+          const xml = fs.readFileSync(BPMN, 'utf8').replace(/TaskListenerProcess/g, key);
+          const form = new FormData();
+          form.append('resources', Buffer.from(xml), { filename: `${key}.bpmn` });
+          form.append('deployment-name', key);
+          await client.api.post('/engine-rest/deployment/create', form, { headers: form.getHeaders() });
+
+          const outsiderEmail = `sse14-out-${run}@goflow.com`;
+          await client.api.post('/users', { email: outsiderEmail, full_name: 'o', password: 'password123' });
+          const insider = await client.api.post('/users', { email: `sse14-in-${run}@goflow.com`, full_name: 'i', password: 'password123' });
+          await client.api.post(`/engine-rest/process-definition/key/${key}/permissions`, { granteeType: 'user', granteeId: insider.data.user.id, permission: 'VIEW' });
+          const outsider = new BpmnGoClient();
+          await outsider.login(outsiderEmail, 'password123');
+
+          const theirs = await TaskSSEClient.connect(outsider.api, {});
+          const ours = await TaskSSEClient.connect(client.api, {});
+          try {
+            const inst = await client.startProcess(key, {});
+            const instanceId = inst.processInstanceId ?? inst.id;
+            await ours.waitFor(e => e.eventType === 'TASK_CREATED' && e.processInstanceId === instanceId);
+            await sleep(1000);
+            assert(!theirs.events.some(e => e.processInstanceId === instanceId),
+              'a user without a grant must not receive the restricted process\'s task events');
+            await client.api.delete(`/engine-rest/process-instance/${instanceId}`, { validateStatus: () => true });
+          } finally {
+            theirs.close();
+            ours.close();
+          }
+        },
+      },
+
     ],
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

@@ -6,7 +6,7 @@ These rules apply to every list and search endpoint below. The tables only state
 
 - **Authentication.** Every endpoint except `/auth/*`, `/health` and `/` requires `Authorization: Bearer <access_token>`.
 - **Tenant.** There is no tenant parameter on most lists. A user that belongs to a tenant only ever sees that tenant's definitions, instances and tasks; a user without a tenant (the superuser) sees all of them. The Camunda 7 task API also accepts `tenantIdIn`.
-- **Permissions.** Lists drop the rows of processes the caller has no `VIEW` grant on (see [process permissions](#process-permissions)). A process with no grant at all is open to every authenticated user. Single-resource reads, and the `/v2` searches that require a `processInstanceKey`, answer `404` rather than `403`.
+- **Permissions.** Lists drop the rows of processes the caller has no `VIEW` grant on (see [process permissions](#process-permissions)). A new process is open only to its deployer until others are granted access. Single-resource reads, and the `/v2` searches that require a `processInstanceKey`, answer `404` rather than `403`.
 - **Combining filters.** Several filters combine with AND. A filter left out, or sent empty, does not filter.
 - **Exact match.** Filters are exact and case-sensitive unless the table says otherwise (`…Like`).
 - **Enumerated values.** `status` and `state` must be one of the values listed. On the `/engine-rest` lists, an unknown value is a `500` (`invalid input value for enum`). On the `/v2` searches it is ignored, and the search returns everything.
@@ -82,7 +82,7 @@ POST   /engine-rest/process-definition/key/:key/permissions   { "granteeType": "
 DELETE /engine-rest/process-definition/key/:key/permissions/:id
 ```
 
-The first grant on a key restricts it to its grantees; holders of the global `CAN_MANAGE_DEPLOY_PROCESS` action keep full access.
+The first deployment of a key grants `MANAGE` to the user who deployed it, and to nobody else: others see or start the process only once granted. Holders of the global `CAN_MANAGE_DEPLOY_PROCESS` action keep full access. Changing a process's grants needs `MANAGE` on it (or that action). The last grant of a process cannot be revoked (`409`). A process deployed before this rule, with no grant at all, stays open to every authenticated user.
 
 ## Process Instances
 
@@ -477,7 +477,8 @@ No filters.
 GET    /users                     (CAN_MANAGE_USER)
 GET    /users/me
 GET    /users/:id
-GET    /users/email/:email
+GET    /users/email/:email        (self, or CAN_MANAGE_USER)
+GET    /users/:id/permission/:actionId  (self, or CAN_MANAGE_USER)
 POST   /users                     { "email", "full_name", "password" }
 PUT    /users/:id
 PUT    /users/:id/password
@@ -508,7 +509,7 @@ No filters or pagination: each list returns everything.
 GET /events/tasks
 
 # WebSocket
-ws://localhost:8080/ws/tasks
+ws://localhost:8080/ws/tasks?token=<access_token>
 ```
 
 ## Camunda 8 REST API (`/v2/...`)

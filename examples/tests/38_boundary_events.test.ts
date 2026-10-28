@@ -13,7 +13,7 @@
  *   F) The message boundary of a task completed in time no longer correlates.
  */
 import * as path from 'path';
-import { BpmnGoClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep, waitUntil } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '38_boundary_events.bpmn');
 const client = new BpmnGoClient();
@@ -64,7 +64,7 @@ async function run() {
           const instanceId = inst.processInstanceId ?? inst.id;
           await client.waitForTask('bm_task', instanceId, 10000);
 
-          const res = await client.api.post('/engine-rest/message', { messageName: 'BeEscalate' }, { validateStatus: () => true });
+          const res = await client.api.post('/engine-rest/message', { messageName: 'BeEscalate', processInstanceId: instanceId }, { validateStatus: () => true });
           assert(res.status < 300, `BeEscalate did not correlate (HTTP ${res.status})`);
 
           const escalated = await client.waitForTask('bm_escalated', instanceId, 10000);
@@ -135,11 +135,49 @@ async function run() {
           await client.completeTask(a.id);
           await client.waitForTask('bsm_b', instanceId, 10000);
 
-          const res = await client.api.post('/engine-rest/message', { messageName: 'BeLate' }, { validateStatus: () => true });
+          const res = await client.api.post('/engine-rest/message', { messageName: 'BeLate', processInstanceId: instanceId }, { validateStatus: () => true });
           assert(res.status >= 400, `BeLate still correlated after its task completed (HTTP ${res.status})`);
           const b = await openTasks(instanceId, 'bsm_b');
           assert(b.length === 1, 'stale message boundary hijacked the token');
           await client.completeTask(b[0].id);
+          await client.waitForProcessEnd(instanceId, 10000);
+        },
+      },
+
+      {
+        name: '[G] A catch-all error boundary catches any code; a precise one wins for its own code',
+        async fn() {
+          for (const [code, expected, other] of [['BE_CARD_DECLINED', 'bec_card', 'bec_any'], ['SOMETHING_ELSE', 'bec_any', 'bec_card']]) {
+            const inst = await client.startProcess('BeErrorCatchAll', {});
+            const instanceId = inst.processInstanceId ?? inst.id;
+            const job = await waitUntil(
+              async () => (await client.fetchAndLock([{ name: 'be-pay' }])).find(j => j.processInstanceId === instanceId),
+              j => j !== undefined, 10000, 'the be-pay job');
+            const res = await client.api.post(`/engine-rest/external-task/${job!.id}/bpmnError`, { workerId: client.workerId, errorCode: code });
+            assert(res.status < 300, `bpmnError ${code}: ${res.status}`);
+            const caught = await client.waitForTask(expected, instanceId, 10000);
+            assert((await openTasks(instanceId, other)).length === 0, `${code} must be caught by ${expected} only`);
+            const incidents = (await client.api.get(`/engine-rest/incident?processInstanceId=${instanceId}`)).data as any[];
+            assert(incidents.length === 0, `${code}: caught, so no incident`);
+            await client.completeTask(caught.id);
+            await client.waitForProcessEnd(instanceId, 10000);
+          }
+        },
+      },
+
+      {
+        name: '[H] An interrupting signal boundary cancels the task and takes its path',
+        async fn() {
+          const inst = await client.startProcess('BeSignalInterrupting', {});
+          const instanceId = inst.processInstanceId ?? inst.id;
+          await client.waitForTask('bsi_task', instanceId, 10000);
+
+          await client.api.post('/engine-rest/signal', { name: 'BeStop' });
+          const stopped = await client.waitForTask('bsi_stopped', instanceId, 10000);
+          assert((await openTasks(instanceId, 'bsi_task')).length === 0, 'the interrupted task is still open');
+          const statuses = await historicTaskStatuses(instanceId, 'bsi_task');
+          assert(statuses.length === 1 && statuses[0] === 'cancelled', `bsi_task must be cancelled in history, got ${statuses}`);
+          await client.completeTask(stopped.id);
           await client.waitForProcessEnd(instanceId, 10000);
         },
       },

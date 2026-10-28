@@ -2,16 +2,27 @@ package dmn
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/jeremielodi/bpmngo/internal/common"
 )
 
-// EvaluateDecisionTable evaluates a decision table against variables.
-// Returns a single value/map for UNIQUE, FIRST and ANY hit policies, or a
-// slice of them for COLLECT. A table with no matching rule returns nil.
+// EvaluateDecisionTable evaluates a decision table against variables, by
+// its hit policy (DMN 1.3):
+//   - UNIQUE (default): the one matching rule; several is an error.
+//   - FIRST: the first matching rule.
+//   - ANY: the matching rules must all give the same output.
+//   - PRIORITY: the match whose output ranks highest in outputValues.
+//   - RULE ORDER, COLLECT: every match, in rule order.
+//   - OUTPUT ORDER: every match, by outputValues rank.
+//   - COLLECT with aggregation SUM, MIN, MAX: one number; COUNT: how many.
+//
+// A result is a value when the table has one output, else a map by output
+// name. No matching rule returns nil (an empty list for list policies).
 func EvaluateDecisionTable(table *DecisionTable, variables map[string]interface{}) (interface{}, error) {
 	if table == nil {
 		return nil, fmt.Errorf("decision table is nil")
@@ -38,6 +49,7 @@ func EvaluateDecisionTable(table *DecisionTable, variables map[string]interface{
 	}
 
 	var matches []map[string]interface{}
+	var matchedRules []string
 	for _, rule := range table.Rules {
 		matched := true
 		for i := range table.Inputs {
@@ -66,25 +78,121 @@ func EvaluateDecisionTable(table *DecisionTable, variables map[string]interface{
 			return nil, fmt.Errorf("rule %s: %w", rule.ID, err)
 		}
 		matches = append(matches, output)
+		matchedRules = append(matchedRules, rule.ID)
 
-		if hitPolicy != "COLLECT" {
-			break // UNIQUE/FIRST/ANY: stop at the first match
+		if hitPolicy == "FIRST" {
+			break
 		}
 	}
 
-	if len(matches) == 0 {
+	results := make([]interface{}, len(matches))
+	for i, m := range matches {
+		results[i] = singleOrMap(table.Outputs, m)
+	}
+
+	switch hitPolicy {
+	case "UNIQUE":
+		if len(results) > 1 {
+			return nil, fmt.Errorf("hit policy UNIQUE: several rules match (%s)", strings.Join(matchedRules, ", "))
+		}
+	case "FIRST":
+	case "ANY":
+		for i := 1; i < len(results); i++ {
+			if !reflect.DeepEqual(results[i], results[0]) {
+				return nil, fmt.Errorf("hit policy ANY: rules %s and %s match with different outputs", matchedRules[0], matchedRules[i])
+			}
+		}
+	case "PRIORITY", "OUTPUT ORDER":
+		ranked, err := byPriority(table.Outputs, matches, results)
+		if err != nil {
+			return nil, fmt.Errorf("hit policy %s: %w", hitPolicy, err)
+		}
+		if hitPolicy == "OUTPUT ORDER" {
+			return ranked, nil
+		}
+		results = ranked
+	case "RULE ORDER":
+		return results, nil
+	case "COLLECT":
+		return collect(strings.ToUpper(strings.TrimSpace(table.Aggregation)), results)
+	default:
+		return nil, fmt.Errorf("unsupported hit policy %q", table.HitPolicy)
+	}
+
+	if len(results) == 0 {
 		return nil, nil
 	}
+	return results[0], nil
+}
 
-	if hitPolicy == "COLLECT" {
-		results := make([]interface{}, len(matches))
-		for i, m := range matches {
-			results[i] = singleOrMap(table.Outputs, m)
-		}
-		return results, nil
+// byPriority orders matches by the rank of their first output's value in
+// that output's outputValues list (first listed = highest), keeping rule
+// order between equals.
+func byPriority(outputs []Output, matches []map[string]interface{}, results []interface{}) ([]interface{}, error) {
+	if len(outputs) == 0 || outputs[0].OutputValues == nil || strings.TrimSpace(outputs[0].OutputValues.Text) == "" {
+		return nil, fmt.Errorf("output %q has no outputValues to rank by", outputKey(outputs[0], 0))
 	}
+	var ranks []interface{}
+	for _, part := range splitTopLevel(outputs[0].OutputValues.Text, ',') {
+		v, err := parseLiteral(part)
+		if err != nil {
+			return nil, err
+		}
+		ranks = append(ranks, v)
+	}
+	rank := func(v interface{}) int {
+		for i, r := range ranks {
+			if c, err := compare(v, r); err == nil && c == 0 {
+				return i
+			}
+		}
+		return len(ranks)
+	}
+	key := outputKey(outputs[0], 0)
+	order := make([]int, len(matches))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		return rank(matches[order[a]][key]) < rank(matches[order[b]][key])
+	})
+	ranked := make([]interface{}, len(order))
+	for i, j := range order {
+		ranked[i] = results[j]
+	}
+	return ranked, nil
+}
 
-	return singleOrMap(table.Outputs, matches[0]), nil
+// collect applies a COLLECT aggregation to single-output results.
+func collect(aggregation string, results []interface{}) (interface{}, error) {
+	switch aggregation {
+	case "":
+		return results, nil
+	case "COUNT":
+		return float64(len(results)), nil
+	case "SUM", "MIN", "MAX":
+	default:
+		return nil, fmt.Errorf("unsupported COLLECT aggregation %q", aggregation)
+	}
+	if len(results) == 0 {
+		return nil, nil
+	}
+	var acc float64
+	for i, r := range results {
+		n, ok := toFloat(r)
+		if !ok {
+			return nil, fmt.Errorf("COLLECT %s needs numbers, got %v", aggregation, r)
+		}
+		switch {
+		case i == 0:
+			acc = n
+		case aggregation == "SUM":
+			acc += n
+		case aggregation == "MIN" && n < acc, aggregation == "MAX" && n > acc:
+			acc = n
+		}
+	}
+	return acc, nil
 }
 
 func singleOrMap(outputs []Output, values map[string]interface{}) interface{} {

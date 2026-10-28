@@ -111,4 +111,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

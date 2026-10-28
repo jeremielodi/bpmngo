@@ -73,7 +73,7 @@ async function run() {
 
           // Correlate the PaymentReceived message
           // As in Camunda 7: the correlations come back only with resultEnabled.
-          const r1 = await correlateMessage(token, 'PaymentReceived', {}, {}, { resultEnabled: true });
+          const r1 = await correlateMessage(token, 'PaymentReceived', {}, {}, { resultEnabled: true, processInstanceId: instanceId });
           assert(r1.ok, `PaymentReceived message failed: ${r1.status}`);
           const body1 = await r1.json() as any;
           assert(Array.isArray(body1) && body1[0]?.resultType === 'Execution', `expected a Camunda 7 result list, got ${JSON.stringify(body1)}`);
@@ -86,7 +86,7 @@ async function run() {
           await sleep(300);
 
           // Correlate the ShipmentReady message
-          const r2 = await correlateMessage(token, 'ShipmentReady');
+          const r2 = await correlateMessage(token, 'ShipmentReady', {}, {}, { processInstanceId: instanceId });
           assert(r2.status === 204, `ShipmentReady: expected 204 without resultEnabled, got ${r2.status}`);
 
           // Complete notify-customer and wait for end
@@ -109,14 +109,14 @@ async function run() {
           await sleep(500);
 
           // Correlate with variables
-          const r1 = await correlateMessage(token, 'PaymentReceived', {}, { paymentRef: 'PAY-XYZ' });
+          const r1 = await correlateMessage(token, 'PaymentReceived', {}, { paymentRef: 'PAY-XYZ' }, { processInstanceId: instanceId });
           assert(r1.ok, `message failed: ${r1.status}`);
 
           await sleep(300);
           await completeExternalTask(token, 'confirm-payment', instanceId);
           await sleep(300);
 
-          const r2 = await correlateMessage(token, 'ShipmentReady', {}, { trackingNumber: 'TRACK-123' });
+          const r2 = await correlateMessage(token, 'ShipmentReady', {}, { trackingNumber: 'TRACK-123' }, { processInstanceId: instanceId });
           assert(r2.ok, `ShipmentReady failed: ${r2.status}`);
 
           await sleep(300);

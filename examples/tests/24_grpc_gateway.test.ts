@@ -36,7 +36,7 @@
 import * as path from 'path';
 import { ZBClient } from 'zeebe-node';
 import { BpmnGoClient, runSuite, assert, sleep } from './client';
-import { GRPC_BASIC_AUTH, rawGatewayCall } from './grpc_client';
+import { GRPC_ADDR, GRPC_BASIC_AUTH, rawGatewayCall } from './grpc_client';
 
 const BPMN = path.join(__dirname, 'bpmn', '24_grpc_process.bpmn');
 const ORDER_BPMN = path.join(__dirname, 'bpmn', '10_order_notification.bpmn');
@@ -45,7 +45,7 @@ const SIGNAL_BPMN = path.join(__dirname, 'bpmn', '24_grpc_signal_process.bpmn');
 const restClient = new BpmnGoClient();
 
 function newZbClient(): ZBClient {
-  return new ZBClient('127.0.0.1:26500', {
+  return new ZBClient(GRPC_ADDR, {
     useTLS: false,
     basicAuth: GRPC_BASIC_AUTH,
     retry: false,
@@ -389,4 +389,4 @@ async function run() {
   zbc.close();
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

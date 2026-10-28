@@ -17,7 +17,7 @@
  *   G) An error end event nothing catches raises an incident.
  */
 import * as path from 'path';
-import { BpmnGoClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep, waitUntil } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '36_bpmn_elements.bpmn');
 const client = new BpmnGoClient();
@@ -63,7 +63,7 @@ async function run() {
           const early = await client.fetchAndLock([{ name: 'elem_send' }]);
           assert(!early.some(t => t.processInstanceId === instanceId), 'send task ran before the message arrived');
 
-          const res = await client.api.post('/engine-rest/message', { messageName: 'ElemOrderPaid', variables: { paid: true } });
+          const res = await client.api.post('/engine-rest/message', { messageName: 'ElemOrderPaid', processInstanceId: instanceId, variables: { paid: true } });
           assert(res.status < 300, `message correlation failed with HTTP ${res.status}`);
 
           await client.pollExternalTask('elem_send', async () => ({ receiptSent: true }), 15000, instanceId);
@@ -148,9 +148,9 @@ async function run() {
           const inst = await client.startProcess('ElemErrorUncaught', {});
           const instanceId = inst.processInstanceId ?? inst.id;
 
-          await sleep(500);
-          const res = await client.api.get(`/engine-rest/incident?processInstanceId=${instanceId}`);
-          const incidents = res.data as any[];
+          const incidents = await waitUntil(
+            async () => (await client.api.get(`/engine-rest/incident?processInstanceId=${instanceId}`)).data as any[],
+            list => list.length > 0, 10000, 'the incident');
           assert(incidents.length === 1, `expected 1 incident, got ${incidents.length}`);
           assert(incidents[0].incidentType === 'unhandledErrorEvent', `unexpected type: ${incidents[0].incidentType}`);
           assert(incidents[0].activityId === 'eu_throw', `unexpected activityId: ${incidents[0].activityId}`);

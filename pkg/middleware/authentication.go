@@ -34,23 +34,22 @@ var PublicRoutes = []string{
 	"/users/log/in",
 	"/clients",
 	"/drivers",
-	"/ws",
 	"/health",
 }
 
-func WithinPublicRoutes(value string, urls []string) bool {
-	if value == "/" {
+// WithinPublicRoutes reports whether path is one of urls or lies under one
+// of them. Matching is by whole path segment: "/app" covers "/app" and
+// "/app/x" but not "/application" nor "/engine-rest/.../key/approval".
+func WithinPublicRoutes(path string, urls []string) bool {
+	if path == "/" {
 		return true
 	}
-	var found bool = false
 	for _, item := range urls {
-		startWith := strings.Contains(value, item)
-		if startWith {
-			found = true
-			break
+		if path == item || strings.HasPrefix(path, strings.TrimSuffix(item, "/")+"/") {
+			return true
 		}
 	}
-	return found
+	return false
 }
 
 // BasicAuthMiddleware handles HTTP Basic Authentication

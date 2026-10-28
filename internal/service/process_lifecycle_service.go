@@ -28,13 +28,32 @@ var ErrProcessInstanceNotFound = fmt.Errorf("process instance not found")
 // failed archive leaves the instance live (already safely marked
 // terminated above), never risking data loss.
 func TerminateProcessInstance(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, instanceID uuid.UUID, reason string) error {
+	return closeProcessInstance(db, dispatcher, instanceID, "terminated", reason, map[string]interface{}{
+		"terminated":        true,
+		"terminatedAt":      time.Now(),
+		"terminationReason": reason,
+	})
+}
+
+// EndProcessInstance closes a running instance as completed, wherever its
+// tokens are (POST /process-instance/:id/end and /stop): the same cleanup
+// as TerminateProcessInstance — open tasks, executions, jobs and timers
+// cancelled, called instances terminated, then archived — with status
+// status ("completed" or "terminated") and variables merged in first.
+func EndProcessInstance(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, instanceID uuid.UUID, status, reason string, variables map[string]interface{}) error {
+	return closeProcessInstance(db, dispatcher, instanceID, status, reason, variables)
+}
+
+func closeProcessInstance(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, instanceID uuid.UUID, status, reason string, variables map[string]interface{}) error {
 	processInstanceRepo := repository.NewProcessInstanceRepository(db)
 	taskRepo := repository.NewTaskRepository(db, dispatcher)
 	engineRepo := repository.NewEngineRepository(db, dispatcher)
 	auditService := NewAuditService(db)
 
+	// FindByID answers (nil, nil) for an instance no longer in the live
+	// table (already archived).
 	instance, err := processInstanceRepo.FindByID(instanceID)
-	if err != nil {
+	if err != nil || instance == nil {
 		return fmt.Errorf("%w: %s", ErrProcessInstanceNotFound, instanceID)
 	}
 	// Guard against a real race: an instance that completes normally right
@@ -54,14 +73,17 @@ func TerminateProcessInstance(db *sqlx.DB, dispatcher *events.TaskEventDispatche
 		return fmt.Errorf("%w: %s (already %s)", ErrProcessInstanceNotFound, instanceID, instance.Status)
 	}
 
-	// Add termination reason as a variable.
-	variables := map[string]interface{}{
-		"terminated":        true,
-		"terminatedAt":      time.Now(),
-		"terminationReason": reason,
+	// Merged into the instance's variables: UpsertVariables replaces the
+	// whole set, and the business data must survive into history.
+	merged, err := processInstanceRepo.GetVariables(instanceID)
+	if err != nil || merged == nil {
+		merged = map[string]interface{}{}
 	}
-	if err := processInstanceRepo.UpsertVariables(instanceID, variables); err != nil {
-		fmt.Printf("Warning: Failed to add termination variables: %v\n", err)
+	for k, v := range variables {
+		merged[k] = v
+	}
+	if err := processInstanceRepo.UpsertVariables(instanceID, merged); err != nil {
+		fmt.Printf("Warning: Failed to add %s variables: %v\n", status, err)
 	}
 
 	tx, err := db.Beginx()
@@ -71,7 +93,7 @@ func TerminateProcessInstance(db *sqlx.DB, dispatcher *events.TaskEventDispatche
 	defer tx.Rollback()
 
 	now := time.Now()
-	if err := processInstanceRepo.UpdateProcessInstanceStatusTx(tx, instanceID, "terminated", &now); err != nil {
+	if err := processInstanceRepo.UpdateProcessInstanceStatusTx(tx, instanceID, status, &now); err != nil {
 		return err
 	}
 
@@ -92,29 +114,45 @@ func TerminateProcessInstance(db *sqlx.DB, dispatcher *events.TaskEventDispatche
 	if err := engineRepo.DeleteTimersByProcessInstanceTx(tx, instanceID); err != nil {
 		return err
 	}
+	if err := repository.NewEventSubscriptionRepository(db).ConsumeByProcessInstanceTx(tx, instanceID); err != nil {
+		return err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return err
 	}
 
-	LogAuditErr("process terminated", auditService.LogProcessTerminated(instanceID, reason))
+	completed := status == "completed"
+	if completed {
+		LogAuditErr("process completed", auditService.LogProcessCompleted(instanceID, variables))
+	} else {
+		LogAuditErr("process terminated", auditService.LogProcessTerminated(instanceID, reason))
+	}
 	for _, taskID := range cancelledTaskIDs {
-		LogAuditErr("task cancelled", auditService.LogTaskCancelled(taskID, instanceID, "process terminated"))
+		LogAuditErr("task cancelled", auditService.LogTaskCancelled(taskID, instanceID, "process "+status))
 	}
 	for _, jobID := range cancelledJobIDs {
-		LogAuditErr("job cancelled", auditService.LogJobFailed(jobID, instanceID, "cancelled: process terminated", 0))
+		LogAuditErr("job cancelled", auditService.LogJobFailed(jobID, instanceID, "cancelled: process "+status, 0))
 	}
 	LogAuditErr("timers cancelled", auditService.LogTimerCancelled(instanceID, nil))
 
 	if p := eventlog.Global(); p != nil {
-		p.ProcessTerminated(instanceID.String(), reason)
+		if completed {
+			p.ProcessCompleted(instanceID.String())
+		} else {
+			p.ProcessTerminated(instanceID.String(), reason)
+		}
 	}
 
 	// The processes its call activities started go with it.
 	TerminateOrphanedCalledInstances(db, dispatcher, &instanceID)
 
-	if err := ArchiveFinishedInstance(db, instanceID, &reason); err != nil {
-		fmt.Printf("Warning: failed to archive terminated process instance %s: %v\n", instanceID, err)
+	var deleteReason *string
+	if !completed {
+		deleteReason = &reason
+	}
+	if err := ArchiveFinishedInstance(db, instanceID, deleteReason); err != nil {
+		fmt.Printf("Warning: failed to archive %s process instance %s: %v\n", status, instanceID, err)
 	}
 
 	return nil

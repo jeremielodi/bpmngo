@@ -116,6 +116,17 @@ func (r *EventSubscriptionRepository) Consume(id uuid.UUID) error {
 	return err
 }
 
+// ConsumeByProcessInstanceTx closes every open subscription of an instance
+// that is ending: until it is archived a message or signal would still
+// match it and reactivate one of its executions.
+func (r *EventSubscriptionRepository) ConsumeByProcessInstanceTx(tx *sqlx.Tx, instanceID uuid.UUID) error {
+	_, err := tx.Exec(`
+		UPDATE event_subscriptions SET consumed_at = NOW()
+		WHERE process_instance_id = $1 AND consumed_at IS NULL
+	`, instanceID)
+	return err
+}
+
 // CancelSiblingSubscriptions marks all other unconsumed subscriptions for the same
 // execution as consumed (used by Event-based Gateway when one event fires).
 func (r *EventSubscriptionRepository) CancelSiblingSubscriptions(executionID uuid.UUID, exceptID uuid.UUID) error {

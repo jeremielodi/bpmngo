@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
@@ -44,25 +43,9 @@ func (e *InclusiveGatewayExecutor) ExecuteFork(
 		return fmt.Errorf("execution not found: %s", execID)
 	}
 
-	// Evaluate conditions — collect only matching outgoing flows.
-	var activeBranches []engine.Flow
-	for _, flow := range gatewayNode.Outgoing {
-		condition := strings.TrimSpace(flow.Condition)
-		if condition == "" {
-			activeBranches = append(activeBranches, flow)
-			continue
-		}
-		ok, err := common.EvaluateCondition(condition, variables)
-		if err != nil {
-			return fmt.Errorf("condition evaluation failed for flow %s: %w", flow.ID, err)
-		}
-		if ok {
-			activeBranches = append(activeBranches, flow)
-		}
-	}
-
-	if len(activeBranches) == 0 {
-		return fmt.Errorf("inclusive gateway %s: no condition matched", gatewayNode.ID)
+	activeBranches, err := common.ResolveInclusiveBranches(gatewayNode, variables)
+	if err != nil {
+		return err
 	}
 
 	tx, err := e.db.BeginTxx(ctx, nil)

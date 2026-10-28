@@ -135,8 +135,41 @@ async function run() {
         },
       },
 
+      // ── F: Camunda 7 form submission routes ─────────────────────────────────
+      {
+        name: '[F] submit-form starts with the form variables; task form-variables, then submit-form completes it',
+        async fn() {
+          const typed = (customer: string) => ({ variables: { customer: { value: customer, type: 'String' }, amount: { value: 42, type: 'Integer' } } });
+
+          // By key, then by definition id: both create the instance with the variables.
+          const byKey = await client.api.post('/engine-rest/process-definition/key/TasklistProcess/submit-form', typed('by-key'));
+          const def = (await client.api.get('/engine-rest/process-definition/key/TasklistProcess')).data;
+          const byId = await client.api.post(`/engine-rest/process-definition/${def.id}/submit-form`, typed('by-id'));
+          for (const [res, customer] of [[byKey, 'by-key'], [byId, 'by-id']] as const) {
+            const id = res.data.id;
+            const vars = (await client.api.get(`/engine-rest/process-instance/${id}/variables`)).data;
+            assert(vars.customer?.value === customer && vars.amount?.value === 42, `submit-form ${customer}: variables ${JSON.stringify(vars)}`);
+          }
+
+          // The started task shows them as form variables, then submit-form completes it.
+          const id = byKey.data.id;
+          const task = await client.waitForTask('reviewTask', id, 10000);
+          const formVars = (await client.api.get(`/engine-rest/task/${task.id}/form-variables`)).data;
+          assert(formVars.customer?.value === 'by-key', `form-variables: ${JSON.stringify(formVars)}`);
+          const submit = await client.api.post(`/engine-rest/task/${task.id}/submit-form`, { variables: { decision: { value: 'approved', type: 'String' } } }, { validateStatus: () => true });
+          assert(submit.status < 300, `task submit-form: ${submit.status} ${JSON.stringify(submit.data)}`);
+          assert((await client.getTasks(id)).every(t => t.id !== task.id), 'the task must be completed');
+          const after = (await client.api.get(`/engine-rest/process-instance/${id}/variables`)).data;
+          assert(after.decision?.value === 'approved', `submitted variable kept: ${JSON.stringify(after)}`);
+
+          const unknown = await client.api.get('/engine-rest/task/00000000-0000-0000-0000-000000000000/form-variables', { validateStatus: () => true });
+          assert(unknown.status === 404, `form-variables of an unknown task: expected 404, got ${unknown.status}`);
+          await client.api.delete(`/engine-rest/process-instance/${byId.data.id}`, { validateStatus: () => true });
+        },
+      },
+
     ],
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

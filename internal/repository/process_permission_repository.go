@@ -2,6 +2,7 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,7 +35,7 @@ func NewProcessPermissionRepository(db *sqlx.DB) *ProcessPermissionRepository {
 }
 
 func (r *ProcessPermissionRepository) ListByProcessKey(processKey string) ([]ProcessPermission, error) {
-	var perms []ProcessPermission
+	perms := []ProcessPermission{}
 	err := r.db.Select(&perms, `
 		SELECT id, resource_type, process_key, grantee_type, grantee_id, permission, created_at
 		FROM public.process_permissions
@@ -60,9 +61,37 @@ func (r *ProcessPermissionRepository) Create(processKey, granteeType string, gra
 	return perm, err
 }
 
-func (r *ProcessPermissionRepository) Delete(id uuid.UUID) error {
-	_, err := r.db.Exec(`DELETE FROM public.process_permissions WHERE id = $1`, id)
-	return err
+// ErrLastPermission: the grant is the process's last one. A process keeps
+// at least one grant, so it never falls back to "open to every user".
+var ErrLastPermission = errors.New("the last permission of a process cannot be revoked")
+
+// DeleteUnlessLast is Delete, refused with ErrLastPermission when id is the
+// last grant of processKey. The key's grants are locked meanwhile, so two
+// concurrent revocations cannot both remove "one of the two".
+func (r *ProcessPermissionRepository) DeleteUnlessLast(processKey string, id uuid.UUID) (bool, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	var ids []uuid.UUID
+	if err := tx.Select(&ids, `SELECT id FROM public.process_permissions WHERE process_key = $1 FOR UPDATE`, processKey); err != nil {
+		return false, err
+	}
+	found := false
+	for _, g := range ids {
+		found = found || g == id
+	}
+	if !found {
+		return false, nil
+	}
+	if len(ids) == 1 {
+		return false, ErrLastPermission
+	}
+	if _, err := tx.Exec(`DELETE FROM public.process_permissions WHERE id = $1 AND process_key = $2`, id, processKey); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
 }
 
 // IsRestricted reports whether processKey has any ACL grants at all —

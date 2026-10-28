@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+  id="Definitions_56" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:message id="Msg56" name="lifecycle56_msg" />
+
+  <!-- One instance waiting on everything an instance can wait on: a user
+       task, an external job, a message and a timer. Ending or stopping it
+       must release all four. -->
+  <bpmn:process id="Lifecycle56" isExecutable="true">
+    <bpmn:startEvent id="l_start"/>
+    <bpmn:sequenceFlow id="l1" sourceRef="l_start" targetRef="l_fork"/>
+    <bpmn:parallelGateway id="l_fork"/>
+    <bpmn:sequenceFlow id="l2" sourceRef="l_fork" targetRef="l_task"/>
+    <bpmn:sequenceFlow id="l3" sourceRef="l_fork" targetRef="l_job"/>
+    <bpmn:sequenceFlow id="l4" sourceRef="l_fork" targetRef="l_msg"/>
+    <bpmn:sequenceFlow id="l5" sourceRef="l_fork" targetRef="l_timer"/>
+    <bpmn:userTask id="l_task"/>
+    <bpmn:serviceTask id="l_job" camunda:type="external" camunda:topic="lifecycle56"/>
+    <bpmn:intermediateCatchEvent id="l_msg"><bpmn:messageEventDefinition messageRef="Msg56"/></bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="l_timer"><bpmn:timerEventDefinition><bpmn:timeDuration>PT1H</bpmn:timeDuration></bpmn:timerEventDefinition></bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="l6" sourceRef="l_task" targetRef="l_join"/>
+    <bpmn:sequenceFlow id="l7" sourceRef="l_job" targetRef="l_join"/>
+    <bpmn:sequenceFlow id="l8" sourceRef="l_msg" targetRef="l_join"/>
+    <bpmn:sequenceFlow id="l9" sourceRef="l_timer" targetRef="l_join"/>
+    <bpmn:parallelGateway id="l_join"/>
+    <bpmn:sequenceFlow id="l10" sourceRef="l_join" targetRef="l_end"/>
+    <bpmn:endEvent id="l_end"/>
+  </bpmn:process>
+
+  <!-- A gateway reading a variable a user can change or delete while the
+       instance waits on v_wait. -->
+  <bpmn:process id="Variables56" isExecutable="true">
+    <bpmn:startEvent id="v_start"/>
+    <bpmn:sequenceFlow id="v1" sourceRef="v_start" targetRef="v_wait"/>
+    <bpmn:userTask id="v_wait"/>
+    <bpmn:sequenceFlow id="v2" sourceRef="v_wait" targetRef="v_gw"/>
+    <bpmn:exclusiveGateway id="v_gw" default="v_no_flow"/>
+    <bpmn:sequenceFlow id="v_yes_flow" sourceRef="v_gw" targetRef="v_yes">
+      <bpmn:conditionExpression>= approved = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="v_no_flow" sourceRef="v_gw" targetRef="v_no"/>
+    <bpmn:userTask id="v_yes"/>
+    <bpmn:userTask id="v_no"/>
+    <bpmn:sequenceFlow id="v3" sourceRef="v_yes" targetRef="v_end"/>
+    <bpmn:sequenceFlow id="v4" sourceRef="v_no" targetRef="v_end"/>
+    <bpmn:endEvent id="v_end"/>
+  </bpmn:process>
+</bpmn:definitions>

@@ -12,10 +12,29 @@
  *   C) Two branches active    — wantRunning=true, wantSwimming=true
  */
 import * as path from 'path';
-import { BpmnGoClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '05_fitness_planner.bpmn');
 const client = new BpmnGoClient();
+
+// Job types created for the instance, once `expected` all exist plus a
+// moment more, so a branch created late is still seen. Checked while the
+// instance runs: finished jobs are archived, and the activity history does
+// not list the service tasks of gateway branches.
+async function jobTypesOnceCreated(instanceId: string, expected: string[]): Promise<Set<string>> {
+  const types = async () =>
+    new Set(((await client.api.get('/jobs', { params: { processInstanceId: instanceId } })).data as any[] ?? []).map(j => j.jobType));
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const seen = await types();
+    if (expected.every(t => seen.has(t))) break;
+    await sleep(300);
+  }
+  await sleep(1000);
+  const seen = await types();
+  assert(expected.every(t => seen.has(t)), `expected jobs ${expected}, got ${[...seen]}`);
+  return seen;
+}
 
 async function run() {
   await client.loginAsSuperUser();
@@ -60,6 +79,11 @@ async function run() {
           });
           const instanceId = inst.processInstanceId ?? inst.id;
 
+          // The point of an inclusive gateway: unselected branches never run.
+          const types = await jobTypesOnceCreated(instanceId, ['register_running']);
+          assert(!types.has('register_swimming') && !types.has('register_cycling'),
+            `unselected branches must not run, jobs: ${[...types]}`);
+
           await client.pollExternalTask('register_running', async () => ({ registered: true }), 15000, instanceId);
 
           await client.waitForProcessEnd(instanceId, 10000);
@@ -79,10 +103,16 @@ async function run() {
           });
           const instanceId = inst.processInstanceId ?? inst.id;
 
-          await Promise.all([
-            client.pollExternalTask('register_running',  async () => ({ registered: true }), 15000, instanceId),
-            client.pollExternalTask('register_swimming', async () => ({ registered: true }), 15000, instanceId),
-          ]);
+          const types = await jobTypesOnceCreated(instanceId, ['register_running', 'register_swimming']);
+          assert(!types.has('register_cycling'), `cycling was not selected and must not run, jobs: ${[...types]}`);
+
+          // Complete running alone: the join must keep waiting for swimming.
+          await client.pollExternalTask('register_running', async () => ({ registered: true }), 15000, instanceId);
+          await sleep(1000);
+          const midway = await client.getProcessInstance(instanceId);
+          assert(!!midway && midway.status !== 'completed', `the join fired before swimming completed: ${midway?.status}`);
+
+          await client.pollExternalTask('register_swimming', async () => ({ registered: true }), 15000, instanceId);
 
           await client.waitForProcessEnd(instanceId, 10000);
           const final = await client.getProcessInstance(instanceId);
@@ -94,4 +124,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

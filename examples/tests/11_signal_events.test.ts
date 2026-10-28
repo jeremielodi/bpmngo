@@ -6,68 +6,39 @@
  *   A) Single process parked at signal catch event, resumed by broadcast
  *   B) Multiple instances all receive the same broadcast signal
  *   C) Unknown signal returns empty count (no error)
+ *
+ * A signal is a broadcast: instances left waiting by an earlier run are
+ * resumed too, so counts are lower bounds; what is checked exactly is that
+ * each of this run's instances is parked before, and resumed after.
  */
 import * as path from 'path';
 import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '11_inventory_broadcast.bpmn');
 const client = new BpmnGoClient();
-const BASE = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
 
-async function broadcastSignal(
-  token: string,
-  name: string,
-  variables: Record<string, unknown> = {}
-): Promise<any> {
-  const r = await fetch(`${BASE}/engine-rest/signal`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name, variables }),
-  });
-  if (!r.ok) throw new Error(`POST /engine-rest/signal → ${r.status}: ${await r.text()}`);
-  return r.json();
+async function broadcastSignal(name: string, variables: Record<string, unknown> = {}): Promise<any> {
+  return (await client.api.post('/engine-rest/signal', { name, variables })).data;
 }
 
-async function completeExternalTask(token: string, topic: string, instanceId: string): Promise<void> {
-  // Complete ALL tasks for this topic (locking them all then completing only the right one
-  // would prevent others from being processed — complete all to avoid deadlock).
-  const r = await fetch(`${BASE}/engine-rest/external-task/fetchAndLock`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ workerId: 'test-worker', maxJobsToActivate: 20, topics: [{ topicName: topic, lockDuration: 10000 }] }),
-  });
-  const tasks = await r.json() as any[];
-  for (const t of tasks) {
-    await fetch(`${BASE}/engine-rest/external-task/${t.id}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ workerId: 'test-worker', variables: {} }),
-    });
-  }
+async function work(topic: string, instanceId: string) {
+  await client.pollExternalTask(topic, async () => ({}), 15000, instanceId);
 }
 
-async function completeExternalTaskForInstance(token: string, topic: string, instanceId: string): Promise<void> {
-  const r = await fetch(`${BASE}/engine-rest/external-task/fetchAndLock`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ workerId: 'test-worker', maxJobsToActivate: 1, topics: [{ topicName: topic, lockDuration: 10000 }] }),
-  });
-  const tasks = await r.json() as any[];
-  for (const t of tasks) {
-    if (t.processInstanceId === instanceId) {
-      await fetch(`${BASE}/engine-rest/external-task/${t.id}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ workerId: 'test-worker', variables: {} }),
-      });
-    }
+// Waits until every instance in ids has a token on the signal catch event.
+async function waitParked(ids: string[]) {
+  const deadline = Date.now() + 10000;
+  for (;;) {
+    const positions = (await client.api.get('/engine-rest/process-definition/key/inventoryAlert/instance-positions')).data as any[];
+    const parked = new Set(positions.filter(p => p.elementId === 'waitForRestock').map(p => p.processInstanceId));
+    if (ids.every(id => parked.has(id))) return;
+    if (Date.now() > deadline) throw new Error(`not all parked at waitForRestock: ${ids.filter(id => !parked.has(id))}`);
+    await sleep(300);
   }
 }
 
 async function run() {
   await client.loginAsSuperUser();
-  const token = (client as any).token as string;
-
   await client.deployBpmn(BPMN, 'Inventory Broadcast Test');
 
   await runSuite({
@@ -81,22 +52,17 @@ async function run() {
           const inst = await client.startProcess('inventoryAlert', { product: 'widget-A' });
           const instanceId = inst.processInstanceId ?? inst.id;
 
-          // complete check-inventory service task
-          await sleep(500);
-          await completeExternalTask(token, 'check-inventory', instanceId);
-          await sleep(500);
+          await work('check-inventory', instanceId);
+          await waitParked([instanceId]);
 
-          // Process should now be waiting at waitForRestock signal
-          const result = await broadcastSignal(token, 'RestockAlert', { restockedProduct: 'widget-A' });
+          const result = await broadcastSignal('RestockAlert', { restockedProduct: 'widget-A' });
           assert(result.count >= 1, `expected count >= 1, got ${result.count}`);
 
-          // Complete update-inventory
-          await sleep(500);
-          await completeExternalTask(token, 'update-inventory', instanceId);
+          await work('update-inventory', instanceId);
           await client.waitForProcessEnd(instanceId, 10000);
-
-          const final = await client.getProcessInstance(instanceId);
-          assert(!final || final.status === 'completed', `expected completed, got ${final?.status}`);
+          const vars = await client.getProcessVariables(instanceId) as Record<string, any>;
+          const restocked = vars.restockedProduct?.value ?? vars.restockedProduct;
+          assert(restocked === 'widget-A', `signal variables must reach the instance, got ${JSON.stringify(vars.restockedProduct)}`);
         },
       },
 
@@ -104,26 +70,20 @@ async function run() {
       {
         name: '[B] Broadcast signal resumes ALL waiting instances',
         async fn() {
-          // Start 3 instances, all waiting for RestockAlert
           const ids: string[] = [];
           for (let i = 0; i < 3; i++) {
             const inst = await client.startProcess('inventoryAlert', { product: `widget-B${i}` });
             ids.push(inst.processInstanceId ?? inst.id);
           }
-
-          // Complete ALL check-inventory tasks in bulk (avoids lock contention)
-          await sleep(600);
-          await completeExternalTask(token, 'check-inventory', '');
-          await sleep(800); // let them all park at signal
+          for (const id of ids) await work('check-inventory', id);
+          await waitParked(ids);
 
           // Broadcast once — all 3 should be resumed
-          const result = await broadcastSignal(token, 'RestockAlert');
+          const result = await broadcastSignal('RestockAlert');
           assert(result.count >= 3, `expected count >= 3, got ${result.count}`);
 
-          // Complete all update-inventory tasks in bulk
-          await sleep(600);
-          await completeExternalTask(token, 'update-inventory', '');
           for (const id of ids) {
+            await work('update-inventory', id);
             await client.waitForProcessEnd(id, 10000);
           }
         },
@@ -133,7 +93,7 @@ async function run() {
       {
         name: '[C] Broadcasting unknown signal returns count=0 without error',
         async fn() {
-          const result = await broadcastSignal(token, 'NonExistentSignal_' + Date.now());
+          const result = await broadcastSignal('NonExistentSignal_' + Date.now());
           assert(result.count === 0, `expected count=0, got ${result.count}`);
         },
       },

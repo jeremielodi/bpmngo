@@ -90,7 +90,7 @@ func (pc *ProcessInstanceController) CreateProcessInstance(c *fiber.Ctx) error {
 		})
 	}
 
-	def, err := pc.processRepo.FindLatestProcessDefinitionByKey(req.ProcessDefinitionId)
+	def, err := pc.processRepo.FindLatestProcessDefinitionByKeyForTenant(req.ProcessDefinitionId, common.GetTenantId(c))
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"title":  "NOT_FOUND",

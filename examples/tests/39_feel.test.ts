@@ -12,7 +12,7 @@
  *   B) A variable that was never set is null in a condition, not an error.
  */
 import * as path from 'path';
-import { BpmnGoClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert, SKIPPED_EXIT_CODE } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '39_feel.bpmn');
 const client = new BpmnGoClient();
@@ -20,7 +20,7 @@ const client = new BpmnGoClient();
 async function run() {
   if ((process.env.FEEL_MODE ?? '').toLowerCase() !== 'feel') {
     console.log('\n  ⏭️  39 — Native FEEL: skipped (set FEEL_MODE=feel on the server and for this suite)\n');
-    return;
+    process.exit(SKIPPED_EXIT_CODE); // reported as skipped by run_all, not as passed
   }
   await client.loginAsSuperUser();
   await client.deployBpmn(BPMN, 'Native FEEL Test');

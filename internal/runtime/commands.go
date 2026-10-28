@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -242,6 +243,8 @@ type FailJobArgs struct {
 	RetriesRemaining int       `json:"retriesRemaining"`
 	ErrorMessage     string    `json:"errorMessage,omitempty"`
 	ErrorCode        string    `json:"errorCode,omitempty"`
+	// Delay before a retried job can be fetched again, in milliseconds.
+	RetryBackoffMs int64 `json:"retryBackoffMs,omitempty"`
 	// Variables set on the instance before the failure (Camunda 8's
 	// ThrowError carries some).
 	Variables map[string]interface{} `json:"variables,omitempty"`
@@ -282,7 +285,7 @@ func (c *commands) failJob(ctx context.Context, a FailJobArgs) (FailJobOutcome, 
 			return out, err
 		}
 	}
-	result, err := service.FailJob(c.db, a.JobID, a.RetriesRemaining, a.ErrorMessage, a.ErrorCode)
+	result, err := service.FailJobWithBackoff(c.db, a.JobID, a.RetriesRemaining, a.ErrorMessage, a.ErrorCode, time.Duration(a.RetryBackoffMs)*time.Millisecond)
 	if err != nil {
 		return out, err
 	}

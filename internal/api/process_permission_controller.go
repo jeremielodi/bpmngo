@@ -2,10 +2,10 @@
 package api
 
 import (
+	"errors"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/repository"
-	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 )
@@ -22,29 +22,38 @@ func NewProcessPermissionController(db *sqlx.DB) *ProcessPermissionController {
 	}
 }
 
-// requireManage 403s unless the caller has MANAGE on processKey (via an
-// explicit grant or the global bypass action) — used to gate who may
-// view/change a process's own ACL.
-func (pc *ProcessPermissionController) requireManage(c *fiber.Ctx, processKey string) error {
+// requireManage answers 401/403 unless the caller may view/change
+// processKey's own ACL, and returns false once it has written that
+// response. That takes an explicit MANAGE grant or the global
+// CAN_MANAGE_DEPLOY_PROCESS action. A process with no grants yet is open
+// to everyone for VIEW/START/MANAGE, but not for its ACL: otherwise any
+// user could grant themselves MANAGE and lock everyone else out.
+func (pc *ProcessPermissionController) requireManage(c *fiber.Ctx, processKey string) bool {
 	userID, err := uuid.Parse(common.GetUserUuid(c))
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "unauthorized"})
+		c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "unauthorized"})
+		return false
 	}
-	allowed, err := service.CanAccessProcess(pc.db, userID, processKey, "MANAGE")
+	allowed, err := pc.permRepo.UserHasProcessPermission(userID, processKey, "MANAGE")
+	if err == nil && !allowed {
+		allowed, err = repository.NewActionRepository(pc.db).UserHasPermission(userID, "CAN_MANAGE_DEPLOY_PROCESS")
+	}
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
+		c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
+		return false
 	}
 	if !allowed {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "you do not have MANAGE access to this process"})
+		c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "you do not have MANAGE access to this process"})
+		return false
 	}
-	return nil
+	return true
 }
 
 // GET /engine-rest/process-definition/key/:key/permissions
 func (pc *ProcessPermissionController) ListPermissions(c *fiber.Ctx) error {
 	key := c.Params("key")
-	if resp := pc.requireManage(c, key); resp != nil {
-		return resp
+	if !pc.requireManage(c, key) {
+		return nil
 	}
 
 	perms, err := pc.permRepo.ListByProcessKey(key)
@@ -57,8 +66,8 @@ func (pc *ProcessPermissionController) ListPermissions(c *fiber.Ctx) error {
 // POST /engine-rest/process-definition/key/:key/permissions
 func (pc *ProcessPermissionController) GrantPermission(c *fiber.Ctx) error {
 	key := c.Params("key")
-	if resp := pc.requireManage(c, key); resp != nil {
-		return resp
+	if !pc.requireManage(c, key) {
+		return nil
 	}
 
 	var req struct {
@@ -90,16 +99,23 @@ func (pc *ProcessPermissionController) GrantPermission(c *fiber.Ctx) error {
 // DELETE /engine-rest/process-definition/key/:key/permissions/:id
 func (pc *ProcessPermissionController) RevokePermission(c *fiber.Ctx) error {
 	key := c.Params("key")
-	if resp := pc.requireManage(c, key); resp != nil {
-		return resp
+	if !pc.requireManage(c, key) {
+		return nil
 	}
 
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "invalid permission id"})
 	}
-	if err := pc.permRepo.Delete(id); err != nil {
+	deleted, err := pc.permRepo.DeleteUnlessLast(key, id)
+	if errors.Is(err, repository.ErrLastPermission) {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
+	}
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
+	}
+	if !deleted {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "no such permission on this process"})
 	}
 	return c.JSON(fiber.Map{"message": "permission revoked"})
 }

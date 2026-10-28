@@ -40,23 +40,39 @@ func (g *ProcessGraph) FindErrorCatcher(elementID, errorCode string) (catcher *N
 	}
 }
 
+// errorBoundary and errorEventSubProcess: at one level, a catcher for this
+// exact code wins over a catch-all one (no errorRef), which catches every
+// BPMN error.
 func (g *ProcessGraph) errorBoundary(attachedTo, errorCode string) *Node {
+	var catchAll *Node
 	for _, n := range g.Nodes {
-		if n.Type == ErrorBoundaryEventType && n.AttachedToRef == attachedTo && n.ErrorCode == errorCode {
+		if n.Type != ErrorBoundaryEventType || n.AttachedToRef != attachedTo {
+			continue
+		}
+		if n.ErrorCode == errorCode {
 			return n
 		}
+		if n.ErrorCode == "" {
+			catchAll = n
+		}
 	}
-	return nil
+	return catchAll
 }
 
 func (g *ProcessGraph) errorEventSubProcess(scope, errorCode, exclude string) *Node {
+	var catchAll *Node
 	for _, n := range g.Nodes {
-		if n.Type == EventSubProcessType && n.TriggerType == TriggerError &&
-			n.ParentScope == scope && n.ErrorCode == errorCode && n.ID != exclude {
+		if n.Type != EventSubProcessType || n.TriggerType != TriggerError || n.ParentScope != scope || n.ID == exclude {
+			continue
+		}
+		if n.ErrorCode == errorCode {
 			return n
 		}
+		if n.ErrorCode == "" {
+			catchAll = n
+		}
 	}
-	return nil
+	return catchAll
 }
 
 // TriggerNodes returns the IDs of every event sub-process node and every

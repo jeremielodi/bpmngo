@@ -2,9 +2,13 @@
  * Suite 00 — Authentication
  * Tests: login, token usage, refresh, logout, invalid credentials
  */
-import { BpmnGoClient, runSuite, assert } from './client';
+import axios from 'axios';
+import * as path from 'path';
+import { BpmnGoClient, BASE_URL, runSuite, assert } from './client';
 
 const client = new BpmnGoClient();
+// No token, no interceptor: what an outsider sees.
+const anonymous = axios.create({ baseURL: BASE_URL, validateStatus: () => true });
 
 async function run() {
   await runSuite({
@@ -45,12 +49,38 @@ async function run() {
           await client.logout();
           // After logout the token is cleared; unauthenticated calls to protected
           // routes must fail with 401.
-          try {
-            await client.api.get('/users/me');
-            // If we reach here the endpoint is public — skip the assertion
-          } catch (e: any) {
-            assert(e.response?.status === 401, `expected 401, got ${e.response?.status}`);
-          }
+          const res = await anonymous.get('/users/me');
+          assert(res.status === 401, `expected 401 after logout, got ${res.status}`);
+          // The client really did drop its token: its own call fails too.
+          const own = await client.api.get('/users/me', { validateStatus: () => true });
+          assert(own.status === 401, `expected 401 after logout, got ${own.status}`);
+        },
+      },
+      {
+        name: 'A process key containing a public prefix ("app…") still requires auth',
+        async fn() {
+          await client.loginAsSuperUser();
+          await client.deployBpmn(path.join(__dirname, 'bpmn/00_approval_key.bpmn'));
+          const key = 'approval00';
+          const get = await anonymous.get(`/engine-rest/process-definition/key/${key}`);
+          assert(get.status === 401, `anonymous GET definition: expected 401, got ${get.status}`);
+          const start = await anonymous.post(`/engine-rest/process-definition/key/${key}/start`, { variables: {} });
+          assert(start.status === 401, `anonymous start: expected 401, got ${start.status}`);
+          // Same path with a token works, so the 401 above is the auth layer.
+          const ok = await client.api.get(`/engine-rest/process-definition/key/${key}`);
+          assert(ok.data.key === key, 'authenticated GET should return the definition');
+        },
+      },
+      {
+        name: 'Task event streams refuse anonymous clients',
+        async fn() {
+          const sse = await anonymous.get('/events/tasks', { timeout: 5000 });
+          assert(sse.status === 401, `anonymous SSE: expected 401, got ${sse.status}`);
+          const ws = await anonymous.get('/ws/tasks', {
+            headers: { Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==' },
+            timeout: 5000,
+          });
+          assert(ws.status === 401, `anonymous WebSocket upgrade: expected 401, got ${ws.status}`);
         },
       },
       {
@@ -69,4 +99,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

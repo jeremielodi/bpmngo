@@ -32,7 +32,7 @@ func claimJobsTx(tx *sqlx.Tx, jobType, workerID string, lockedUntil time.Time, m
 	if err := tx.Select(&candidates, `
 		SELECT id, process_instance_id FROM public.jobs
 		WHERE job_type = $1 AND status = 'pending'
-		  AND (locked_by IS NULL OR locked_until < $3)
+		  AND (locked_until IS NULL OR locked_until < $3)
 		ORDER BY random()
 		LIMIT $2`, jobType, max*3, time.Now()); err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func claimJobsTx(tx *sqlx.Tx, jobType, workerID string, lockedUntil time.Time, m
 			UPDATE public.jobs
 			SET status = 'locked', locked_by = $1, locked_until = $2
 			WHERE process_instance_id = $3 AND id = $4 AND status = 'pending'
-			  AND (locked_by IS NULL OR locked_until < $5)
+			  AND (locked_until IS NULL OR locked_until < $5)
 			RETURNING id, payload, retries, execution_id, process_instance_id, status, created_at`,
 			workerID, lockedUntil, c.ProcessInstanceID, c.ID, time.Now()); err != nil {
 			return nil, err

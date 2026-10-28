@@ -84,7 +84,9 @@ func TestFindAll_ExcludeStatuses_SkippedWhenStatusExplicitlyFiltered(t *testing.
 func TestFindAll_NoExclusions_ReturnsEveryStatus(t *testing.T) {
 	repo, mock := newMockTaskRepo(t)
 
-	mock.ExpectQuery(regexp.QuoteMeta("FROM public.tasks")).
+	// Anchored: no WHERE between FROM and ORDER BY, so no hidden
+	// "status NOT IN (...)" default can slip in.
+	mock.ExpectQuery(`FROM public\.tasks\s+ORDER BY created_at ASC$`).
 		WillReturnRows(taskRow())
 
 	_, err := repo.FindAll(map[string]interface{}{})

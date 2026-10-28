@@ -10,6 +10,8 @@
   <bpmn:message id="Msg_BeEscalate" name="BeEscalate"/>
   <bpmn:message id="Msg_BeLate" name="BeLate"/>
   <bpmn:signal id="Sig_BeNotify" name="BeNotify"/>
+  <bpmn:signal id="Sig_BeStop" name="BeStop"/>
+  <bpmn:error id="Err_BeCard" errorCode="BE_CARD_DECLINED"/>
 
   <!-- the boundary timer of a task completed in time must never fire -->
   <bpmn:process id="BeStaleTimer" isExecutable="true">
@@ -107,5 +109,38 @@
     <bpmn:endEvent id="bsm_end"/>
     <bpmn:sequenceFlow id="bsm4" sourceRef="bsm_late" targetRef="bsm_late_end"/>
     <bpmn:endEvent id="bsm_late_end"/>
+  </bpmn:process>
+
+  <!-- error boundaries: one for a precise code, one catch-all (no errorRef) -->
+  <bpmn:process id="BeErrorCatchAll" isExecutable="true">
+    <bpmn:startEvent id="bec_start"/>
+    <bpmn:sequenceFlow id="bec1" sourceRef="bec_start" targetRef="bec_pay"/>
+    <bpmn:serviceTask id="bec_pay" camunda:type="external" camunda:topic="be-pay"/>
+    <bpmn:sequenceFlow id="bec2" sourceRef="bec_pay" targetRef="bec_end"/>
+    <bpmn:endEvent id="bec_end"/>
+    <bpmn:boundaryEvent id="bec_on_card" attachedToRef="bec_pay"><bpmn:errorEventDefinition errorRef="Err_BeCard"/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="bec3" sourceRef="bec_on_card" targetRef="bec_card"/>
+    <bpmn:userTask id="bec_card"/>
+    <bpmn:sequenceFlow id="bec4" sourceRef="bec_card" targetRef="bec_end2"/>
+    <bpmn:endEvent id="bec_end2"/>
+    <bpmn:boundaryEvent id="bec_on_any" attachedToRef="bec_pay"><bpmn:errorEventDefinition/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="bec5" sourceRef="bec_on_any" targetRef="bec_any"/>
+    <bpmn:userTask id="bec_any"/>
+    <bpmn:sequenceFlow id="bec6" sourceRef="bec_any" targetRef="bec_end3"/>
+    <bpmn:endEvent id="bec_end3"/>
+  </bpmn:process>
+
+  <!-- interrupting signal boundary: the task is cancelled -->
+  <bpmn:process id="BeSignalInterrupting" isExecutable="true">
+    <bpmn:startEvent id="bsi_start"/>
+    <bpmn:sequenceFlow id="bsi1" sourceRef="bsi_start" targetRef="bsi_task"/>
+    <bpmn:userTask id="bsi_task"/>
+    <bpmn:sequenceFlow id="bsi2" sourceRef="bsi_task" targetRef="bsi_end"/>
+    <bpmn:endEvent id="bsi_end"/>
+    <bpmn:boundaryEvent id="bsi_stop" attachedToRef="bsi_task"><bpmn:signalEventDefinition signalRef="Sig_BeStop"/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="bsi3" sourceRef="bsi_stop" targetRef="bsi_stopped"/>
+    <bpmn:userTask id="bsi_stopped"/>
+    <bpmn:sequenceFlow id="bsi4" sourceRef="bsi_stopped" targetRef="bsi_end2"/>
+    <bpmn:endEvent id="bsi_end2"/>
   </bpmn:process>
 </bpmn:definitions>

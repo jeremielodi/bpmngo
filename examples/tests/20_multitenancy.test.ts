@@ -29,12 +29,13 @@ const BPMN = path.join(__dirname, 'bpmn', '20_tenant_process.bpmn');
 const superuser = new BpmnGoClient();
 
 async function createTenantUser(email: string, tenantId: string): Promise<BpmnGoClient> {
+  // 409 on a re-run against the same database: the user is already there.
   await superuser.api.post('/users', {
     email,
     full_name: email,
     password: 'password123',
     tenant_id: tenantId,
-  });
+  }, { validateStatus: s => s < 300 || s === 409 });
   const client = new BpmnGoClient();
   await client.login(email, 'password123');
   return client;
@@ -70,6 +71,15 @@ async function run() {
           formB.append('tenant-id', 'tenant-b');
           const resB = await superuser.api.post('/engine-rest/deployment/create', formB, { headers: formB.getHeaders() });
           assert(resB.data.deployedProcessDefinitions?.TenantProcess !== undefined, 'expected TenantProcess deployed for tenant-b');
+
+          // A new process is its deployer's alone: let both tenant users in.
+          // Permissions are per key; tenants still isolate the instances.
+          for (const user of [userA, userB]) {
+            const me = (await user.api.get('/users/me')).data.user;
+            for (const permission of ['VIEW', 'START']) {
+              await superuser.api.post('/engine-rest/process-definition/key/TenantProcess/permissions', { granteeType: 'user', granteeId: me.id, permission });
+            }
+          }
         },
       },
 
@@ -125,8 +135,97 @@ async function run() {
         },
       },
 
+      // ── E: which definition a start runs ───────────────────────────────────
+      {
+        name: '[E] A tenant always runs its own version of a shared key, never another tenant\'s',
+        async fn() {
+          // The latest version of TenantProcess per tenant, as the superuser sees them.
+          const all = (await superuser.api.get('/engine-rest/process-definition?key=TenantProcess')).data as any[];
+          const latest = (tenant: string) => all.filter(d => d.tenantId === tenant).sort((x, y) => y.version - x.version)[0].id;
+          const defA = latest('tenant-a');
+          const defB = latest('tenant-b');
+          const ok = { validateStatus: () => true };
+          const base = '/engine-rest/process-definition/key/TenantProcess';
+
+          // By key alone: tenant A's own version, whichever tenant deployed last.
+          const byKey = await userA.api.post(`${base}/start`, {}, ok);
+          assert(byKey.status === 200 && byKey.data.definitionId === defA && byKey.data.tenantId === 'tenant-a',
+            `A by key must run A's definition ${defA}, got ${JSON.stringify(byKey.data)}`);
+
+          // Its own tenant route: same, and the GET agrees.
+          const own = await userA.api.post(`${base}/tenant-id/tenant-a/start`, {}, ok);
+          assert(own.status === 200 && own.data.definitionId === defA, `A on tenant-a route: ${own.status} ${JSON.stringify(own.data)}`);
+          const ownGet = await userA.api.get(`${base}/tenant-id/tenant-a`, ok);
+          assert(ownGet.status === 200 && ownGet.data.id === defA && ownGet.data.tenantId === 'tenant-a', `A GET tenant-a: ${JSON.stringify(ownGet.data)}`);
+          const form = await userA.api.post(`${base}/tenant-id/tenant-a/submit-form`, { variables: {} }, ok);
+          assert(form.status === 200 && form.data.definitionId === defA, `A submit-form on tenant-a: ${form.status}`);
+
+          // Another tenant's route: as if it did not exist.
+          for (const [method, url] of [['post', `${base}/tenant-id/tenant-b/start`], ['get', `${base}/tenant-id/tenant-b`], ['post', `${base}/tenant-id/tenant-b/submit-form`]] as const) {
+            const res = method === 'get' ? await userA.api.get(url, ok) : await userA.api.post(url, {}, ok);
+            assert(res.status === 404, `A ${method.toUpperCase()} ${url}: expected 404, got ${res.status}`);
+          }
+          // Nor by definition id.
+          const byId = await userA.api.post(`/engine-rest/process-definition/${defB}/start`, {}, ok);
+          assert(byId.status === 404, `A starting B's definition by id: expected 404, got ${byId.status}`);
+
+          // Unknown tenant: 404 for everyone.
+          const unknown = await superuser.api.post(`${base}/tenant-id/no-such-tenant/start`, {}, ok);
+          assert(unknown.status === 404, `unknown tenant: expected 404, got ${unknown.status}`);
+
+          // The superuser may pick a tenant explicitly.
+          const su = await superuser.api.post(`${base}/tenant-id/tenant-b/start`, {}, ok);
+          assert(su.status === 200 && su.data.definitionId === defB && su.data.tenantId === 'tenant-b',
+            `superuser on tenant-b route: ${JSON.stringify(su.data)}`);
+
+          // The other start APIs resolve the same way.
+          const legacy = await userA.api.post('/engine-rest/v2/process-definitions/TenantProcess/start', { variables: {} }, ok);
+          assert(legacy.status < 300, `legacy start: ${legacy.status} ${JSON.stringify(legacy.data)}`);
+          {
+            const legacyId = legacy.data.processInstanceId ?? legacy.data.id ?? legacy.data.instanceId;
+            const inst = (await superuser.api.get(`/engine-rest/process-instance/${legacyId}`)).data;
+            assert(inst.definitionId === defA, `legacy start by A ran ${inst.definitionId}, want ${defA}`);
+          }
+          const v2 = await userA.api.post('/v2/process-instances', { processDefinitionId: 'TenantProcess' }, ok);
+          assert(v2.status < 300, `v2 start: ${v2.status} ${JSON.stringify(v2.data)}`);
+          const v2Inst = (await superuser.api.get(`/engine-rest/process-instance/${v2.data.processInstanceKey}`)).data;
+          assert(v2Inst.definitionId === defA, `v2 start by A ran ${v2Inst.definitionId}, want ${defA}`);
+
+          for (const r of [byKey, own, form, su]) {
+            await superuser.api.delete(`/engine-rest/process-instance/${r.data.id}`, ok);
+          }
+          await superuser.api.delete(`/engine-rest/process-instance/${v2.data.processInstanceKey}`, ok);
+        },
+      },
+      {
+        name: '[F] A tenant cannot deploy into another tenant, nor see its tokens',
+        async fn() {
+          const fs = require('fs');
+          const FormData = require('form-data');
+          const form = new FormData();
+          form.append('resources', fs.createReadStream(BPMN));
+          form.append('deployment-name', 'cross-tenant');
+          form.append('tenant-id', 'tenant-b');
+          const res = await userA.api.post('/engine-rest/deployment/create', form, { headers: form.getHeaders(), validateStatus: () => true });
+          assert(res.status === 403, `A deploying as tenant-b: expected 403, got ${res.status}`);
+
+          // One instance per tenant, both waiting on reviewTask.
+          const instId = (i: any) => (i.processInstanceId ?? i.id) as string;
+          const a = instId(await userA.startProcess('TenantProcess', {}));
+          const b = instId(await userB.startProcess('TenantProcess', {}));
+          await superuser.waitForTask('reviewTask', a, 10000);
+          await superuser.waitForTask('reviewTask', b, 10000);
+          const positions = (await userA.api.get('/engine-rest/process-definition/key/TenantProcess/instance-positions')).data as any[];
+          assert(positions.some(p => p.processInstanceId === a), 'A sees its own instance');
+          assert(!positions.some(p => p.processInstanceId === b), `A must not see B's instance: ${JSON.stringify(positions)}`);
+          const all = (await superuser.api.get('/engine-rest/process-definition/key/TenantProcess/instance-positions')).data as any[];
+          assert(all.some(p => p.processInstanceId === a) && all.some(p => p.processInstanceId === b), 'the superuser sees both');
+          for (const id of [a, b]) await superuser.api.delete(`/engine-rest/process-instance/${id}`);
+        },
+      },
+
     ],
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

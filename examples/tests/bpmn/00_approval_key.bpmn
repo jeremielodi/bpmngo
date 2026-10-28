@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Key starts with "app": guards against a public-route allowlist matched
+     by substring ("/app" inside ".../key/approval00/start"). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_00" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="approval00" name="Approval (auth regression)" isExecutable="true">
+    <bpmn:startEvent id="Start" />
+    <bpmn:sequenceFlow id="F1" sourceRef="Start" targetRef="Review" />
+    <bpmn:userTask id="Review" name="Review" />
+    <bpmn:sequenceFlow id="F2" sourceRef="Review" targetRef="End" />
+    <bpmn:endEvent id="End" />
+  </bpmn:process>
+</bpmn:definitions>

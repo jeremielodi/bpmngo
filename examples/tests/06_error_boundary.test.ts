@@ -12,7 +12,7 @@
  *                    → "Handle Payment Error" user task appears → process ends as "Order Failed"
  */
 import * as path from 'path';
-import { BpmnGoClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert, waitUntil } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '06_payment_error.bpmn');
 const client = new BpmnGoClient();
@@ -60,9 +60,9 @@ async function run() {
           const instanceId = inst.processInstanceId ?? inst.id;
 
           // Lock the job, then fail it with the BPMN error code in one call
-          const tasks = await client.fetchAndLock([{ name: 'process_payment' }]);
-          const job = tasks.find(t => t.processInstanceId === instanceId);
-          assert(job !== undefined, 'process_payment job not found');
+          const job = await waitUntil(
+            async () => (await client.fetchAndLock([{ name: 'process_payment' }])).find(t => t.processInstanceId === instanceId),
+            j => j !== undefined, 10000, 'the process_payment job');
 
           // Single failure call with errorCode — retries=0 means permanent, triggers error boundary
           await client.api.post(`/engine-rest/external-task/${job!.id}/failure`, {
@@ -91,4 +91,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

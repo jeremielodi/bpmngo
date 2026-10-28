@@ -53,6 +53,30 @@ func getCurrentUserID(c *fiber.Ctx) (uuid.UUID, error) {
 	return uuid.Parse(userUUID)
 }
 
+// selfOrUserAdmin answers 401/403 unless the caller is userID or holds
+// CAN_MANAGE_USER. It returns false once it has written that response.
+func (uc *UserController) selfOrUserAdmin(c *fiber.Ctx, userID uuid.UUID) bool {
+	currentUserID, err := getCurrentUserID(c)
+	if err != nil {
+		c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":   "Unauthorized",
+			"message": err.Error(),
+		})
+		return false
+	}
+	if currentUserID == userID {
+		return true
+	}
+	if ok, _ := repository.NewActionRepository(uc.db).UserHasPermission(currentUserID, "CAN_MANAGE_USER"); ok {
+		return true
+	}
+	c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+		"error":   "Forbidden",
+		"message": "You can only access your own account",
+	})
+	return false
+}
+
 // ============================================================
 // AUTHENTICATION
 // ============================================================
@@ -469,6 +493,11 @@ func (uc *UserController) GetUserByEmail(c *fiber.Ctx) error {
 	}
 
 	user, err := uc.userRepo.FindByEmail(email)
+	// An unknown email is checked as uuid.Nil, never the caller: a
+	// non-admin gets the same 403 whether or not the email exists.
+	if !uc.selfOrUserAdmin(c, user.ID) {
+		return nil
+	}
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -834,30 +863,21 @@ func (uc *UserController) DeleteUser(c *fiber.Ctx) error {
 // ACCESS CONTROL
 // ============================================================
 
-// CheckAccess handles GET /users/:id/access/:resource
-func (uc *UserController) CheckAccess(c *fiber.Ctx) error {
-	userID := c.Params("id")
-	resourceID := c.Params("resource")
-
-	hasAccess, err := uc.userRepo.HasAccess(userID, resourceID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "Access check failed",
-			"message": err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"has_access": hasAccess,
-		"user_id":    userID,
-		"resource":   resourceID,
-	})
-}
-
 // CheckPermission handles GET /users/:id/permission/:actionId
 func (uc *UserController) CheckPermission(c *fiber.Ctx) error {
 	userID := c.Params("id")
 	actionIDStr := c.Params("actionId")
+
+	id, err := uuid.Parse(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Invalid user ID",
+			"message": err.Error(),
+		})
+	}
+	if !uc.selfOrUserAdmin(c, id) {
+		return nil
+	}
 
 	// Parse action ID as integer
 	actionID, err := strconv.Atoi(actionIDStr)

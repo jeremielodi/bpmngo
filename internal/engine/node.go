@@ -95,8 +95,11 @@ type Node struct {
 	CandidateGroupExpr *string
 	Incoming           []string
 	Outgoing           []Flow
-	JobType            *string              // for service tasks
-	MultiInstance      *MultiInstanceConfig `json:"multiInstance,omitempty"`
+	// Exclusive/inclusive gateways: id of the outgoing flow taken only
+	// when no other flow's condition is true (BPMN "default" attribute).
+	DefaultFlow   string               `json:"defaultFlow,omitempty"`
+	JobType       *string              // for service tasks
+	MultiInstance *MultiInstanceConfig `json:"multiInstance,omitempty"`
 	// Timer support
 	TimerDefinition string `json:"timerDefinition,omitempty"` // Raw XML timer definition
 

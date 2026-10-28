@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+  id="Definitions_57" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- Waits on a user task, an external job and a 1 h timer at once: what
+       the task, job and timer routes list. -->
+  <bpmn:process id="Ops57" isExecutable="true">
+    <bpmn:startEvent id="o_start"/>
+    <bpmn:sequenceFlow id="o1" sourceRef="o_start" targetRef="o_fork"/>
+    <bpmn:parallelGateway id="o_fork"/>
+    <bpmn:sequenceFlow id="o2" sourceRef="o_fork" targetRef="o_task"/>
+    <bpmn:sequenceFlow id="o3" sourceRef="o_fork" targetRef="o_job"/>
+    <bpmn:sequenceFlow id="o4" sourceRef="o_fork" targetRef="o_timer"/>
+    <bpmn:userTask id="o_task" name="Ops task"/>
+    <bpmn:serviceTask id="o_job" camunda:type="external" camunda:topic="ops57"/>
+    <bpmn:intermediateCatchEvent id="o_timer"><bpmn:timerEventDefinition><bpmn:timeDuration>PT1H</bpmn:timeDuration></bpmn:timerEventDefinition></bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="o5" sourceRef="o_task" targetRef="o_join"/>
+    <bpmn:sequenceFlow id="o6" sourceRef="o_job" targetRef="o_join"/>
+    <bpmn:sequenceFlow id="o7" sourceRef="o_timer" targetRef="o_join"/>
+    <bpmn:parallelGateway id="o_join"/>
+    <bpmn:sequenceFlow id="o8" sourceRef="o_join" targetRef="o_end"/>
+    <bpmn:endEvent id="o_end"/>
+  </bpmn:process>
+
+  <!-- A parallel loop of three user tasks: the multi-instance counters. -->
+  <bpmn:process id="Mi57" isExecutable="true">
+    <bpmn:startEvent id="m_start"/>
+    <bpmn:sequenceFlow id="m1" sourceRef="m_start" targetRef="m_each"/>
+    <bpmn:userTask id="m_each">
+      <bpmn:multiInstanceLoopCharacteristics isSequential="false">
+        <bpmn:loopCardinality>3</bpmn:loopCardinality>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="m2" sourceRef="m_each" targetRef="m_end"/>
+    <bpmn:endEvent id="m_end"/>
+  </bpmn:process>
+</bpmn:definitions>

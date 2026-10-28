@@ -21,11 +21,13 @@ type Decision struct {
 // DecisionTable is the parsed, storable representation of a DMN decision
 // table: one row per Input/Output column, one Rule per row of the table.
 type DecisionTable struct {
-	ID        string   `xml:"id,attr" json:"id"`
-	HitPolicy string   `xml:"hitPolicy,attr" json:"hitPolicy"`
-	Inputs    []Input  `xml:"input" json:"inputs"`
-	Outputs   []Output `xml:"output" json:"outputs"`
-	Rules     []Rule   `xml:"rule" json:"rules"`
+	ID        string `xml:"id,attr" json:"id"`
+	HitPolicy string `xml:"hitPolicy,attr" json:"hitPolicy"`
+	// COLLECT only: SUM, COUNT, MIN or MAX ("" = the list of results).
+	Aggregation string   `xml:"aggregation,attr" json:"aggregation,omitempty"`
+	Inputs      []Input  `xml:"input" json:"inputs"`
+	Outputs     []Output `xml:"output" json:"outputs"`
+	Rules       []Rule   `xml:"rule" json:"rules"`
 }
 
 type Input struct {
@@ -40,6 +42,9 @@ type Output struct {
 	ID    string `xml:"id,attr" json:"id"`
 	Label string `xml:"label,attr" json:"label"`
 	Name  string `xml:"name,attr" json:"name"`
+	// The output's allowed values, highest priority first: what PRIORITY
+	// and OUTPUT ORDER sort by.
+	OutputValues *Entry `xml:"outputValues" json:"outputValues,omitempty"`
 }
 
 type Rule struct {

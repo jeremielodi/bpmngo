@@ -19,7 +19,7 @@ func NewTimerController(db *sqlx.DB) *TimerController {
 func (c *TimerController) GetTimers(ctx *fiber.Ctx) error {
 	processInstanceID := ctx.Query("processInstanceId")
 
-	var timers []models.TimerJob
+	timers := []models.TimerJob{}
 	query := `
 		SELECT id, process_instance_id, execution_id, event_type, due_at, payload, 
 		       is_triggered, created_at, triggered_at, cycle_count, total_cycles, repeat_interval

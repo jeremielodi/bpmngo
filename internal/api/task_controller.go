@@ -2,6 +2,8 @@
 package api
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
@@ -138,12 +140,14 @@ func (tc *TaskController) Claim(c *fiber.Ctx) error {
 
 	taskId, err := uuid.Parse(id)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	repo := repository.NewTaskRepository(tc.db, tc.dispatcher)
 	task, err := repo.FindTaskByID(taskId)
-
+	if errors.Is(err, sql.ErrNoRows) {
+		return c.Status(404).JSON(fiber.Map{"error": "task not found"})
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -180,12 +184,14 @@ func (tc *TaskController) UnClaim(c *fiber.Ctx) error {
 
 	taskId, err := uuid.Parse(id)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	repo := repository.NewTaskRepository(tc.db, tc.dispatcher)
 	task, err := repo.FindTaskByID(taskId)
-
+	if errors.Is(err, sql.ErrNoRows) {
+		return c.Status(404).JSON(fiber.Map{"error": "task not found"})
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -223,12 +229,14 @@ func (tc *TaskController) GetTask(c *fiber.Ctx) error {
 
 	taskId, err := uuid.Parse(id)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	repo := repository.NewTaskRepository(tc.db, tc.dispatcher)
 	task, err := repo.FindTaskByID(taskId)
-
+	if errors.Is(err, sql.ErrNoRows) {
+		return c.Status(404).JSON(fiber.Map{"error": "task not found"})
+	}
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}

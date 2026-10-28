@@ -4,8 +4,11 @@
  *
  * Tests:
  *   A) Main process invokes sub-process via Call Activity, waits for it, then continues
- *   B) Sub-process instance is created with parent_instance_id set
+ *   B) Exactly one sub-process instance is created per call, and it ends
  *   C) After sub-process completes, main process resumes and completes
+ *
+ * Each job is taken from its own instance (the main one, or the child found
+ * through history), so instances left by an earlier run cannot interfere.
  */
 import * as path from 'path';
 import { BpmnGoClient, runSuite, assert, sleep } from './client';
@@ -13,37 +16,47 @@ import { BpmnGoClient, runSuite, assert, sleep } from './client';
 const BPMN_MAIN = path.join(__dirname, 'bpmn', '13_call_activity_main.bpmn');
 const BPMN_SUB = path.join(__dirname, 'bpmn', '13_credit_check_process.bpmn');
 const client = new BpmnGoClient();
-const BASE = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
 
-async function completeExternalTaskForAny(token: string, topic: string): Promise<number> {
-  const r = await fetch(`${BASE}/engine-rest/external-task/fetchAndLock`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ workerId: 'test-worker', maxJobsToActivate: 10, topics: [{ topicName: topic, lockDuration: 30000 }] }),
-  });
-  const tasks = await r.json() as any[];
-  let completed = 0;
-  for (const t of tasks) {
-    await fetch(`${BASE}/engine-rest/external-task/${t.id}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ workerId: 'test-worker', variables: {} }),
-    });
-    completed++;
-  }
-  return completed;
+async function work(topic: string, instanceId: string) {
+  await client.pollExternalTask(topic, async () => ({}), 15000, instanceId);
 }
 
-async function getHistoricInstances(token: string, key: string): Promise<any[]> {
-  const r = await fetch(`${BASE}/engine-rest/history/process-instance?processDefinitionKey=${key}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return r.json() as Promise<any[]>;
+// creditCheckProcess instances started since `since` (ISO time).
+async function childrenSince(since: string): Promise<any[]> {
+  return (await client.api.get('/engine-rest/history/process-instance', {
+    params: { processDefinitionKey: 'creditCheckProcess', startedAfter: since },
+  })).data as any[];
+}
+
+// Starts a loan application and runs it up to its call activity; returns
+// the main instance and the one child it started.
+async function startUpToChild(applicantId: string) {
+  const inst = await client.startProcess('loanApplication', { applicantId });
+  const mainId = (inst.processInstanceId ?? inst.id) as string;
+  // The server's clock, not this host's: children started after the main
+  // instance are the ones it called (tests run one at a time).
+  const mains = (await client.api.get('/engine-rest/history/process-instance', { params: { processDefinitionKey: 'loanApplication' } })).data as any[];
+  const since = mains.find(m => m.id === mainId)?.startTime as string;
+  assert(!!since, 'main instance not found in history');
+  await work('prepare-documents', mainId);
+
+  let children: any[] = [];
+  const deadline = Date.now() + 10000;
+  while (children.length === 0 && Date.now() < deadline) {
+    children = await childrenSince(since);
+    if (children.length === 0) await sleep(300);
+  }
+  assert(children.length === 1, `one creditCheckProcess instance expected, got ${children.length}`);
+  return { mainId, childId: children[0].id as string, since };
+}
+
+async function runChild(childId: string) {
+  await work('retrieve-credit-score', childId);
+  await work('evaluate-risk', childId);
 }
 
 async function run() {
   await client.loginAsSuperUser();
-  const token = (client as any).token as string;
 
   // Deploy both processes
   await client.deployBpmn(BPMN_SUB, 'Credit Check Sub-Process');
@@ -57,54 +70,26 @@ async function run() {
       {
         name: '[A] Main process invokes sub-process and completes after sub ends',
         async fn() {
-          const inst = await client.startProcess('loanApplication', { applicantId: 'APP-001' });
-          const instanceId = inst.processInstanceId ?? inst.id;
-
-          // Complete prepare-documents (main process)
-          await sleep(400);
-          await completeExternalTaskForAny(token, 'prepare-documents');
-
-          // Now the call activity fires, creating a child creditCheckProcess
-          // Complete sub-process tasks
-          await sleep(400);
-          await completeExternalTaskForAny(token, 'retrieve-credit-score');
-          await sleep(300);
-          await completeExternalTaskForAny(token, 'evaluate-risk');
-
+          const { mainId, childId } = await startUpToChild('APP-001');
+          await runChild(childId);
           // Sub-process ends → parent resumes → make-decision runs
-          await sleep(500);
-          await completeExternalTaskForAny(token, 'make-decision');
-
-          await client.waitForProcessEnd(instanceId, 15000);
-
-          const final = await client.getProcessInstance(instanceId);
-          assert(!final || final.status === 'completed', `expected completed, got ${final?.status}`);
+          await work('make-decision', mainId);
+          await client.waitForProcessEnd(mainId, 15000);
         },
       },
 
-      // ── B: child instance has parent_instance_id ──────────────────────────
+      // ── B: one child per call, and it ends ────────────────────────────────
       {
-        name: '[B] Child process instance is created with correct parent reference',
+        name: '[B] Exactly one child process instance is created, and it ends',
         async fn() {
-          const inst = await client.startProcess('loanApplication', { applicantId: 'APP-002' });
-          const mainInstanceId = inst.processInstanceId ?? inst.id;
+          const { mainId, childId, since } = await startUpToChild('APP-002');
+          await runChild(childId);
+          await work('make-decision', mainId);
+          await client.waitForProcessEnd(mainId, 15000);
 
-          await sleep(400);
-          await completeExternalTaskForAny(token, 'prepare-documents');
-          await sleep(600); // child instance should now be running
-
-          // Find the child process instance via history
-          const childInstances = await getHistoricInstances(token, 'creditCheckProcess');
-          assert(childInstances.length >= 1, 'expected at least one creditCheckProcess instance');
-
-          // Complete the child
-          await completeExternalTaskForAny(token, 'retrieve-credit-score');
-          await sleep(300);
-          await completeExternalTaskForAny(token, 'evaluate-risk');
-          await sleep(500);
-          await completeExternalTaskForAny(token, 'make-decision');
-
-          await client.waitForProcessEnd(mainInstanceId, 15000);
+          const children = await childrenSince(since);
+          assert(children.length === 1, `still one child after the run, got ${children.length}`);
+          assert(children[0].endTime !== null && children[0].state !== 'ACTIVE', `the child must be over: ${JSON.stringify(children[0])}`);
         },
       },
 
@@ -112,26 +97,16 @@ async function run() {
       {
         name: '[C] Main process stays running while sub-process is active',
         async fn() {
-          const inst = await client.startProcess('loanApplication', { applicantId: 'APP-003' });
-          const instanceId = inst.processInstanceId ?? inst.id;
-
-          await sleep(400);
-          await completeExternalTaskForAny(token, 'prepare-documents');
-          await sleep(600);
+          const { mainId, childId } = await startUpToChild('APP-003');
 
           // Main process should still be running (waiting on call activity)
-          const mid = await client.getProcessInstance(instanceId) as any;
+          const mid = await client.getProcessInstance(mainId) as any;
           assert(mid?.status === 'running', `expected main to be running (waiting), got ${mid?.status}`);
 
-          // Now complete the child
-          await completeExternalTaskForAny(token, 'retrieve-credit-score');
-          await sleep(300);
-          await completeExternalTaskForAny(token, 'evaluate-risk');
-          await sleep(500);
-          await completeExternalTaskForAny(token, 'make-decision');
-
-          await client.waitForProcessEnd(instanceId, 15000);
-          const final = await client.getProcessInstance(instanceId);
+          await runChild(childId);
+          await work('make-decision', mainId);
+          await client.waitForProcessEnd(mainId, 15000);
+          const final = await client.getProcessInstance(mainId);
           assert(!final || final.status === 'completed', `expected completed, got ${final?.status}`);
         },
       },

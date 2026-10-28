@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jmoiron/sqlx"
 )
 
 type SSEClient struct {
@@ -21,15 +22,18 @@ type SSEClient struct {
 	TaskFilter         string   // Filter by task ID ("*" for all)
 	ProcessKeys        []string // Filter by process keys (empty = all)
 	ExcludeProcessKeys []string // Exclude specific process keys
+	Viewer             Viewer   // who it is: events are filtered by its grants
 }
 
 type SSEListener struct {
+	db        *sqlx.DB
 	clients   map[string]*SSEClient
 	clientsMu sync.RWMutex
 }
 
-func NewSSEListener() *SSEListener {
+func NewSSEListener(db *sqlx.DB) *SSEListener {
 	return &SSEListener{
+		db:      db,
 		clients: make(map[string]*SSEClient),
 	}
 }
@@ -89,8 +93,9 @@ func (l *SSEListener) OnTaskEvent(ctx context.Context, event *events.TaskEvent) 
 	l.clientsMu.RLock()
 	defer l.clientsMu.RUnlock()
 
+	visible := newVisibility(l.db, event)
 	for _, client := range l.clients {
-		if l.shouldFilterEvent(client, event) {
+		if l.shouldFilterEvent(client, event) || !visible.allows(client.Viewer) {
 			continue
 		}
 
@@ -196,6 +201,9 @@ func (l *SSEListener) SSEHandler(c *fiber.Ctx) error {
 	c.Set("Connection", "keep-alive")
 	c.Set("X-Accel-Buffering", "no") // Disable nginx buffering
 
+	// Read before streaming starts: the request context is gone after.
+	viewer := viewerOf(c)
+
 	// Capture the done channel BEFORE entering SetBodyStreamWriter
 	ctxDone := c.Context().Done()
 
@@ -207,6 +215,7 @@ func (l *SSEListener) SSEHandler(c *fiber.Ctx) error {
 			TaskFilter:         taskFilter,
 			ProcessKeys:        processKeys,
 			ExcludeProcessKeys: excludeProcessKeys,
+			Viewer:             viewer,
 		}
 
 		l.AddClient(client)

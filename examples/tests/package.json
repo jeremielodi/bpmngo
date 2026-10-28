@@ -5,11 +5,7 @@
   "scripts": {
     "test": "ts-node --transpile-only run_all.ts",
     "typecheck": "tsc --noEmit -p .",
-    "test:auth": "ts-node 01_auth.test.ts",
-    "test:user-task": "ts-node 02_user_task.test.ts",
-    "test:service-task": "ts-node 03_service_task.test.ts",
-    "test:boundary-timer": "ts-node 04_boundary_timer.test.ts",
-    "test:parallel": "ts-node 05_parallel_gateway.test.ts"
+    "suite": "ts-node --transpile-only"
   },
   "dependencies": {
     "axios": "^1.6.0",

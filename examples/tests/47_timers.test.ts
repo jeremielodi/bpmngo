@@ -49,10 +49,18 @@ async function main() {
           const inst = await client.startProcess('TimerBoundaryCycle47', {});
           const id = inst.processInstanceId ?? inst.id;
           await client.waitForTask('bc_work', id, 10000);
-          await sleep(4500);
-
-          const iso = await tasksOf(id, 'bc_iso_task');
-          const cron = await tasksOf(id, 'bc_cron_task');
+          // Up to 8 s for the cron's third firing (a slow CI host may lag a
+          // second or two); done as soon as it is there.
+          const deadline = Date.now() + 8000;
+          let iso = await tasksOf(id, 'bc_iso_task');
+          let cron = await tasksOf(id, 'bc_cron_task');
+          while ((iso.length < 2 || cron.length < 3) && Date.now() < deadline) {
+            await sleep(250);
+            iso = await tasksOf(id, 'bc_iso_task');
+            cron = await tasksOf(id, 'bc_cron_task');
+          }
+          await sleep(1200); // R2: a third ISO firing would have come by now
+          iso = await tasksOf(id, 'bc_iso_task');
           assert(iso.length === 2, `R2/PT1S should fire twice, got ${iso.length}`);
           assert(cron.length >= 3, `a every-second cron should keep firing, got ${cron.length}`);
           assert((await tasksOf(id, 'bc_work')).length === 1, 'the P1D interrupting timer must not have fired');

@@ -6,48 +6,41 @@
  *   A) CustomerApproved message fires first → order is processed
  *   B) CustomerRejected message fires first → quote is archived
  *   C) After first event fires, second event has no effect (cancelled subscription)
+ *
+ * Every message names its instance (processInstanceId) and every job is
+ * taken from its own instance, so instances left over by an earlier run
+ * cannot interfere.
  */
 import * as path from 'path';
 import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '12_customer_decision.bpmn');
 const client = new BpmnGoClient();
-const BASE = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
+const ok = { validateStatus: () => true };
 
-async function correlateMessage(
-  token: string,
-  messageName: string,
-  variables: Record<string, unknown> = {}
-): Promise<Response> {
-  return fetch(`${BASE}/engine-rest/message`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messageName, correlationKeys: {}, variables }),
-  });
+// Correlates messageName to instanceId; with waitForSubscription, retries
+// while the gateway has not opened its subscriptions yet.
+async function correlateMessage(messageName: string, instanceId: string, waitForSubscription = true) {
+  const deadline = Date.now() + 10000;
+  for (;;) {
+    const r = await client.api.post('/engine-rest/message', { messageName, processInstanceId: instanceId }, ok);
+    if (r.status < 300 || !waitForSubscription || Date.now() > deadline) return r;
+    await sleep(300);
+  }
 }
 
-async function completeExternalTask(token: string, topic: string, instanceId: string): Promise<void> {
-  const r = await fetch(`${BASE}/engine-rest/external-task/fetchAndLock`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ workerId: 'test-worker', maxJobsToActivate: 10, topics: [{ topicName: topic, lockDuration: 30000 }] }),
-  });
-  const tasks = await r.json() as any[];
-  for (const t of tasks) {
-    if (t.processInstanceId === instanceId) {
-      await fetch(`${BASE}/engine-rest/external-task/${t.id}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ workerId: 'test-worker', variables: {} }),
-      });
-    }
-  }
+// Completes this instance's job of the given topic; fails if none appears.
+async function completeExternalTask(topic: string, instanceId: string): Promise<void> {
+  await client.pollExternalTask(topic, async () => ({}), 10000, instanceId);
+}
+
+// The job types this instance has had, read while it runs.
+async function jobTypes(instanceId: string): Promise<string[]> {
+  return ((await client.api.get('/jobs', { params: { processInstanceId: instanceId } })).data ?? []).map((j: any) => j.jobType);
 }
 
 async function run() {
   await client.loginAsSuperUser();
-  const token = (client as any).token as string;
-
   await client.deployBpmn(BPMN, 'Customer Decision Test');
 
   await runSuite({
@@ -61,22 +54,12 @@ async function run() {
           const inst = await client.startProcess('customerDecision', { quoteId: 'Q-001' });
           const instanceId = inst.processInstanceId ?? inst.id;
 
-          // Complete send-quote service task
-          await sleep(400);
-          await completeExternalTask(token, 'send-quote', instanceId);
-          await sleep(500); // let EBG park
+          await completeExternalTask('send-quote', instanceId);
+          const r = await correlateMessage('CustomerApproved', instanceId);
+          assert(r.status < 300, `CustomerApproved message failed: ${r.status}`);
 
-          // Fire the approval message
-          const r = await correlateMessage(token, 'CustomerApproved');
-          assert(r.ok, `CustomerApproved message failed: ${r.status}`);
-
-          // Complete process-order
-          await sleep(400);
-          await completeExternalTask(token, 'process-order', instanceId);
+          await completeExternalTask('process-order', instanceId);
           await client.waitForProcessEnd(instanceId, 10000);
-
-          const final = await client.getProcessInstance(instanceId);
-          assert(!final || final.status === 'completed', `expected completed, got ${final?.status}`);
         },
       },
 
@@ -87,21 +70,12 @@ async function run() {
           const inst = await client.startProcess('customerDecision', { quoteId: 'Q-002' });
           const instanceId = inst.processInstanceId ?? inst.id;
 
-          await sleep(400);
-          await completeExternalTask(token, 'send-quote', instanceId);
-          await sleep(500);
+          await completeExternalTask('send-quote', instanceId);
+          const r = await correlateMessage('CustomerRejected', instanceId);
+          assert(r.status < 300, `CustomerRejected message failed: ${r.status}`);
 
-          // Fire the rejection message
-          const r = await correlateMessage(token, 'CustomerRejected');
-          assert(r.ok, `CustomerRejected message failed: ${r.status}`);
-
-          // Complete archive-quote
-          await sleep(400);
-          await completeExternalTask(token, 'archive-quote', instanceId);
+          await completeExternalTask('archive-quote', instanceId);
           await client.waitForProcessEnd(instanceId, 10000);
-
-          const final = await client.getProcessInstance(instanceId);
-          assert(!final || final.status === 'completed', `expected completed, got ${final?.status}`);
         },
       },
 
@@ -112,25 +86,23 @@ async function run() {
           const inst = await client.startProcess('customerDecision', { quoteId: 'Q-003' });
           const instanceId = inst.processInstanceId ?? inst.id;
 
-          await sleep(400);
-          await completeExternalTask(token, 'send-quote', instanceId);
-          await sleep(500);
+          await completeExternalTask('send-quote', instanceId);
+          const r1 = await correlateMessage('CustomerApproved', instanceId);
+          assert(r1.status < 300, `CustomerApproved failed: ${r1.status}`);
 
-          // Approve first
-          const r1 = await correlateMessage(token, 'CustomerApproved');
-          assert(r1.ok, `CustomerApproved failed: ${r1.status}`);
+          // The gateway closed its other subscription: rejection no longer
+          // correlates to THIS instance...
+          const r2 = await correlateMessage('CustomerRejected', instanceId, false);
+          assert(r2.status >= 400, `CustomerRejected still correlated to the instance (HTTP ${r2.status})`);
 
-          // Now try to reject — should 404 (no subscription left)
-          await sleep(200);
-          const r2 = await correlateMessage(token, 'CustomerRejected');
-          // Either 404 (no subscription) or it correlates to a different instance — either is fine
-          // The key is the CURRENT instance keeps advancing on the approve path
-          await sleep(400);
-          await completeExternalTask(token, 'process-order', instanceId);
+          // ...and the archive-quote branch never starts.
+          await sleep(1000);
+          const types = await jobTypes(instanceId);
+          assert(types.includes('process-order'), `process-order expected, jobs: ${types}`);
+          assert(!types.includes('archive-quote'), `archive-quote must never be created, jobs: ${types}`);
+
+          await completeExternalTask('process-order', instanceId);
           await client.waitForProcessEnd(instanceId, 10000);
-
-          const final = await client.getProcessInstance(instanceId);
-          assert(!final || final.status === 'completed', `expected completed, got ${final?.status}`);
         },
       },
 

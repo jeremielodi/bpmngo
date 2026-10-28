@@ -169,21 +169,33 @@ func (c *AuditController) GetTaskAuditLogs(ctx *fiber.Ctx) error {
 		})
 	}
 
-	if task, terr := c.taskRepo.FindTaskByID(taskID); terr == nil {
-		if !c.checkAuditAccess(ctx, task.ProcessInstanceID, "VIEW") {
-			return ctx.Status(404).JSON(fiber.Map{
-				"title":   "Not Found",
-				"message": "task not found",
-			})
-		}
-	}
-
 	logs, err := c.auditRepo.GetTaskAuditLogs(taskID)
 	if err != nil {
 		return ctx.Status(500).JSON(fiber.Map{
 			"title":   "Database Error",
 			"message": "Failed to fetch audit logs",
 			"error":   err.Error(),
+		})
+	}
+
+	// The owning instance, from the live task or else from its own logs:
+	// an archived task is no longer in the tasks table, and its logs must
+	// stay behind the same grant.
+	var instanceID *uuid.UUID
+	if task, terr := c.taskRepo.FindTaskByID(taskID); terr == nil {
+		instanceID = &task.ProcessInstanceID
+	} else {
+		for _, l := range logs {
+			if l.ProcessInstanceID != nil {
+				instanceID = l.ProcessInstanceID
+				break
+			}
+		}
+	}
+	if instanceID != nil && !c.checkAuditAccess(ctx, *instanceID, "VIEW") {
+		return ctx.Status(404).JSON(fiber.Map{
+			"title":   "Not Found",
+			"message": "task not found",
 		})
 	}
 
@@ -205,6 +217,12 @@ func (c *AuditController) GetAuditLogsByDateRange(ctx *fiber.Ctx) error {
 		return ctx.Status(400).JSON(fiber.Map{
 			"title":   "Validation Error",
 			"message": "Invalid request body",
+		})
+	}
+	if req.Start.IsZero() || req.End.IsZero() || req.End.Before(req.Start) {
+		return ctx.Status(400).JSON(fiber.Map{
+			"title":   "Validation Error",
+			"message": "start and end are required, with start <= end",
 		})
 	}
 

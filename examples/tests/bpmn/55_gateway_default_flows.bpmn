@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_55" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- Exclusive gateway with a default flow. The default is listed FIRST:
+       read as an unconditioned flow, it would win every time. Two
+       conditions can both be true (amount > 100 and amount > 1000): the
+       first in document order wins. -->
+  <bpmn:process id="ExclusiveDefault55" isExecutable="true">
+    <bpmn:startEvent id="x_start"/>
+    <bpmn:sequenceFlow id="x1" sourceRef="x_start" targetRef="x_gw"/>
+    <bpmn:exclusiveGateway id="x_gw" default="x_default"/>
+    <bpmn:sequenceFlow id="x_default" sourceRef="x_gw" targetRef="x_small"/>
+    <bpmn:sequenceFlow id="x_big_flow" sourceRef="x_gw" targetRef="x_big">
+      <bpmn:conditionExpression>= amount &gt; 100</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="x_huge_flow" sourceRef="x_gw" targetRef="x_huge">
+      <bpmn:conditionExpression>= amount &gt; 1000</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="x_small"/>
+    <bpmn:userTask id="x_big"/>
+    <bpmn:userTask id="x_huge"/>
+    <bpmn:sequenceFlow id="x2" sourceRef="x_small" targetRef="x_end"/>
+    <bpmn:sequenceFlow id="x3" sourceRef="x_big" targetRef="x_end"/>
+    <bpmn:sequenceFlow id="x4" sourceRef="x_huge" targetRef="x_end"/>
+    <bpmn:endEvent id="x_end"/>
+  </bpmn:process>
+
+  <!-- Inclusive gateway with a default flow: taken only when no box is
+       ticked, never in addition to a ticked one. -->
+  <bpmn:process id="InclusiveDefault55" isExecutable="true">
+    <bpmn:startEvent id="i_start"/>
+    <bpmn:sequenceFlow id="i1" sourceRef="i_start" targetRef="i_fork"/>
+    <bpmn:inclusiveGateway id="i_fork" default="i_default"/>
+    <bpmn:sequenceFlow id="i_default" sourceRef="i_fork" targetRef="i_none"/>
+    <bpmn:sequenceFlow id="i_a_flow" sourceRef="i_fork" targetRef="i_a">
+      <bpmn:conditionExpression>= wantA</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="i_b_flow" sourceRef="i_fork" targetRef="i_b">
+      <bpmn:conditionExpression>= wantB</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="i_none"/>
+    <bpmn:userTask id="i_a"/>
+    <bpmn:userTask id="i_b"/>
+    <bpmn:sequenceFlow id="i2" sourceRef="i_none" targetRef="i_join"/>
+    <bpmn:sequenceFlow id="i3" sourceRef="i_a" targetRef="i_join"/>
+    <bpmn:sequenceFlow id="i4" sourceRef="i_b" targetRef="i_join"/>
+    <bpmn:inclusiveGateway id="i_join"/>
+    <bpmn:sequenceFlow id="i5" sourceRef="i_join" targetRef="i_end"/>
+    <bpmn:endEvent id="i_end"/>
+  </bpmn:process>
+
+  <!-- Inclusive gateway, no default: nothing true is an incident. -->
+  <bpmn:process id="InclusiveNoBranch55" isExecutable="true">
+    <bpmn:startEvent id="n_start"/>
+    <bpmn:sequenceFlow id="n1" sourceRef="n_start" targetRef="n_fork"/>
+    <bpmn:inclusiveGateway id="n_fork"/>
+    <bpmn:sequenceFlow id="n_a_flow" sourceRef="n_fork" targetRef="n_a">
+      <bpmn:conditionExpression>= wantA</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="n_b_flow" sourceRef="n_fork" targetRef="n_b">
+      <bpmn:conditionExpression>= wantB</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="n_a"/>
+    <bpmn:userTask id="n_b"/>
+    <bpmn:sequenceFlow id="n2" sourceRef="n_a" targetRef="n_join"/>
+    <bpmn:sequenceFlow id="n3" sourceRef="n_b" targetRef="n_join"/>
+    <bpmn:inclusiveGateway id="n_join"/>
+    <bpmn:sequenceFlow id="n4" sourceRef="n_join" targetRef="n_end"/>
+    <bpmn:endEvent id="n_end"/>
+  </bpmn:process>
+</bpmn:definitions>

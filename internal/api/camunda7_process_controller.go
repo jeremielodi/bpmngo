@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -38,7 +39,12 @@ func (pc *Camunda7ProcessController) definition(c *fiber.Ctx) (models.ProcessDef
 		return pc.repo.FindProcessDefinitionByID(defID)
 	}
 	key := c.Params("key")
+	callerTenant := common.GetTenantId(c)
 	if tenant := c.Params("tenant"); tenant != "" {
+		// A tenant user names only its own tenant.
+		if callerTenant != "" && tenant != callerTenant {
+			return models.ProcessDefinition{}, sql.ErrNoRows
+		}
 		var defID uuid.UUID
 		if err := pc.db.Get(&defID, `
 			SELECT id FROM public.process_definitions
@@ -48,7 +54,7 @@ func (pc *Camunda7ProcessController) definition(c *fiber.Ctx) (models.ProcessDef
 		}
 		return pc.repo.FindProcessDefinitionByID(defID)
 	}
-	return pc.repo.FindLatestProcessDefinitionByKey(key)
+	return pc.repo.FindLatestProcessDefinitionByKeyForTenant(key, callerTenant)
 }
 
 func (pc *Camunda7ProcessController) notFound(c *fiber.Ctx) error {
@@ -120,7 +126,7 @@ func (pc *Camunda7ProcessController) Start(c *fiber.Ctx) error {
 	}
 
 	def, err := pc.definition(c)
-	if err != nil {
+	if err != nil || !common.TenantMayStart(def.TenantID, common.GetTenantId(c)) {
 		return pc.notFound(c)
 	}
 	if userID, parseErr := uuid.Parse(common.GetUserUuid(c)); parseErr == nil {

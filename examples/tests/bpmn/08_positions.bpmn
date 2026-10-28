@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Two waits in a row: instances can stand at different places. Also a
+     non-executable participant, which must not be deployed. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_08p" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Positions08" isExecutable="true">
+    <bpmn:startEvent id="p_start"/>
+    <bpmn:sequenceFlow id="p1" sourceRef="p_start" targetRef="p_first"/>
+    <bpmn:userTask id="p_first"/>
+    <bpmn:sequenceFlow id="p2" sourceRef="p_first" targetRef="p_second"/>
+    <bpmn:userTask id="p_second"/>
+    <bpmn:sequenceFlow id="p3" sourceRef="p_second" targetRef="p_end"/>
+    <bpmn:endEvent id="p_end"/>
+  </bpmn:process>
+  <bpmn:process id="Customer08" isExecutable="false">
+    <bpmn:startEvent id="c_start"/>
+  </bpmn:process>
+</bpmn:definitions>

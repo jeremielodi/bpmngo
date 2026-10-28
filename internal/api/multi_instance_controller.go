@@ -4,6 +4,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -21,6 +23,11 @@ func (c *MultiInstanceController) GetByProcessInstance(ctx *fiber.Ctx) error {
 	pid, err := uuid.Parse(instanceId)
 	if err != nil {
 		return ctx.Status(400).JSON(fiber.Map{"error": "invalid id"})
+	}
+	if userID, perr := uuid.Parse(common.GetUserUuid(ctx)); perr == nil {
+		if allowed, _ := service.CanAccessProcessInstance(c.db, userID, pid, "VIEW"); !allowed {
+			return ctx.Status(404).JSON(fiber.Map{"error": "not found"})
+		}
 	}
 
 	var miExec models.MultiInstanceExecution

@@ -222,6 +222,29 @@ func (r *ProcessRepository) FindLatestProcessDefinitionByKey(
 	return def, err
 }
 
+// latestForTenantSQL picks, for a tenant ($2), the latest version of a key
+// deployed for that tenant, else of a shared one (no tenant) — never
+// another tenant's. Definitions are not partitioned by tenant: two tenants
+// deploying one key make v1 and v2 of the same key.
+const latestForTenantSQL = `
+        SELECT id, deployment_id, process_key, process_name, tenant_id, version,
+               is_active, bpmn_xml, parsed_graph, created_at, write_path
+        FROM public.process_definitions
+        WHERE process_key = $1 AND (tenant_id = $2 OR tenant_id IS NULL OR tenant_id = '')
+        ORDER BY (tenant_id = $2) DESC NULLS LAST, version DESC
+        LIMIT 1`
+
+// FindLatestProcessDefinitionByKeyForTenant is FindLatestProcessDefinitionByKey
+// as seen by a caller of tenant callerTenant ("" = no tenant: any version).
+func (r *ProcessRepository) FindLatestProcessDefinitionByKeyForTenant(processKey, callerTenant string) (models.ProcessDefinition, error) {
+	if callerTenant == "" {
+		return r.FindLatestProcessDefinitionByKey(processKey)
+	}
+	var def models.ProcessDefinition
+	err := r.db.Get(&def, latestForTenantSQL, processKey, callerTenant)
+	return def, err
+}
+
 // FindProcessDefinitionByID returns definition by ID.
 func (r *ProcessRepository) FindProcessDefinitionByID(
 	id uuid.UUID,

@@ -4,6 +4,7 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -21,6 +22,44 @@ func NewAuditMiddleware(db *sqlx.DB) *AuditMiddleware {
 	return &AuditMiddleware{
 		auditRepo: repository.NewAuditRepository(db),
 	}
+}
+
+// sensitiveKeys are JSON fields never written to the audit log, at any
+// depth, compared case-insensitively.
+var sensitiveKeys = map[string]bool{
+	"password": true, "current_password": true, "new_password": true,
+	"token": true, "access_token": true, "refresh_token": true,
+	"client_secret": true, "secret": true,
+}
+
+// redactBody returns a request body fit for the audit log: JSON with its
+// sensitive fields replaced, or a placeholder for a body that is not JSON
+// (a form may carry a password too).
+func redactBody(body []byte) string {
+	var v interface{}
+	if err := json.Unmarshal(body, &v); err != nil {
+		return "[non-JSON body not logged]"
+	}
+	out, _ := json.Marshal(redactValue(v))
+	return string(out)
+}
+
+func redactValue(v interface{}) interface{} {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		for k, val := range t {
+			if sensitiveKeys[strings.ToLower(k)] {
+				t[k] = "[redacted]"
+			} else {
+				t[k] = redactValue(val)
+			}
+		}
+	case []interface{}:
+		for i := range t {
+			t[i] = redactValue(t[i])
+		}
+	}
+	return v
 }
 
 // APIAuditMiddleware logs API requests and responses
@@ -57,7 +96,7 @@ func (m *AuditMiddleware) APIAuditMiddleware() fiber.Handler {
 		}
 
 		if len(requestBody) > 0 && len(requestBody) < 10000 { // Don't log huge bodies
-			logData["requestBody"] = string(requestBody)
+			logData["requestBody"] = redactBody(requestBody)
 		}
 
 		if err != nil {

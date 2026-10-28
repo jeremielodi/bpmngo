@@ -32,8 +32,19 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 		return fmt.Errorf("callActivity %s has no calledElement", node.ID)
 	}
 
+	// The called process runs in the caller's tenant: resolved there, and
+	// stamped with it.
+	var parentTenant *string
+	if err := r.DB.Get(&parentTenant, `SELECT tenant_id FROM process_instances WHERE id = $1`, exec.ProcessInstanceID); err != nil {
+		return fmt.Errorf("callActivity: read caller tenant: %w", err)
+	}
+	tenant := ""
+	if parentTenant != nil {
+		tenant = *parentTenant
+	}
+
 	// Find the called process definition
-	procDef, err := engineRepo.FindLatestProcessDefinitionByKey(calledID)
+	procDef, err := engineRepo.FindLatestProcessDefinitionByKeyForTenant(calledID, tenant)
 	if err != nil {
 		return fmt.Errorf("callActivity: cannot find process '%s': %w", calledID, err)
 	}
@@ -69,9 +80,9 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 	// Create child process instance with parent tracking
 	_, err = tx.Exec(`
 		INSERT INTO process_instances
-		  (id, process_definition_id, status, started_at, parent_instance_id, parent_execution_id)
-		VALUES ($1, $2, 'running', $3, $4, $5)
-	`, childInstanceID, procDef.ID, now, exec.ProcessInstanceID, exec.ID)
+		  (id, process_definition_id, status, started_at, parent_instance_id, parent_execution_id, tenant_id)
+		VALUES ($1, $2, 'running', $3, $4, $5, $6)
+	`, childInstanceID, procDef.ID, now, exec.ProcessInstanceID, exec.ID, parentTenant)
 	if err != nil {
 		return fmt.Errorf("callActivity: create child instance: %w", err)
 	}

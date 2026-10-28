@@ -360,8 +360,9 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 	// ---- Exclusive Gateways ----
 	for _, g := range process.ExclusiveGateways {
 		register(&Node{
-			ID:   g.ID,
-			Type: ExclusiveGatewayType,
+			ID:          g.ID,
+			Type:        ExclusiveGatewayType,
+			DefaultFlow: g.Default,
 		})
 	}
 
@@ -376,8 +377,9 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 	// ---- Inclusive Gateways ----
 	for _, g := range process.InclusiveGateways {
 		register(&Node{
-			ID:   g.ID,
-			Type: InclusiveGatewayType,
+			ID:          g.ID,
+			Type:        InclusiveGatewayType,
+			DefaultFlow: g.Default,
 		})
 	}
 

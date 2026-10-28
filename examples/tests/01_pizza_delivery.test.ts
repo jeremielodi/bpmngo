@@ -3,12 +3,14 @@
  * Source: https://camunda.com/bpmn/reference/ — Boundary Timer example
  *
  * Scenario: Customer orders pizza. If the pizza arrives (user completes the task)
- * before the 60-second timer, the process ends normally. If the timer fires first,
+ * before the 8-second timer (PT8S, kept short so the suite runs fast), the
+ * process ends normally. If the timer fires first,
  * an external worker makes the anxious phone call.
  *
  * Tests:
  *   A) Normal path — task completed before timer fires
- *   B) Timer path  — task NOT completed; timer fires and triggers escalation worker
+ *   B) Timer path  — task NOT completed; timer fires, cancels the task and
+ *      triggers the escalation worker
  *   C) Claim / unclaim on a candidateGroup task (adapted variant)
  */
 import * as path from 'path';
@@ -70,6 +72,13 @@ async function run() {
             instanceId
           );
 
+          // The interrupting timer cancelled order_pizza: recorded as such,
+          // not merely gone.
+          const history = (await client.api.get('/engine-rest/history/task', { params: { processInstanceId: instanceId } })).data as any[];
+          const order = history.filter(t => t.taskDefinitionKey === 'order_pizza');
+          assert(order.length === 1 && (order[0].taskState ?? order[0].status) === 'cancelled',
+            `order_pizza must be cancelled in history, got ${JSON.stringify(order.map(t => t.taskState ?? t.status))}`);
+
           await client.waitForProcessEnd(instanceId, 10000);
         },
       },
@@ -112,4 +121,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

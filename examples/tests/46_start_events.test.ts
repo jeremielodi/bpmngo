@@ -21,8 +21,20 @@ async function openTasks(taskKey: string) {
   return tasks.filter(t => t.taskDefinitionKey === taskKey);
 }
 
-async function completeAll(taskKey: string) {
-  for (const t of await openTasks(taskKey)) {
+// Open tasks of taskKey outside the instances in `before`: tasks an earlier
+// run left open must not count.
+async function newTasks(taskKey: string, before: Set<string>) {
+  return (await openTasks(taskKey)).filter(t => !before.has(t.processInstanceId));
+}
+
+async function instancesOf(...taskKeys: string[]) {
+  const ids = new Set<string>();
+  for (const k of taskKeys) for (const t of await openTasks(k)) ids.add(t.processInstanceId);
+  return ids;
+}
+
+async function completeAll(taskKey: string, before = new Set<string>()) {
+  for (const t of await newTasks(taskKey, before)) {
     await client.completeTask(t.id);
   }
 }
@@ -36,36 +48,38 @@ async function main() {
       {
         name: '[A] + [B] Timer cycle and timer date start events start instances',
         async fn() {
+          const before = await instancesOf('tc_task', 'td_task');
           await client.deployBpmn(bpmn('46_start_events.bpmn'), 'Start Events Test');
 
           const deadline = Date.now() + 10000;
-          while (Date.now() < deadline && (await openTasks('tc_task')).length < 2) await sleep(500);
+          while (Date.now() < deadline && (await newTasks('tc_task', before)).length < 2) await sleep(500);
           await sleep(3000); // a third firing would have come by now
-          const cycle = await openTasks('tc_task');
+          const cycle = await newTasks('tc_task', before);
           assert(cycle.length === 2, `R2/PT2S should start exactly 2 instances, got ${cycle.length}`);
 
-          const date = await openTasks('td_task');
+          const date = await newTasks('td_task', before);
           assert(date.length === 1, `a past timeDate should start exactly 1 instance, got ${date.length}`);
 
-          await completeAll('tc_task');
-          await completeAll('td_task');
+          await completeAll('tc_task', before);
+          await completeAll('td_task', before);
         },
       },
       {
         name: '[C] A new version without the timer start event stops the old cycle',
         async fn() {
+          const before = await instancesOf('tf_task');
           await client.deployBpmn(bpmn('46_timer_forever_v1.bpmn'), 'Timer Forever v1');
           const deadline = Date.now() + 8000;
-          while (Date.now() < deadline && (await openTasks('tf_task')).length < 2) await sleep(300);
-          assert((await openTasks('tf_task')).length >= 2, 'version 1 should tick every second');
+          while (Date.now() < deadline && (await newTasks('tf_task', before)).length < 2) await sleep(300);
+          assert((await newTasks('tf_task', before)).length >= 2, 'version 1 should tick every second');
 
           await client.deployBpmn(bpmn('46_timer_forever_v2.bpmn'), 'Timer Forever v2');
           await sleep(1500); // a tick already claimed may still land
-          const after = (await openTasks('tf_task')).length;
+          const after = (await newTasks('tf_task', before)).length;
           await sleep(3000);
-          const later = (await openTasks('tf_task')).length;
+          const later = (await newTasks('tf_task', before)).length;
           assert(later === after, `no more ticks after version 2: ${after} then ${later}`);
-          await completeAll('tf_task');
+          await completeAll('tf_task', before);
         },
       },
       {

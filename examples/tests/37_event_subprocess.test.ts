@@ -48,7 +48,7 @@ async function run() {
           const instanceId = inst.processInstanceId ?? inst.id;
           await client.waitForTask('es_work', instanceId, 10000);
 
-          const res = await client.api.post('/engine-rest/message', { messageName: 'EsCancel' });
+          const res = await client.api.post('/engine-rest/message', { messageName: 'EsCancel', processInstanceId: instanceId });
           assert(res.status < 300, `correlating EsCancel failed with HTTP ${res.status}`);
 
           const handler = await client.waitForTask('es_cancelled', instanceId, 10000);
@@ -71,7 +71,7 @@ async function run() {
           await client.waitForProcessEnd(instanceId, 10000);
 
           // The instance's message subscription must be gone with it.
-          const res = await client.api.post('/engine-rest/message', { messageName: 'EsCancel' }, { validateStatus: () => true });
+          const res = await client.api.post('/engine-rest/message', { messageName: 'EsCancel', processInstanceId: instanceId }, { validateStatus: () => true });
           assert(res.status >= 400, `EsCancel still correlated to something after the instance ended (HTTP ${res.status})`);
         },
       },

@@ -64,6 +64,24 @@ export interface TaskListenerEvent {
 export const sleep = (ms: number): Promise<void> =>
   new Promise(r => setTimeout(r, ms));
 
+// Exit code of a suite that did not run (its prerequisites are missing):
+// run_all reports it as skipped, neither passed nor failed.
+export const SKIPPED_EXIT_CODE = 3;
+
+// Calls fn until ok(value) holds, and returns that value; throws after
+// timeoutMs. For anything the engine does asynchronously: never a fixed
+// sleep followed by a single check.
+export async function waitUntil<T>(fn: () => Promise<T>, ok: (v: T) => boolean, timeoutMs: number, what: string): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  let v = await fn();
+  while (!ok(v)) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}: last value ${JSON.stringify(v)}`);
+    await sleep(250);
+    v = await fn();
+  }
+  return v;
+}
+
 export function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
@@ -324,16 +342,19 @@ export class BpmnGoClient {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const tasks = await this.fetchAndLock([{ name: topic }]);
+      let done = false;
       for (const task of tasks) {
-        if (processInstanceId && task.processInstanceId !== processInstanceId) {
-          // wrong instance — release by completing with no-op so it's not stuck locked
-          // We can't "nack" in Camunda style, so just skip; the lock will expire
+        if (done || (processInstanceId && task.processInstanceId !== processInstanceId)) {
+          // Not ours: release it at once rather than hold its lock for 30 s,
+          // which would stall whichever test is waiting on it.
+          await this.api.post(`/engine-rest/external-task/${task.id}/unlock`, {}, { validateStatus: () => true });
           continue;
         }
         const vars = await handler(task);
         await this.completeExternalTask(task.id, vars);
-        return;
+        done = true;
       }
+      if (done) return;
       await sleep(1000);
     }
     throw new Error(`Timeout polling external task topic "${topic}"${processInstanceId ? ` for instance ${processInstanceId}` : ''}`);
@@ -384,8 +405,8 @@ export async function runSuite(suite: Suite): Promise<TestResult[]> {
 
   // Without this, a suite whose assertions fail (but don't throw an
   // uncaught exception past this function) would still exit 0 — every
-  // suite file's `run().catch(console.error)` never rethrows a per-test
-  // failure, so run_all.ts's exit-code-based "X/Y suites passed" summary
+  // suite file's `run().catch(...)` handler only sees errors thrown outside a
+  // test, so run_all.ts's exit-code-based "X/Y suites passed" summary
   // would silently miss real assertion failures.
   if (passed < results.length) {
     process.exitCode = 1;

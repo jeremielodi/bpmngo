@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"runtime/debug"
 	"net"
 	"os"
 	"strconv"
@@ -203,11 +204,11 @@ func main() {
 	}
 
 	// Create SSE listener for real-time events
-	sseListener := listeners.NewSSEListener()
+	sseListener := listeners.NewSSEListener(db)
 	taskEventDispatcher.RegisterViewer(sseListener)
 
 	// Create WebSocket listener
-	wsListener := listeners.NewWebSocketListener()
+	wsListener := listeners.NewWebSocketListener(db)
 	taskEventDispatcher.RegisterViewer(wsListener)
 
 	// Create Webhook listener (optional - configure as needed)
@@ -267,6 +268,12 @@ func main() {
 		func() float64 { return float64(workerPool.GetMetrics().ActiveWorkers) })
 	metrics.RegisterGaugeFunc("goflow_worker_pool_jobs_failed", "Async worker pool requests that failed since startup.",
 		func() float64 { return float64(workerPool.GetMetrics().JobsFailed) })
+
+	if n, err := service.BackfillGatewayDefaults(db); err != nil {
+		log.Println("⚠️ gateway default-flow backfill:", err)
+	} else if n > 0 {
+		log.Printf("✅ Gateway default flows added to %d stored process graphs", n)
+	}
 
 	retentionCfg, err := retention.ConfigFromEnv(util.DotEnvVariable)
 	if err != nil {
@@ -382,6 +389,17 @@ func main() {
 	// ============================================================
 
 	app := fiber.New()
+	// A panic in one request answers 500 and is logged; without this it
+	// took the whole server down.
+	app.Use(func(c *fiber.Ctx) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("panic serving %s %s: %v\n%s", c.Method(), c.Path(), r, debug.Stack())
+				err = c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "Error", "message": "internal error"})
+			}
+		}()
+		return c.Next()
+	})
 	app.Use(metrics.Middleware())
 
 	// Health check endpoints
@@ -407,15 +425,22 @@ func main() {
 	app.Get("/metrics", metrics.Handler(metricsToken))
 
 	// ============================================================
+	// AUTHENTICATION MIDDLEWARE
+	// ============================================================
+
+	app.Use(middleware.CombinedAuthMiddleware(db, jwcService, oidcService, util))
+
+	// ============================================================
 	// EVENT STREAMING ENDPOINTS
 	// ============================================================
 
-	// SSE endpoint for task events (requires authentication)
+	// Registered after the auth middleware: task events carry process data.
+	// A browser WebSocket cannot set headers, so it passes ?token=<jwt>.
 	app.Get("/events/tasks", sseListener.SSEHandler)
 
-	// WebSocket endpoint for task events
 	app.Use("/ws/tasks", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
+			listeners.RememberViewer(c)
 			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
@@ -423,12 +448,6 @@ func main() {
 	app.Get("/ws/tasks", websocket.New(wsListener.HandleWebSocket))
 
 	log.Println("✅ Event streaming endpoints initialized (SSE: /events/tasks, WebSocket: /ws/tasks)")
-
-	// ============================================================
-	// AUTHENTICATION MIDDLEWARE
-	// ============================================================
-
-	app.Use(middleware.CombinedAuthMiddleware(db, jwcService, oidcService, util))
 
 	// ============================================================
 	// ROLE & ACTION ROUTES
@@ -477,7 +496,6 @@ func main() {
 	app.Delete("/users/:id", permissions(db, "CAN_MANAGE_USER"), userController.DeleteUser)
 
 	// Access control routes
-	app.Get("/users/:id/access/:resource", userController.CheckAccess)
 	app.Get("/users/:id/permission/:actionId", userController.CheckPermission)
 
 	// ============================================================
@@ -670,8 +688,8 @@ func main() {
 	// TIMER & MULTI-INSTANCE ROUTES
 	// ============================================================
 
-	app.Get("/timers", timerController.GetTimers)
-	app.Get("/timers/:id", timerController.GetTimerByID)
+	app.Get("/timers", permissions(db, "CAN_READ_JOBS"), timerController.GetTimers)
+	app.Get("/timers/:id", permissions(db, "CAN_READ_JOBS"), timerController.GetTimerByID)
 	app.Get("/multi-instance/execution/:instanceId", multiInstanceController.GetByProcessInstance)
 
 	// ============================================================
@@ -709,7 +727,7 @@ func main() {
 	// METRICS ENDPOINTS
 	// ============================================================
 
-	app.Get("/metrics/pool", func(c *fiber.Ctx) error {
+	app.Get("/metrics/pool", permissions(db, "CAN_VIEW_METRICS"), func(c *fiber.Ctx) error {
 		metrics := workerPool.GetMetrics()
 		return c.JSON(fiber.Map{
 			"name":            "BpmnGo-Main",
@@ -725,8 +743,9 @@ func main() {
 		})
 	})
 
-	app.Post("/metrics/pool/reset", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
+	// Not implemented: the counters live until the process restarts.
+	app.Post("/metrics/pool/reset", permissions(db, "CAN_VIEW_METRICS"), func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
 			"message": "Restart server to reset metrics",
 			"note":    "Metrics are not resettable without restart",
 		})

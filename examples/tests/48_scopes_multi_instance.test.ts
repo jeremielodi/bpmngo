@@ -22,7 +22,7 @@
  *      every inner instance.
  */
 import * as path from 'path';
-import { BpmnGoClient, ExternalTask, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, ExternalTask, runSuite, assert, sleep, waitUntil } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '48_scopes_multi_instance.bpmn');
 const client = new BpmnGoClient();
@@ -84,8 +84,9 @@ async function main() {
           const id = inst.processInstanceId ?? inst.id;
           const counters: number[] = [];
           for (let i = 0; i < 3; i++) {
-            await sleep(300);
-            const open = (await client.fetchAndLock([{ name: 'mi48-sequential' }])).filter(j => j.processInstanceId === id);
+            const open = await waitUntil(
+              async () => (await client.fetchAndLock([{ name: 'mi48-sequential' }])).filter(j => j.processInstanceId === id),
+              jobs => jobs.length > 0, 10000, `sequential job ${i + 1}`);
             assert(open.length === 1, `sequential: one job at a time, got ${open.length}`);
             counters.push(plain(open[0]).loopCounter);
             await client.completeExternalTask(open[0].id, {});

@@ -56,7 +56,7 @@ func (r *ExternalTaskRepository) FetchAndLockJobsTx(tx *sqlx.Tx, topics []TopicC
 			FROM public.jobs j
 			WHERE j.job_type = $1
 			  AND j.status = 'pending'
-			  AND (j.locked_by IS NULL OR j.locked_until < NOW())
+			  AND (j.locked_until IS NULL OR j.locked_until < NOW())
 			LIMIT $2
 			FOR UPDATE SKIP LOCKED
 		`
@@ -197,12 +197,19 @@ func (r *ExternalTaskRepository) FailJobPermanentlyTx(tx *sqlx.Tx, processInstan
 }
 
 // ResetJobForRetryTx puts a job back to pending with its remaining retries.
-func (r *ExternalTaskRepository) ResetJobForRetryTx(tx *sqlx.Tx, processInstanceID, jobID uuid.UUID, retries int, errorMessage string) error {
+// With a backoff, locked_until holds it back until then: a pending job is
+// claimable only once locked_until is NULL or past.
+func (r *ExternalTaskRepository) ResetJobForRetryTx(tx *sqlx.Tx, processInstanceID, jobID uuid.UUID, retries int, errorMessage string, backoff time.Duration) error {
+	var notBefore *time.Time
+	if backoff > 0 {
+		t := time.Now().Add(backoff)
+		notBefore = &t
+	}
 	_, err := tx.Exec(`
 		UPDATE public.jobs
-		SET retries = $1, status = 'pending', locked_by = NULL, locked_until = NULL, error_message = $2
+		SET retries = $1, status = 'pending', locked_by = NULL, locked_until = $5, error_message = $2
 		WHERE process_instance_id = $3 AND id = $4
-	`, retries, errorMessage, processInstanceID, jobID)
+	`, retries, errorMessage, processInstanceID, jobID, notBefore)
 	return err
 }
 

@@ -307,6 +307,39 @@ func setCachedProgram(key string, prog *cachedProgram) {
 }
 
 // ResolveNext resolves the next node based on node type and conditions
+// ResolveInclusiveBranches returns the outgoing flows an inclusive gateway
+// activates: every flow whose condition is true (no condition counts as
+// true), or the default flow alone when none is.
+func ResolveInclusiveBranches(node *engine.Node, variables map[string]interface{}) ([]engine.Flow, error) {
+	var active []engine.Flow
+	var defaultFlow *engine.Flow
+	for i, flow := range node.Outgoing {
+		if flow.ID == node.DefaultFlow {
+			defaultFlow = &node.Outgoing[i]
+			continue
+		}
+		condition := strings.TrimSpace(flow.Condition)
+		if condition == "" {
+			active = append(active, flow)
+			continue
+		}
+		ok, err := EvaluateCondition(condition, variables)
+		if err != nil {
+			return nil, fmt.Errorf("condition evaluation failed for flow %s: %w", flow.ID, err)
+		}
+		if ok {
+			active = append(active, flow)
+		}
+	}
+	if len(active) == 0 && defaultFlow != nil {
+		active = append(active, *defaultFlow)
+	}
+	if len(active) == 0 {
+		return nil, fmt.Errorf("inclusive gateway %s: no condition matched", node.ID)
+	}
+	return active, nil
+}
+
 func ResolveNext(node *engine.Node, variables map[string]interface{}) (string, error) {
 	if len(node.Outgoing) == 0 {
 		// BPMN's implicit end: the token ends in the node's scope.
@@ -334,37 +367,33 @@ func ResolveNext(node *engine.Node, variables map[string]interface{}) (string, e
 		return normalFlows[0].TargetRef, nil
 	}
 
-	// For ExclusiveGateway, evaluate conditions
+	// For ExclusiveGateway, as in BPMN 2.0 (and Camunda 7 and 8): the first
+	// flow, in document order, whose condition is true (a flow without a
+	// condition counts as true); the default flow only when none is.
 	if node.Type == engine.ExclusiveGatewayType {
-		var selected *engine.Flow
-		for _, flow := range node.Outgoing {
-			condition := strings.TrimSpace(flow.Condition)
-
-			// Empty condition = always true
-			if condition == "" {
-				if selected != nil {
-					return "", fmt.Errorf("multiple conditions true on exclusive gateway: flow %s and %s both have no condition", selected.ID, flow.ID)
-				}
-				selected = &flow
+		var defaultFlow *engine.Flow
+		for i, flow := range node.Outgoing {
+			if flow.ID == node.DefaultFlow {
+				defaultFlow = &node.Outgoing[i]
 				continue
 			}
-
+			condition := strings.TrimSpace(flow.Condition)
+			if condition == "" {
+				return flow.TargetRef, nil
+			}
 			ok, err := EvaluateCondition(condition, variables)
 			if err != nil {
 				return "", fmt.Errorf("condition evaluation failed for flow %s: %w", flow.ID, err)
 			}
 			if ok {
-				if selected != nil {
-					return "", fmt.Errorf("multiple conditions true on exclusive gateway: flow %s and %s", selected.ID, flow.ID)
-				}
-				selected = &flow
+				return flow.TargetRef, nil
 			}
 		}
 
-		if selected == nil {
-			return "", fmt.Errorf("no matching condition on exclusive gateway")
+		if defaultFlow != nil {
+			return defaultFlow.TargetRef, nil
 		}
-		return selected.TargetRef, nil
+		return "", fmt.Errorf("no matching condition on exclusive gateway %s", node.ID)
 	}
 
 	// For ParallelGateway, return first outgoing

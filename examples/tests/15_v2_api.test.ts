@@ -139,6 +139,77 @@ async function run() {
         },
       },
 
+      // ── G: failing a job ───────────────────────────────────────────────────
+      {
+        name: '[G] POST /v2/jobs/:id/failure: retries left, retryBackOff honoured, 0 -> incident',
+        async fn() {
+          const created = await client.api.post('/v2/process-instances', { processDefinitionId: 'TaskListenerProcess', variables: {} });
+          const processInstanceKey = created.data.processInstanceKey;
+          await completeV2UserTask(processInstanceKey, 'reviewTask', 'dana');
+
+          // Short activation timeout: other instances' jobs taken here are
+          // released quickly.
+          const activate = async () => {
+            const res = await client.api.post('/v2/jobs/activation', { type: 'listener_worker_task', worker: 'v2-fail', timeout: 2000, maxJobsToActivate: 10 });
+            return (res.data.jobs as any[]).find(j => j.processInstanceKey === processInstanceKey);
+          };
+          let job: any;
+          const deadline = Date.now() + 10000;
+          while (!job && Date.now() < deadline) { job = await activate(); if (!job) await sleep(300); }
+          assert(!!job, 'expected an activated job for our instance');
+
+          const fail1 = await client.api.post(`/v2/jobs/${job.jobKey}/failure`, { retries: 1, errorMessage: 'transient', retryBackOff: 3000 }, { validateStatus: () => true });
+          assert(fail1.status < 300, `failure: ${fail1.status} ${JSON.stringify(fail1.data)}`);
+          const failedAt = Date.now();
+          assert(!(await activate()), 'the job must wait out its retryBackOff');
+
+          let again: any;
+          while (!again && Date.now() - failedAt < 12000) { again = await activate(); if (!again) await sleep(300); }
+          assert(!!again && again.jobKey === job.jobKey, 'the same job must come back');
+          assert(Date.now() - failedAt >= 2500, `came back after ${Date.now() - failedAt} ms, before its 3 s retryBackOff`);
+          assert(again.retries === 1, `retries is what is left: expected 1, got ${again.retries}`);
+          let incidents = (await client.api.get(`/engine-rest/incident?processInstanceId=${processInstanceKey}`)).data as any[];
+          assert(incidents.length === 0, 'retries left: no incident yet');
+
+          await client.api.post(`/v2/jobs/${again.jobKey}/failure`, { retries: 0, errorMessage: 'gave up' });
+          const until = Date.now() + 8000;
+          while (incidents.length === 0 && Date.now() < until) {
+            await sleep(300);
+            incidents = (await client.api.get(`/engine-rest/incident?processInstanceId=${processInstanceKey}`)).data as any[];
+          }
+          assert(incidents.length === 1, `retries 0: one incident expected, got ${incidents.length}`);
+          assert(!(await activate()), 'a job with an incident is not activatable');
+          await client.api.delete(`/engine-rest/process-instance/${processInstanceKey}`);
+        },
+      },
+
+      // ── H: unassigning a user task ─────────────────────────────────────────
+      {
+        name: '[H] DELETE /v2/user-tasks/:id/assignee: no assignee, claimable again',
+        async fn() {
+          const created = await client.api.post('/v2/process-instances', { processDefinitionId: 'TaskListenerProcess', variables: {} });
+          const processInstanceKey = created.data.processInstanceKey;
+          const find = async () => {
+            const res = await client.api.post('/v2/user-tasks/search', { filter: { processInstanceKey, elementId: 'reviewTask' } });
+            return (res.data.items as any[]).find(t => t.elementId === 'reviewTask');
+          };
+          let task: any;
+          const deadline = Date.now() + 10000;
+          while (!task && Date.now() < deadline) { task = await find(); if (!task) await sleep(300); }
+          assert(!!task, 'reviewTask not found');
+
+          await client.api.post(`/v2/user-tasks/${task.userTaskKey}/assignment`, { assignee: 'dana' });
+          assert((await find()).assignee === 'dana', 'assigned to dana');
+          const un = await client.api.delete(`/v2/user-tasks/${task.userTaskKey}/assignee`, { validateStatus: () => true });
+          assert(un.status < 300, `unassign: ${un.status} ${JSON.stringify(un.data)}`);
+          const after = await find();
+          assert(!after.assignee, `no assignee after unassign, got ${JSON.stringify(after.assignee)}`);
+          const claim = await client.api.post(`/v2/user-tasks/${task.userTaskKey}/assignment`, { assignee: 'erin' }, { validateStatus: () => true });
+          assert(claim.status < 300 && (await find()).assignee === 'erin', 'claimable again after unassign');
+          await client.api.delete(`/engine-rest/process-instance/${processInstanceKey}`);
+        },
+      },
+
       // ── D: message publication ─────────────────────────────────────────────
       {
         name: '[D] POST /v2/messages/publication correlates to the waiting instance',
@@ -209,4 +280,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

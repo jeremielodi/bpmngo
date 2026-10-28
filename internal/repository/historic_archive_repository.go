@@ -317,7 +317,7 @@ func (r *HistoricArchiveRepository) FindTasksForHistoricQuery(params HistoricTas
 			hpi.process_definition_id as process_definition_id,
 			hpi.process_definition_key as process_definition_key,
 			t.task_definition_key,
-			t.task_name,
+			COALESCE(t.task_name, '') AS task_name,
 			t.assignee,
 			t.status,
 			t.created_at as start_time,

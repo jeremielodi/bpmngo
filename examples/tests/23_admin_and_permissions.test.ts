@@ -80,6 +80,21 @@ async function deploy(client: BpmnGoClient): Promise<void> {
   await client.api.post('/engine-rest/deployment/create', form, { headers: form.getHeaders() });
 }
 
+// Unique per execution, so G/H can be re-run against a stack that already
+// holds their users and grants (SKIP_SETUP=1).
+const runId = Date.now().toString(36);
+
+// Deploys 23_permission_process.bpmn under another process key.
+async function deployKey(client: BpmnGoClient, key: string): Promise<void> {
+  const fs = require('fs');
+  const FormData = require('form-data');
+  const xml = fs.readFileSync(BPMN, 'utf8').replace(/PermissionProcess/g, key);
+  const form = new FormData();
+  form.append('resources', Buffer.from(xml), { filename: `${key}.bpmn` });
+  form.append('deployment-name', key);
+  await client.api.post('/engine-rest/deployment/create', form, { headers: form.getHeaders() });
+}
+
 async function run() {
   await superuser.loginAsSuperUser();
 
@@ -119,20 +134,26 @@ async function run() {
 
       // ── B: per-resource process permissions ─────────────────────────────────
       {
-        name: '[B] Unrestricted by default; granting VIEW+START restricts to grantees; MANAGE required to redeploy',
+        name: '[B] A new process is its deployer\'s alone; grants let others in; MANAGE required to redeploy',
         async fn() {
           await deploy(superuser);
 
           const { id: userAId, client: userA } = await createUser('perm-user-a@goflow.com');
           const { client: userB } = await createUser('perm-user-b@goflow.com');
 
-          // Regression: unrestricted — any authenticated user can see/start it.
-          const listB = await userB.api.get('/engine-rest/process-definition?key=PermissionProcess');
-          assert(listB.data.length > 0, 'expected unrestricted process to be visible to an unrelated user');
-          const startB = await userB.startProcess('PermissionProcess', {});
-          assert(!!(startB.processInstanceId ?? (startB as any).id), 'expected unrestricted process to be startable by an unrelated user');
+          // The first deployment granted the deployer MANAGE, and only them.
+          const me = (await superuser.api.get('/users/me')).data.user;
+          const initial = (await superuser.api.get('/engine-rest/process-definition/key/PermissionProcess/permissions')).data.permissions as any[];
+          assert(initial.length === 1 && initial[0].granteeId === me.id && initial[0].permission === 'MANAGE',
+            `deployer MANAGE expected, got ${JSON.stringify(initial)}`);
 
-          // Restrict: grant userA VIEW + START.
+          // Anyone else neither sees nor starts it until granted.
+          const listB = await userB.api.get('/engine-rest/process-definition?key=PermissionProcess');
+          assert(listB.data.length === 0, 'a new process must be invisible to an unrelated user');
+          const startB = await userB.startProcess('PermissionProcess', {}).catch(e => e.response);
+          assert(startB.status === 403, `starting without a grant: expected 403, got ${startB.status}`);
+
+          // Let userA in: VIEW + START.
           await superuser.api.post('/engine-rest/process-definition/key/PermissionProcess/permissions', {
             granteeType: 'user', granteeId: userAId, permission: 'VIEW',
           });
@@ -341,8 +362,134 @@ async function run() {
         },
       },
 
+
+      // ── G: revoking a process permission ───────────────────────────────────
+      {
+        name: '[G] Revoking a grant cuts access; MANAGE on one process cannot revoke another\'s grants',
+        async fn() {
+          const keyA = `RevokeA_${runId}`;
+          const keyB = `RevokeB_${runId}`;
+          await deployKey(superuser, keyA);
+          await deployKey(superuser, keyB);
+          const { id: viewerId, client: viewer } = await createUser(`revoke-viewer-${runId}@goflow.com`);
+          const { id: managerId, client: manager } = await createUser(`revoke-manager-${runId}@goflow.com`);
+
+          const grant = async (key: string, granteeId: string, permission: string) =>
+            (await superuser.api.post(`/engine-rest/process-definition/key/${key}/permissions`, {
+              granteeType: 'user', granteeId, permission,
+            })).data.permission.id as string;
+
+          const viewA = await grant(keyA, viewerId, 'VIEW');
+          const viewB = await grant(keyB, viewerId, 'VIEW');
+          await grant(keyA, managerId, 'MANAGE');
+
+          const seen = async (c: BpmnGoClient, key: string) =>
+            (await c.api.get(`/engine-rest/process-definition/key/${key}`, { validateStatus: () => true })).status;
+          assert(await seen(viewer, keyA) === 200, 'viewer should see A before revoke');
+
+          // Without MANAGE: refused, and the grant survives.
+          const denied = await viewer.api.delete(`/engine-rest/process-definition/key/${keyA}/permissions/${viewA}`, { validateStatus: () => true });
+          assert(denied.status === 403, `revoke without MANAGE: expected 403, got ${denied.status}`);
+          assert(await seen(viewer, keyA) === 200, 'a refused revoke must leave the grant in place');
+
+          // Nor can a non-manager grant itself MANAGE (the 403 used to be
+          // written but the handler carried on and created the grant).
+          const selfGrant = await viewer.api.post(`/engine-rest/process-definition/key/${keyA}/permissions`,
+            { granteeType: 'user', granteeId: viewerId, permission: 'MANAGE' }, { validateStatus: () => true });
+          assert(selfGrant.status === 403, `self-grant without MANAGE: expected 403, got ${selfGrant.status}`);
+          const listDenied = await viewer.api.get(`/engine-rest/process-definition/key/${keyA}/permissions`, { validateStatus: () => true });
+          assert(listDenied.status === 403, `listing grants without MANAGE: expected 403, got ${listDenied.status}`);
+          const grantsA = (await superuser.api.get(`/engine-rest/process-definition/key/${keyA}/permissions`)).data.permissions as any[];
+          assert(!grantsA.some(p => p.granteeId === viewerId && p.permission === 'MANAGE'), 'a refused self-grant must not be stored');
+
+          // Nor on a process it has no grant on at all.
+          const keyOther = `RevokeOther_${runId}`;
+          await deployKey(superuser, keyOther);
+          const takeover = await viewer.api.post(`/engine-rest/process-definition/key/${keyOther}/permissions`,
+            { granteeType: 'user', granteeId: viewerId, permission: 'MANAGE' }, { validateStatus: () => true });
+          assert(takeover.status === 403, `granting itself MANAGE elsewhere: expected 403, got ${takeover.status}`);
+          const otherGrants = (await superuser.api.get(`/engine-rest/process-definition/key/${keyOther}/permissions`)).data.permissions as any[];
+          assert(otherGrants.length === 1 && otherGrants[0].granteeId !== viewerId, `only the deployer's grant may remain: ${JSON.stringify(otherGrants)}`);
+
+          // MANAGE on A, grant id from B, URL under A: must not touch B.
+          const cross = await manager.api.delete(`/engine-rest/process-definition/key/${keyA}/permissions/${viewB}`, { validateStatus: () => true });
+          assert(cross.status === 404, `cross-process revoke: expected 404, got ${cross.status}`);
+          assert(await seen(viewer, keyB) === 200, 'cross-process revoke must leave B\'s grant in place');
+
+          // The manager revokes on its own process: access is cut at once.
+          const ok = await manager.api.delete(`/engine-rest/process-definition/key/${keyA}/permissions/${viewA}`, { validateStatus: () => true });
+          assert(ok.status === 200, `revoke with MANAGE: expected 200, got ${ok.status}`);
+          assert(await seen(viewer, keyA) === 404, 'viewer must lose access to A after revoke');
+          const again = await manager.api.delete(`/engine-rest/process-definition/key/${keyA}/permissions/${viewA}`, { validateStatus: () => true });
+          assert(again.status === 404, `revoking twice: expected 404, got ${again.status}`);
+
+          // Revoke everything on B: all goes but the last grant, which is
+          // refused (409) — a process never falls back to "open to all".
+          const listB = (await superuser.api.get(`/engine-rest/process-definition/key/${keyB}/permissions`)).data.permissions as any[];
+          const statuses: number[] = [];
+          for (const p of listB) {
+            statuses.push((await superuser.api.delete(`/engine-rest/process-definition/key/${keyB}/permissions/${p.id}`, { validateStatus: () => true })).status);
+          }
+          assert(statuses.slice(0, -1).every(s => s === 200) && statuses[statuses.length - 1] === 409,
+            `all revocations but the last succeed, the last is a 409: ${statuses}`);
+          const left = (await superuser.api.get(`/engine-rest/process-definition/key/${keyB}/permissions`)).data.permissions as any[];
+          assert(left.length === 1, `one grant must remain, got ${left.length}`);
+          const { client: outsider } = await createUser(`revoke-outsider-${runId}@goflow.com`);
+          assert(await seen(outsider, keyB) === 404, 'the process must stay closed to everyone else');
+        },
+      },
+
+      // ── H: self-service user routes ─────────────────────────────────────────
+      {
+        name: '[H] Own password change, email lookup and permission check are self-or-admin only',
+        async fn() {
+          const emailA = `self-a-${runId}@goflow.com`;
+          const emailB = `self-b-${runId}@goflow.com`;
+          const { id: aId, client: a } = await createUser(emailA);
+          const { id: bId } = await createUser(emailB);
+          const status = (p: Promise<any>) => p.then(r => r.status, e => e.response?.status);
+
+          // Password: validation, wrong current password, someone else's.
+          assert(await status(a.api.put(`/users/${aId}/password`, { current_password: 'password123', new_password: '' })) === 400, 'empty new password must be refused');
+          assert(await status(a.api.put(`/users/${aId}/password`, { current_password: 'password123', new_password: '12345' })) === 400, 'too short a password must be refused');
+          assert(await status(a.api.put(`/users/${aId}/password`, { current_password: 'wrong', new_password: 'newpass789' })) === 401, 'wrong current password must be refused');
+          assert(await status(a.api.put(`/users/${bId}/password`, { current_password: 'password123', new_password: 'newpass789' })) === 403, 'changing another user\'s password must be refused');
+          assert(await status(superuser.api.put(`/users/${aId}/password`, { current_password: 'x', new_password: 'newpass789' })) === 403, 'even an admin uses reset-password, not this route');
+
+          await a.api.put(`/users/${aId}/password`, { current_password: 'password123', new_password: 'newpass789' });
+          const fresh = new BpmnGoClient();
+          assert(!!(await fresh.login(emailA, 'newpass789')).access_token, 'new password must work');
+          assert(await status(fresh.login(emailA, 'password123')) === 401, 'old password must no longer work');
+
+          // Email lookup: self or admin; a non-admin cannot probe which emails exist.
+          const self = await a.api.get(`/users/email/${emailA}`);
+          assert(self.data.user.id === aId, 'own email lookup should return self');
+          assert(await status(a.api.get(`/users/email/${emailB}`)) === 403, 'looking up another user by email must be refused');
+          assert(await status(a.api.get(`/users/email/nobody-${runId}@goflow.com`)) === 403, 'an unknown email must look the same as a known one to a non-admin');
+          assert(await status(superuser.api.get(`/users/email/nobody-${runId}@goflow.com`)) === 404, 'admin lookup of an unknown email: 404');
+          assert((await superuser.api.get(`/users/email/${emailA}`)).data.user.id === aId, 'admin can look up any email');
+
+          // Permission check follows role assignment, and is self-or-admin.
+          const actions = (await superuser.api.get('/actions')).data.actions as any[];
+          const readTasks = actions.find(x => x.code === 'CAN_READ_TASKS');
+          const allowed = async () => (await a.api.get(`/users/${aId}/permission/${readTasks.id}`)).data.is_allowed;
+          assert(await allowed() === false, 'fresh user should not hold CAN_READ_TASKS');
+          const roleId = (await superuser.api.post('/roles', { label: `self-check-${runId}`, is_default: 0 })).data.role.id;
+          await superuser.api.post(`/roles/${roleId}/actions/${readTasks.id}`);
+          const roleActions = (await superuser.api.get(`/roles/${roleId}/actions`)).data;
+          assert(JSON.stringify(roleActions).includes('CAN_READ_TASKS'), `GET /roles/:id/actions should list CAN_READ_TASKS, got ${JSON.stringify(roleActions)}`);
+          assert(await status(a.api.get(`/roles/${roleId}/actions`)) === 403, 'reading a role\'s actions needs an admin right');
+          await superuser.api.post(`/users/${aId}/roles/${roleId}`);
+          assert(await allowed() === true, 'CAN_READ_TASKS should be allowed once the role is assigned');
+          await superuser.api.delete(`/users/${aId}/roles/${roleId}`);
+          assert(await allowed() === false, 'CAN_READ_TASKS should be gone once the role is removed');
+          assert(await status(a.api.get(`/users/${bId}/permission/${readTasks.id}`)) === 403, 'checking another user\'s permissions must be refused');
+          assert((await superuser.api.get(`/users/${bId}/permission/${readTasks.id}`)).data.is_allowed === false, 'admin can check anyone');
+          await superuser.api.delete(`/roles/${roleId}`);
+        },
+      },
     ],
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

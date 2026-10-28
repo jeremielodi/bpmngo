@@ -20,6 +20,7 @@ type Job struct {
 	ID          string                 `json:"id"`
 	Type        string                 `json:"type"`
 	ProcessKey  string                 `json:"processKey,omitempty"`
+	TenantID    string                 `json:"tenantId,omitempty"` // the caller's ("" = none)
 	ExecutionID uuid.UUID              `json:"executionId,omitempty"`
 	TaskID      uuid.UUID              `json:"taskId,omitempty"`
 	Variables   map[string]interface{} `json:"variables,omitempty"`
@@ -187,15 +188,19 @@ func (p *WorkerPool) processStartProcess(job Job) JobResult {
 	engineRepo := repository.NewEngineRepository(p.db, p.dispatcher)
 
 	// Get process definition
-	procDef, err := engineRepo.FindLatestProcessDefinitionByKey(job.ProcessKey)
+	procDef, err := engineRepo.FindLatestProcessDefinitionByKeyForTenant(job.ProcessKey, job.TenantID)
 	if err != nil {
 		log.Printf("❌ Failed to find process definition: %v", err)
 		return JobResult{Success: false, Error: fmt.Errorf("process definition not found: %w", err)}
 	}
+	tenantID := procDef.TenantID
+	if job.TenantID != "" {
+		tenantID = &job.TenantID
+	}
 
 	// Run asynchronously: the request was already answered.
 	go func() {
-		instanceID, _, err := runtime.StartInstance(context.Background(), procDef.ID, procDef.TenantID, job.Variables)
+		instanceID, _, err := runtime.StartInstance(context.Background(), procDef.ID, tenantID, job.Variables)
 		if err != nil {
 			log.Printf("❌ Execution error for instance %s: %v", instanceID, err)
 		} else {

@@ -4,7 +4,7 @@ import "testing"
 
 func TestFEELModes(t *testing.T) {
 	vars := map[string]interface{}{"amount": 250.0, "price": 0.1}
-	defer setFEELMode(feelModeShadow)
+	defer setFEELMode(feelMode())
 
 	// FEEL-only syntax: CEL rejects it, the native interpreter doesn't.
 	const ifExpr = `= if amount > 100 then "high" else "low"`

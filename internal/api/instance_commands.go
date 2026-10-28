@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -129,40 +130,31 @@ type endArgs struct {
 	Variables  map[string]interface{} `json:"variables"`
 }
 
-func (ic *instanceCommands) end(_ context.Context, a endArgs) (struct{}, error) {
-	if err := ic.repo.UpdateStatus(a.InstanceID, "completed"); err != nil {
-		return struct{}{}, err
-	}
-	if err := ic.mergeVariables(a.InstanceID, a.Variables); err != nil {
-		return struct{}{}, err
-	}
-	if err := service.ArchiveFinishedInstance(ic.db, a.InstanceID, nil); err != nil {
-		fmt.Printf("Warning: failed to archive ended process instance %s: %v\n", a.InstanceID, err)
-	}
-	return struct{}{}, nil
+// end and stop close the instance with the same cleanup as a cancellation
+// (open tasks, jobs, timers, called instances), as completed or terminated.
+func (ic *instanceCommands) end(ctx context.Context, a endArgs) (struct{}, error) {
+	err := service.EndProcessInstance(ic.db, ic.dispatcher, a.InstanceID, "completed", "Process ended by user", a.Variables)
+	return struct{}{}, ignoreRedeliveredNotFound(ctx, err)
 }
 
 type stopArgs struct {
 	InstanceID uuid.UUID              `json:"instanceId"`
+	Reason     string                 `json:"reason"`
 	Variables  map[string]interface{} `json:"variables"`
 }
 
-func (ic *instanceCommands) stop(_ context.Context, a stopArgs) (struct{}, error) {
-	if err := ic.mergeVariables(a.InstanceID, a.Variables); err != nil {
-		return struct{}{}, err
-	}
-	return struct{}{}, ic.repo.UpdateStatus(a.InstanceID, "terminated")
+func (ic *instanceCommands) stop(ctx context.Context, a stopArgs) (struct{}, error) {
+	err := service.EndProcessInstance(ic.db, ic.dispatcher, a.InstanceID, "terminated", a.Reason, a.Variables)
+	return struct{}{}, ignoreRedeliveredNotFound(ctx, err)
 }
 
-func (ic *instanceCommands) mergeVariables(instanceID uuid.UUID, vars map[string]interface{}) error {
-	existing, err := ic.repo.GetVariables(instanceID)
-	if err != nil {
-		return err
+// ignoreRedeliveredNotFound: a redelivered command whose first delivery
+// already closed the instance has nothing left to do.
+func ignoreRedeliveredNotFound(ctx context.Context, err error) error {
+	if errors.Is(err, service.ErrProcessInstanceNotFound) && cmdbus.Redelivered(ctx) {
+		return nil
 	}
-	for k, v := range vars {
-		existing[k] = v
-	}
-	return ic.repo.UpsertVariables(instanceID, existing)
+	return err
 }
 
 type correlateArgs struct {

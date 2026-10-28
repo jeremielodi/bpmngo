@@ -11,6 +11,7 @@
  *   B) Salad path   (recipe=salad)  — XOR routes to prepare_salad user task
  *   C) External task failure with retry
  *   D) Variables set by external worker are visible on subsequent tasks
+ *      (checked in A)
  */
 import * as path from 'path';
 import { BpmnGoClient, runSuite, assert, sleep } from './client';
@@ -45,11 +46,17 @@ async function run() {
             mealReady: true,
             cookedAt: new Date().toISOString(),
             dish: task.variables?.recipe?.value ?? 'unknown',
-          }), 15000);
+          }), 15000, instanceId);
 
           // Step 3: Serve the hot meal
           const serveTask = await client.waitForTask('serve_hot_meal', instanceId, 10000);
           assert(serveTask.assignee === 'christian', 'wrong assignee on serve_hot_meal');
+
+          // D) What the worker wrote is visible from the next task on.
+          const vars = await client.getProcessVariables(instanceId) as Record<string, any>;
+          const val = (v: any) => (v && typeof v === 'object' && 'value' in v ? v.value : v);
+          assert(val(vars.dish) === 'pasta' && val(vars.mealReady) === true,
+            `worker variables must reach the process: dish=${JSON.stringify(vars.dish)} mealReady=${JSON.stringify(vars.mealReady)}`);
           await client.completeTask(serveTask.id);
 
           await client.waitForProcessEnd(instanceId, 10000);
@@ -95,7 +102,7 @@ async function run() {
           await client.pollExternalTask('cook_meal', async () => ({
             mealReady: true,
             dish: 'steak',
-          }), 15000);
+          }), 15000, instanceId);
 
           const serveTask = await client.waitForTask('serve_hot_meal', instanceId, 10000);
           await client.completeTask(serveTask.id);
@@ -115,30 +122,43 @@ async function run() {
           const chooseTask = await client.waitForTask('choose_recipe', instanceId, 10000);
           await client.completeTask(chooseTask.id, { recipe: 'pasta' });
 
-          // First fetch: fail the task with retries=1
-          let failed = false;
-          const startFail = Date.now();
-          while (Date.now() - startFail < 10000) {
-            const tasks = await client.fetchAndLock([{ name: 'cook_meal' }]);
-            if (tasks.length > 0) {
-              // retries is what remains after this failure (Camunda 7): one retry
-              await client.failExternalTask(tasks[0].id, 'Temporary cooking failure', 1);
-              failed = true;
-              break;
+          // Fetches this instance's cook_meal job, if available now; others
+          // are released at once.
+          const fetchOurs = async () => {
+            let ours: any;
+            for (const t of await client.fetchAndLock([{ name: 'cook_meal' }])) {
+              if (!ours && t.processInstanceId === instanceId) ours = t;
+              else await client.api.post(`/engine-rest/external-task/${t.id}/unlock`, {});
             }
-            await sleep(1000);
+            return ours;
+          };
+
+          // First fetch: fail it with retries=1 (what remains, Camunda 7).
+          let first: any;
+          const deadline = Date.now() + 10000;
+          while (!first && Date.now() < deadline) {
+            first = await fetchOurs();
+            if (!first) await sleep(300);
           }
-          assert(failed, 'Expected to fetch cook_meal task for failure');
+          assert(!!first, 'Expected to fetch cook_meal task for failure');
+          await client.failExternalTask(first.id, 'Temporary cooking failure', 1);
+          const failedAt = Date.now();
 
-          // Short wait for retry to become available (retryTimeout=5000ms)
-          console.log('       ⏳  Waiting 6s for retry timeout…');
-          await sleep(6000);
+          // Not available again before the 5 s retryTimeout...
+          assert(!(await fetchOurs()), 'the job must not be fetchable right after the failure');
+          await sleep(2000);
+          assert(!(await fetchOurs()), 'the job must not be fetchable before its retryTimeout');
 
-          // Second fetch: succeed
-          await client.pollExternalTask('cook_meal', async () => ({
-            mealReady: true,
-            retriedAt: new Date().toISOString(),
-          }), 15000);
+          // ...then the same job comes back.
+          let retry: any;
+          while (!retry && Date.now() - failedAt < 15000) {
+            retry = await fetchOurs();
+            if (!retry) await sleep(300);
+          }
+          assert(!!retry, 'the job must come back after its retryTimeout');
+          assert(retry.id === first.id, `the same job must come back, got ${retry.id} after ${first.id}`);
+          assert(Date.now() - failedAt >= 4500, `came back after ${Date.now() - failedAt} ms, before the 5 s retryTimeout`);
+          await client.completeExternalTask(retry.id, { mealReady: true, retriedAt: new Date().toISOString() });
 
           const serveTask = await client.waitForTask('serve_hot_meal', instanceId, 10000);
           await client.completeTask(serveTask.id);
@@ -150,4 +170,4 @@ async function run() {
   });
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exit(1); });

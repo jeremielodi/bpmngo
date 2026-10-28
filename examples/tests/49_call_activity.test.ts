@@ -140,15 +140,26 @@ async function main() {
           const job = await workJob('child49', marker, () => 'BAD');
           await client.waitForTask('e_handled', id, 10000);
           await waitStatus(job.instanceId, 'terminated');
-          const incidents = await client.api.get(`/engine-rest/process-instance/${job.instanceId}/incidents`).then(r => r.data).catch(() => []);
-          assert(!Array.isArray(incidents) || incidents.length === 0, `no incident in the called instance: ${JSON.stringify(incidents)}`);
+          // No catch: a failing query (404 on a finished instance, say) must
+          // fail the test, not pass it with an empty list.
+          const res = await client.api.get(`/engine-rest/process-instance/${job.instanceId}/incidents`);
+          assert(Array.isArray(res.data) && res.data.length === 0, `no incident in the called instance: ${JSON.stringify(res.data)}`);
           await finish(id, 'e_handled');
         },
       },
       {
         name: '[D] An error end event in the called process is caught by the call activity',
         async fn() {
+          // A margin for clock skew between this host and the server.
+          const since = new Date(Date.now() - 2000).toISOString();
           const id = await start('CallError49', { marker: `D-${run}`, childId: 'ChildErrorEnd49' });
+          await client.waitForTask('e_handled', id, 10000);
+          const children = (await client.api.get('/engine-rest/history/process-instance',
+            { params: { processDefinitionKey: 'ChildErrorEnd49', startedAfter: since } })).data as any[];
+          assert(children.length === 1, `one called instance expected, got ${children.length}`);
+          assert(children[0].endTime !== null && children[0].state !== 'ACTIVE', `the called instance must be over: ${JSON.stringify(children[0])}`);
+          const res = await client.api.get(`/engine-rest/process-instance/${children[0].id}/incidents`);
+          assert(Array.isArray(res.data) && res.data.length === 0, `no incident in the called instance: ${JSON.stringify(res.data)}`);
           await finish(id, 'e_handled');
         },
       },

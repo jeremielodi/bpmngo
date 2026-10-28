@@ -75,6 +75,13 @@ func GetTenantId(c *fiber.Ctx) string {
 	return tenantId
 }
 
+// TenantMayStart reports whether a caller may start a process definition
+// of definitionTenant: its own tenant's or a shared one (no tenant). An
+// empty callerTenant (superuser / untenanted) may start any.
+func TenantMayStart(definitionTenant *string, callerTenant string) bool {
+	return callerTenant == "" || definitionTenant == nil || *definitionTenant == "" || *definitionTenant == callerTenant
+}
+
 // TenantMatches reports whether a resource's tenant is visible to the
 // caller's tenant. An empty callerTenant means "no tenant restriction"
 // (superuser / untenanted deployment) and always matches.

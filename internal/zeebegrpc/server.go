@@ -22,6 +22,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/runtime"
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jeremielodi/bpmngo/internal/zeebegrpc/pb"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -84,6 +85,11 @@ func (s *Server) Topology(ctx context.Context, req *pb.TopologyRequest) (*pb.Top
 
 func (s *Server) DeployResource(ctx context.Context, req *pb.DeployResourceRequest) (*pb.DeployResourceResponse, error) {
 	userID := UserIDFromContext(ctx)
+	tenant, err := s.effectiveTenant(userID, req.TenantId)
+	if err != nil {
+		return nil, err
+	}
+	req.TenantId = tenant
 
 	resources := make([]service.RawResource, len(req.Resources))
 	for i, r := range req.Resources {
@@ -133,9 +139,22 @@ func (s *Server) DeployResource(ctx context.Context, req *pb.DeployResourceReque
 	}, nil
 }
 
+// effectiveTenant is the tenant a call acts in: a tenant user's own (a
+// request naming another one is refused), else the one the request names.
+func (s *Server) effectiveTenant(userID uuid.UUID, requested string) (string, error) {
+	var own *string
+	if err := s.db.Get(&own, `SELECT tenant_id FROM public.users WHERE id = $1`, userID); err != nil || own == nil || *own == "" {
+		return requested, nil
+	}
+	if requested != "" && requested != *own {
+		return "", status.Errorf(codes.PermissionDenied, "tenant %q is not yours", requested)
+	}
+	return *own, nil
+}
+
 // ── CreateProcessInstance ───────────────────────────────────────────────
 
-func (s *Server) resolveDefinition(req *pb.CreateProcessInstanceRequest) (models.ProcessDefinition, error) {
+func (s *Server) resolveDefinition(req *pb.CreateProcessInstanceRequest, tenant string) (models.ProcessDefinition, error) {
 	if req.ProcessDefinitionKey != 0 {
 		id, err := s.zeebeKeys.ResolveKey("process_definition", req.ProcessDefinitionKey)
 		if err != nil {
@@ -147,7 +166,7 @@ func (s *Server) resolveDefinition(req *pb.CreateProcessInstanceRequest) (models
 		return models.ProcessDefinition{}, fmt.Errorf("either processDefinitionKey or bpmnProcessId must be set")
 	}
 	if req.Version <= 0 {
-		return s.processRepo.FindLatestProcessDefinitionByKey(req.BpmnProcessId)
+		return s.processRepo.FindLatestProcessDefinitionByKeyForTenant(req.BpmnProcessId, tenant)
 	}
 	return s.processRepo.FindProcessDefinitionByKeyAndVersion(req.BpmnProcessId, int(req.Version))
 }
@@ -155,7 +174,14 @@ func (s *Server) resolveDefinition(req *pb.CreateProcessInstanceRequest) (models
 func (s *Server) CreateProcessInstance(ctx context.Context, req *pb.CreateProcessInstanceRequest) (*pb.CreateProcessInstanceResponse, error) {
 	userID := UserIDFromContext(ctx)
 
-	def, err := s.resolveDefinition(req)
+	tenant, err := s.effectiveTenant(userID, req.TenantId)
+	if err != nil {
+		return nil, err
+	}
+	def, err := s.resolveDefinition(req, tenant)
+	if err == nil && !common.TenantMayStart(def.TenantID, tenant) {
+		err = fmt.Errorf("process definition not found")
+	}
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
@@ -171,7 +197,10 @@ func (s *Server) CreateProcessInstance(ctx context.Context, req *pb.CreateProces
 		}
 	}
 
-	tenantID := req.TenantId
+	tenantID := tenant
+	if tenantID == "" && def.TenantID != nil {
+		tenantID = *def.TenantID
+	}
 	instanceID, _, err := runtime.StartInstance(ctx, def.ID, &tenantID, vars)
 	if errors.Is(err, runtime.ErrExecutionFailed) {
 		return nil, status.Errorf(codes.Internal, "failed to execute process: %v", err)
@@ -194,7 +223,7 @@ func (s *Server) CreateProcessInstance(ctx context.Context, req *pb.CreateProces
 		BpmnProcessId:        def.ProcessKey,
 		Version:              int32(def.Version),
 		ProcessInstanceKey:   instKey,
-		TenantId:             req.TenantId,
+		TenantId:             tenantID,
 	}, nil
 }
 
@@ -389,6 +418,7 @@ func (s *Server) FailJob(ctx context.Context, req *pb.FailJobRequest) (*pb.FailJ
 		JobID:            jobID,
 		RetriesRemaining: int(req.Retries),
 		ErrorMessage:     req.ErrorMessage,
+		RetryBackoffMs:   req.RetryBackOff,
 	}); err != nil {
 		return nil, mapJobError(err)
 	}

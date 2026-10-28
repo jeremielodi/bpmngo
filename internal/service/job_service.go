@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
@@ -172,6 +173,12 @@ type FailJobResult struct {
 // ExternalTaskController.HandleFailure, which does req.Retries-1 before
 // calling this so its own REST semantics are unchanged).
 func FailJob(db *sqlx.DB, jobID uuid.UUID, retriesRemaining int, errorMessage, errorCode string) (*FailJobResult, error) {
+	return FailJobWithBackoff(db, jobID, retriesRemaining, errorMessage, errorCode, 0)
+}
+
+// FailJobWithBackoff is FailJob with a delay before a retried job can be
+// fetched again (Camunda 7 retryTimeout, Camunda 8 retryBackOff).
+func FailJobWithBackoff(db *sqlx.DB, jobID uuid.UUID, retriesRemaining int, errorMessage, errorCode string, retryBackoff time.Duration) (*FailJobResult, error) {
 	externalTaskRepo := repository.NewExternalTaskRepository(db)
 	incidentRepo := repository.NewIncidentRepository(db)
 	auditService := NewAuditService(db)
@@ -305,7 +312,7 @@ func FailJob(db *sqlx.DB, jobID uuid.UUID, retriesRemaining int, errorMessage, e
 			}
 		}
 	} else {
-		if err := externalTaskRepo.ResetJobForRetryTx(tx, processInstanceID, jobID, retriesRemaining, errorMessage); err != nil {
+		if err := externalTaskRepo.ResetJobForRetryTx(tx, processInstanceID, jobID, retriesRemaining, errorMessage, retryBackoff); err != nil {
 			return nil, fmt.Errorf("failed to reset job for retry: %w", err)
 		}
 	}
