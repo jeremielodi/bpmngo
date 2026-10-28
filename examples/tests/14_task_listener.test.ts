@@ -19,11 +19,11 @@
  *      filter excludes events from processes the client didn't ask for.
  */
 import * as path from 'path';
-import { GoFlowClient, TaskSSEClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, TaskSSEClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '14_task_listener.bpmn');
 const PIZZA_BPMN = path.join(__dirname, 'bpmn', '01_pizza_delivery.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   await client.loginAsSuperUser();

@@ -2,9 +2,9 @@
  * Suite 00 — Authentication
  * Tests: login, token usage, refresh, logout, invalid credentials
  */
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   await runSuite({

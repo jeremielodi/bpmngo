@@ -14,10 +14,10 @@
  *   D) An interrupting conditional event sub-process cancels the main flow.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '42_conditional.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function setVars(instanceId: string, vars: Record<string, unknown>) {
   await client.api.post(`/engine-rest/process-instance/${instanceId}/variables`, vars);

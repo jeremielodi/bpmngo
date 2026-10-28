@@ -45,7 +45,7 @@ const log = {
 // API CLIENT
 // ============================================================
 
-class GoFlowClient {
+class BpmnGoClient {
     static async deployBpmn(filePath, deploymentName) {
         if (!fs.existsSync(filePath)) {
             throw new Error(`BPMN file not found: ${filePath}`);
@@ -193,7 +193,7 @@ async function runSequentialMultiInstanceTest() {
             log.info(`Please ensure ${BPMN_FILE} exists in the current directory`);
             return false;
         }
-        await GoFlowClient.deployBpmn(BPMN_FILE, 'Sequential Multi-Instance Test');
+        await BpmnGoClient.deployBpmn(BPMN_FILE, 'Sequential Multi-Instance Test');
         
         // Step 2: Start worker
         log.section('WORKER STARTUP');
@@ -203,7 +203,7 @@ async function runSequentialMultiInstanceTest() {
         
         // Step 3: Start process
         log.section('PROCESS START');
-        const processData = await GoFlowClient.startProcess(PROCESS_KEY, {});
+        const processData = await BpmnGoClient.startProcess(PROCESS_KEY, {});
         processInstanceId = processData.processInstanceId;
         
         // Step 4: Monitor progress
@@ -219,7 +219,7 @@ async function runSequentialMultiInstanceTest() {
             await sleep(checkInterval);
             elapsed += checkInterval;
             
-            const jobs = await GoFlowClient.getJobs(processInstanceId, TOPIC_NAME);
+            const jobs = await BpmnGoClient.getJobs(processInstanceId, TOPIC_NAME);
             const completedJobs = jobs.filter(j => j.status === 'completed');
             
             if (completedJobs.length > lastCompleted) {
@@ -241,7 +241,7 @@ async function runSequentialMultiInstanceTest() {
         const duration = (Date.now() - startTime) / 1000;
         
         // Check process instance
-        const processInstance = await GoFlowClient.getProcessInstance(processInstanceId);
+        const processInstance = await BpmnGoClient.getProcessInstance(processInstanceId);
         if (!processInstance) {
             log.success(`Process completed successfully`);
         } else {
@@ -249,7 +249,7 @@ async function runSequentialMultiInstanceTest() {
         }
         
         // Check jobs
-        const finalJobs = await GoFlowClient.getJobs(processInstanceId, TOPIC_NAME);
+        const finalJobs = await BpmnGoClient.getJobs(processInstanceId, TOPIC_NAME);
         const completedCount = finalJobs.filter(j => j.status === 'completed').length;
         log.info(`Jobs created: ${finalJobs.length}`);
         log.info(`Jobs completed: ${completedCount}`);
@@ -296,4 +296,4 @@ if (require.main === module) {
         });
 }
 
-module.exports = { runSequentialMultiInstanceTest, GoFlowClient, SequentialWorker };
+module.exports = { runSequentialMultiInstanceTest, BpmnGoClient, SequentialWorker };

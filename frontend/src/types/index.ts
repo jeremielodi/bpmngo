@@ -72,7 +72,7 @@ export type TaskStatus = 'created' | 'claimed' | 'completed' | 'cancelled';
 
 export interface UserTask {
   id: string;
-  // The GoFlow /engine-rest/tasks response is models.Task marshaled as-is
+  // The BpmnGo /engine-rest/tasks response is models.Task marshaled as-is
   // (see internal/models/task.go) — field names below match that JSON
   // shape exactly, not the Camunda 7 REST API's naming.
   taskName?: string;

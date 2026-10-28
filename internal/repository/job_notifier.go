@@ -10,7 +10,7 @@ import (
 )
 
 // JobAvailableChannel is the Postgres NOTIFY channel used to broadcast job
-// creation across every GoFlow instance sharing this database, not just the
+// creation across every BpmnGo instance sharing this database, not just the
 // instance that created the job. This is what lets a horizontally-scaled
 // deployment (multiple stateless app instances behind a load balancer, one
 // Postgres) still get near-instant gRPC ActivateJobs wake-ups on any
@@ -29,7 +29,7 @@ var (
 
 // NotifyJobAvailable broadcasts, via Postgres NOTIFY, that a job of jobType
 // was created — waking any ActivateJobs callers currently waiting on it, on
-// every GoFlow instance connected to this database (including this one,
+// every BpmnGo instance connected to this database (including this one,
 // which receives its own notification back through the same LISTEN
 // connection started by StartJobWakeListener). Must only be called after the
 // job's creating transaction has committed — waking a waiter before the row

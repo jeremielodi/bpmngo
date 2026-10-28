@@ -20,10 +20,10 @@
  *      refused the second time, an unknown job is a 404.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '27_partitions.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 const run = Date.now().toString(36);
 
 async function start(vars: Record<string, unknown>) {

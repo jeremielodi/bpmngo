@@ -7,10 +7,10 @@ import (
 	"log"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/common"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 )
 
 func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository.EngineRepository, exec *repository.Execution, node *engine.Node, variables map[string]interface{}) error {

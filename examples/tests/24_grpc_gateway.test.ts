@@ -5,7 +5,7 @@
  * CreateProcessInstance, ActivateJobs, CompleteJob, FailJob — against a
  * real, unmodified Zeebe client SDK (`zeebe-node`), not a hand-rolled
  * client, since the whole point of this feature is that genuine Zeebe
- * client SDKs can talk to GoFlow directly. Points at 127.0.0.1:26500
+ * client SDKs can talk to BpmnGo directly. Points at 127.0.0.1:26500
  * (Zeebe's own default gateway port) with zero client-side config beyond
  * disabling TLS, matching a self-managed Zeebe broker with no auth.
  *
@@ -35,14 +35,14 @@
  */
 import * as path from 'path';
 import { ZBClient } from 'zeebe-node';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 import { GRPC_BASIC_AUTH, rawGatewayCall } from './grpc_client';
 
 const BPMN = path.join(__dirname, 'bpmn', '24_grpc_process.bpmn');
 const ORDER_BPMN = path.join(__dirname, 'bpmn', '10_order_notification.bpmn');
 const DMN = path.join(__dirname, 'bpmn', '17_approval_decision.dmn');
 const SIGNAL_BPMN = path.join(__dirname, 'bpmn', '24_grpc_signal_process.bpmn');
-const restClient = new GoFlowClient();
+const restClient = new BpmnGoClient();
 
 function newZbClient(): ZBClient {
   return new ZBClient('127.0.0.1:26500', {
@@ -53,7 +53,7 @@ function newZbClient(): ZBClient {
   });
 }
 
-// The gRPC gateway hands back Zeebe-protocol int64 keys, not GoFlow's
+// The gRPC gateway hands back Zeebe-protocol int64 keys, not BpmnGo's
 // internal UUIDs — the REST API (used here only to verify gRPC and REST
 // share the same underlying engine state) needs the UUID. Resolve it by
 // finding the most recently started running instance of processKey.
@@ -377,9 +377,9 @@ async function run() {
           const topology = await rawGatewayCall('Topology', {}, basic);
           assert(topology.brokers.length > 0, 'Basic credentials must be accepted');
 
-          const login = await new GoFlowClient().loginAsSuperUser();
+          const login = await new BpmnGoClient().loginAsSuperUser();
           const created = await rawGatewayCall('CreateProcessInstance', create, `Bearer ${login.access_token}`);
-          assert(!!created.processInstanceKey, 'a valid GoFlow JWT must be accepted');
+          assert(!!created.processInstanceKey, 'a valid BpmnGo JWT must be accepted');
         },
       },
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/jeremielodi/goflow/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/models"
 )
 
 // distributedClaims: jobs and timers are Citus-distributed tables. Citus

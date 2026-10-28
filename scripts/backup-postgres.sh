@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Sauvegarde de la base GoFlow (Postgres dockerisé) avec rotation.
+# Sauvegarde de la base BpmnGo (Postgres dockerisé) avec rotation.
 #
 #   ./scripts/backup-postgres.sh                 # sauvegarde dans ./backups
 #   BACKUP_DIR=/srv/backups BACKUP_KEEP_DAYS=30 ./scripts/backup-postgres.sh
@@ -10,7 +10,7 @@
 #   PGHOST=haproxy PGPORT=5000 PGPASSWORD=… ./scripts/backup-postgres.sh
 #
 # pg_dump tourne alors dans un conteneur postgres:16 jetable, sur le réseau
-# Docker de GoFlow (DOCKER_NETWORK, camunda-like_goflow-network par défaut).
+# Docker de BpmnGo (DOCKER_NETWORK, camunda-like_goflow-network par défaut).
 #
 # Cron quotidien (3h du matin) :
 #   0 3 * * * cd /root/apps/goflow && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1

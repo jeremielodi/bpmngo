@@ -4,7 +4,7 @@
  * Driven by the real zeebe-node SDK where it exposes the RPC; for
  * StreamActivatedJobs and DeleteResource (absent from zeebe-node 8.3) by
  * grpc-js loading zeebe-node's own official zeebe.proto — the genuine
- * protocol definition, not GoFlow's.
+ * protocol definition, not BpmnGo's.
  *
  * Tests:
  *   A) ThrowError: the job's BPMN error is caught by the error boundary.
@@ -22,12 +22,12 @@ import * as os from 'os';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { ZBClient } from 'zeebe-node';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 import { GRPC_BASIC_AUTH, authInterceptor } from './grpc_client';
 
 const BPMN = path.join(__dirname, 'bpmn', '40_grpc_more.bpmn');
 const GRPC_ADDR = process.env.GRPC_ADDR ?? '127.0.0.1:26500';
-const restClient = new GoFlowClient();
+const restClient = new BpmnGoClient();
 
 function newZbClient(): ZBClient {
   return new ZBClient(GRPC_ADDR, { useTLS: false, retry: false, eagerConnection: false, basicAuth: GRPC_BASIC_AUTH });

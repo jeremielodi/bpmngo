@@ -8,9 +8,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -56,7 +56,7 @@ type HistoricActivityInstanceResponse struct {
 }
 
 // c7HistoricState is Camunda 7's name for an instance status: ACTIVE,
-// SUSPENDED, COMPLETED, or EXTERNALLY_TERMINATED (GoFlow's terminated is an
+// SUSPENDED, COMPLETED, or EXTERNALLY_TERMINATED (BpmnGo's terminated is an
 // instance ended through the API).
 func c7HistoricState(status string) string {
 	switch strings.ToLower(status) {
@@ -70,8 +70,8 @@ func c7HistoricState(status string) string {
 }
 
 // historicStateFilter maps a state= filter, in Camunda 7's spelling
-// (ACTIVE, EXTERNALLY_TERMINATED, …) or GoFlow's (active, terminated, …),
-// to GoFlow's: active, suspended, completed or terminated. Anything else is
+// (ACTIVE, EXTERNALLY_TERMINATED, …) or BpmnGo's (active, terminated, …),
+// to BpmnGo's: active, suspended, completed or terminated. Anything else is
 // passed on lower-cased.
 func historicStateFilter(state string) string {
 	switch s := strings.ToLower(state); s {
@@ -102,7 +102,7 @@ func (hc *HistoryController) ListHistoricProcessInstances(c *fiber.Ctx) error {
 	if businessKey == "" {
 		businessKey = param("processInstanceBusinessKey") // Camunda 7's name
 	}
-	// GoFlow's state=, in Camunda 7 or GoFlow spelling, or Camunda 7's
+	// BpmnGo's state=, in Camunda 7 or BpmnGo spelling, or Camunda 7's
 	// boolean filters; state wins when both are given.
 	state := historicStateFilter(param("state"))
 	if state == "" {

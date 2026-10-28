@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jmoiron/sqlx"
 )
 

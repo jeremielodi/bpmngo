@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/cmdbus"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
 )
 
 // ErrStepBackRefused is returned when a token can't be stepped back; the

@@ -1,4 +1,4 @@
-// Package v2 exposes GoFlow's engine through the Camunda 8 "Orchestration
+// Package v2 exposes BpmnGo's engine through the Camunda 8 "Orchestration
 // Cluster" REST API shapes (POST /v2/process-instances, /v2/jobs/activation,
 // /v2/user-tasks/..., etc.), in parallel with the existing Camunda 7 style
 // /engine-rest/... surface. It reuses the same repositories/services as the
@@ -12,12 +12,12 @@ import (
 	"errors"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -39,7 +39,7 @@ func NewProcessInstanceController(db *sqlx.DB, dispatcher *events.TaskEventDispa
 	}
 }
 
-// processInstanceState maps GoFlow's internal status to the uppercase state
+// processInstanceState maps BpmnGo's internal status to the uppercase state
 // names used by the Camunda 8 REST API.
 func processInstanceState(status string) string {
 	switch status {

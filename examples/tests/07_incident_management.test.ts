@@ -14,10 +14,10 @@
  *   D) Delete incident → incident disappears from open list
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '07_support_ticket.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   await client.loginAsSuperUser();

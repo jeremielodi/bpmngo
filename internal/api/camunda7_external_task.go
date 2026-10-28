@@ -11,9 +11,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
 )
 
 // maxAsyncResponseTimeout caps how long a fetchAndLock long poll waits.
@@ -60,7 +60,7 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 			break
 		}
 		// Woken as soon as a job of the first topic is created on any
-		// GoFlow instance; the other topics at the next poll.
+		// BpmnGo instance; the other topics at the next poll.
 		select {
 		case <-wake:
 		case <-time.After(500 * time.Millisecond):
@@ -76,7 +76,7 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 	wanted := map[string][]string{}
 	for _, t := range req.Topics {
 		lockDuration[t.TopicName] = t.LockDuration
-		// An empty list means all of them, as GoFlow clients have always sent.
+		// An empty list means all of them, as BpmnGo clients have always sent.
 		if len(t.Variables) > 0 {
 			wanted[t.TopicName] = t.Variables
 		}

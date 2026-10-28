@@ -3,7 +3,7 @@ package service
 
 import (
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 

@@ -8,8 +8,8 @@ faut faire côté base de données à chaque étape.
 ## La base de données ne change pas de schéma
 
 Ajouter des serveurs **ne demande aucune migration SQL**. Les migrations
-(`database/migrations/`) suivent les versions de GoFlow, pas le nombre de
-machines : on les applique à chaque mise à jour de GoFlow, comme
+(`database/migrations/`) suivent les versions de BpmnGo, pas le nombre de
+machines : on les applique à chaque mise à jour de BpmnGo, comme
 d'habitude, quel que soit le déploiement.
 
 Ce que chaque étape demande côté Postgres, c'est de l'infrastructure :
@@ -17,8 +17,8 @@ Ce que chaque étape demande côté Postgres, c'est de l'infrastructure :
 | Passage | Côté base de données |
 |---|---|
 | 1 → 2 serveurs | Un rôle de réplication et une ligne d'autorisation sur le serveur actuel. Les données ne bougent pas. |
-| 2 → 3 serveurs (cluster) | Une copie de la base dans le cluster (`pg_dump` / `pg_restore`), GoFlow arrêté le temps de la copie. L'ancienne base reste intacte. |
-| 3 → 4 serveurs et plus | Rien : on ajoute des instances GoFlow. |
+| 2 → 3 serveurs (cluster) | Une copie de la base dans le cluster (`pg_dump` / `pg_restore`), BpmnGo arrêté le temps de la copie. L'ancienne base reste intacte. |
+| 3 → 4 serveurs et plus | Rien : on ajoute des instances BpmnGo. |
 
 ## En bref
 
@@ -26,8 +26,8 @@ Ce que chaque étape demande côté Postgres, c'est de l'infrastructure :
 |---|---|---|---|
 | **1** | `docker-compose.yaml` | Le plus simple | La machine tombe : tout s'arrête ; la protection, ce sont les sauvegardes copiées ailleurs |
 | **2** | serveur 1 : `docker-compose.yaml` ; serveur 2 : `deploy/replica-server.compose.yaml` | Une copie de la base tenue à jour en continu sur une autre machine, prête à prendre le relais | Bascule **manuelle** |
-| **3** | `deploy/ha/node.compose.yaml` sur chacun, `deploy/ha/app.compose.yaml` pour GoFlow | Bascule **automatique** de Postgres, sans perte | GoFlow et Redpanda en un seul exemplaire |
-| **4+** | les 3 serveurs de base + `deploy/ha/scale-ha.compose.yaml` | Plusieurs GoFlow derrière un load balancer : plus aucun point unique | — |
+| **3** | `deploy/ha/node.compose.yaml` sur chacun, `deploy/ha/app.compose.yaml` pour BpmnGo | Bascule **automatique** de Postgres, sans perte | BpmnGo et Redpanda en un seul exemplaire |
+| **4+** | les 3 serveurs de base + `deploy/ha/scale-ha.compose.yaml` | Plusieurs BpmnGo derrière un load balancer : plus aucun point unique | — |
 
 Pourquoi trois pour la bascule automatique : avec deux serveurs, si le
 lien entre eux coupe, chacun peut se croire principal et écrire de son
@@ -56,16 +56,16 @@ rsync -a backups/ sauvegarde@autre-machine:/sauvegardes/goflow/   # ou rclone, s
 
 ## 2 serveurs : une copie de la base, prête à prendre le relais
 
-Le serveur 1 garde tout (GoFlow, Postgres principal). Le serveur 2 fait
+Le serveur 1 garde tout (BpmnGo, Postgres principal). Le serveur 2 fait
 tourner une **réplique** : une copie de la base qui suit le serveur 1 en
 continu, à quelques millisecondes près. Si le serveur 1 est perdu, on
-promeut la réplique et on démarre GoFlow sur le serveur 2 : quasiment
+promeut la réplique et on démarre BpmnGo sur le serveur 2 : quasiment
 aucune perte, quelques minutes d'arrêt — au lieu de restaurer la
 sauvegarde de la nuit.
 
 Dans l'exemple : serveur 1 = `10.0.0.1`, serveur 2 = `10.0.0.2`.
 
-### Mise en place (sans arrêter GoFlow)
+### Mise en place (sans arrêter BpmnGo)
 
 **Sur le serveur 1** — autoriser la réplication :
 
@@ -82,7 +82,7 @@ docker exec goflow-postgres psql -U goflow -c "SELECT pg_reload_conf()"
 
 3. Rendre Postgres joignable par le serveur 2 : dans le `.env` du
    serveur 1, `POSTGRES_BIND=0.0.0.0`, puis `docker compose up -d postgres`
-   (quelques secondes de coupure de la base, GoFlow se reconnecte seul).
+   (quelques secondes de coupure de la base, BpmnGo se reconnecte seul).
    Au pare-feu, n'ouvrir le port 5432 **qu'au serveur 2** — jamais à
    Internet.
 
@@ -110,7 +110,7 @@ Les sauvegardes continuent sur le serveur 1, comme avant.
 # 1. La réplique devient la base principale (elle accepte les écritures)
 docker exec goflow-postgres psql -U goflow -c "SELECT pg_promote()"
 
-# 2. Démarrer GoFlow sur le serveur 2
+# 2. Démarrer BpmnGo sur le serveur 2
 docker compose -f docker-compose.yaml -f deploy/replica-server.compose.yaml up -d
 ```
 
@@ -138,7 +138,7 @@ la base promue reste principale après un redémarrage.
 Les trois serveurs font tourner Postgres en cluster : un principal, deux
 copies synchrones (une écriture confirmée est sur deux machines). Si le
 principal tombe, une copie prend le relais **toute seule** (21 à 28 s
-mesurées, aucune instance perdue) ; GoFlow suit, à travers HAProxy.
+mesurées, aucune instance perdue) ; BpmnGo suit, à travers HAProxy.
 
 Mise en place et passage depuis une base existante : voir
 [Operations — Postgres high availability](operations.md#postgres-high-availability).
@@ -146,12 +146,12 @@ En résumé :
 
 1. Appliquer les migrations sur la base actuelle, comme d'habitude.
 2. Démarrer les trois nœuds (`deploy/ha/node.compose.yaml`), vérifier le cluster.
-3. Arrêter GoFlow, faire un `pg_dump` de la base actuelle (une lecture).
+3. Arrêter BpmnGo, faire un `pg_dump` de la base actuelle (une lecture).
 4. Créer le rôle et la base vide dans le cluster, `pg_restore` dans le principal.
-5. Démarrer GoFlow sur le cluster (`deploy/ha/app.compose.yaml`).
+5. Démarrer BpmnGo sur le cluster (`deploy/ha/app.compose.yaml`).
 
 L'ancienne base reste arrêtée mais intacte : revenir en arrière, c'est
-redémarrer GoFlow sans `app.compose.yaml`. Si on avait 2 serveurs, la
+redémarrer BpmnGo sans `app.compose.yaml`. Si on avait 2 serveurs, la
 réplique du serveur 2 n'est plus utile : son serveur devient l'un des
 trois nœuds (après avoir effacé son volume).
 
@@ -160,10 +160,10 @@ Les sauvegardes passent alors par HAProxy :
 
 ---
 
-## 4 serveurs et plus : plusieurs GoFlow
+## 4 serveurs et plus : plusieurs BpmnGo
 
 Les trois serveurs de base restent tels quels ; on ajoute des instances
-GoFlow derrière un load balancer (nginx), PgBouncer passant par HAProxy :
+BpmnGo derrière un load balancer (nginx), PgBouncer passant par HAProxy :
 
 ```bash
 docker compose -f docker-compose.yaml -f docker-compose.scale.yaml \
@@ -180,7 +180,7 @@ avec plusieurs instances (voir
 
 - **`WRITE_PATH=partitioned`** (le mode « Camunda 8 », voir
   [Architecture](architecture.md#partitioned-write-path)) : utile avec
-  plusieurs instances GoFlow. Pour qu'il survive à la perte d'une
+  plusieurs instances BpmnGo. Pour qu'il survive à la perte d'une
   machine, Redpanda doit lui-même tourner sur trois nœuds — fichier non
   fourni aujourd'hui.
 - **Citus** : seulement si un seul serveur Postgres ne suit plus en

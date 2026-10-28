@@ -6,7 +6,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // the "pgx" driver
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // LISTEN (pq.Listener) and pq helpers
 )
@@ -20,7 +20,7 @@ type PoolConfig struct {
 }
 
 // Default pool configuration for production. MaxOpenConns must stay well
-// below Postgres's max_connections, multiplied by the number of GoFlow
+// below Postgres's max_connections, multiplied by the number of BpmnGo
 // instances: past it Postgres refuses new connections ("too many clients
 // already") and requests fail. Override with DB_MAX_OPEN_CONNS and
 // DB_MAX_IDLE_CONNS.

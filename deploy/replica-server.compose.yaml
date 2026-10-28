@@ -8,9 +8,9 @@
 #
 # "postgres" here is the replica: on its first start it copies the first
 # server's database (pg_basebackup), then follows it. Only postgres is
-# started: GoFlow keeps running on the first server.
+# started: BpmnGo keeps running on the first server.
 #
-# If the first server is lost, promote it and start GoFlow here — see
+# If the first server is lost, promote it and start BpmnGo here — see
 # docs/adding-servers.md:
 #
 #   docker exec goflow-postgres psql -U goflow -c "SELECT pg_promote()"

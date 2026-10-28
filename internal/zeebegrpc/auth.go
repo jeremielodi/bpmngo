@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/pkg/authentication"
-	"github.com/jeremielodi/goflow/pkg/middleware"
+	"github.com/jeremielodi/bpmngo/pkg/authentication"
+	"github.com/jeremielodi/bpmngo/pkg/middleware"
 	"github.com/jmoiron/sqlx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -46,8 +46,8 @@ func ResolveAnonymousUserID(db *sqlx.DB) (uuid.UUID, error) {
 }
 
 // Authenticator checks the `authorization` metadata of every gRPC call with
-// the same credentials as the REST API: a GoFlow JWT or an OIDC token
-// (`Bearer …`), or a GoFlow e-mail and password (`Basic …`, what
+// the same credentials as the REST API: a BpmnGo JWT or an OIDC token
+// (`Bearer …`), or a BpmnGo e-mail and password (`Basic …`, what
 // zeebe-node's basicAuth and the Desktop Modeler send). A call whose
 // credentials don't check out is refused, whatever the configuration. A
 // call with no credentials at all is refused too, unless anonymous is set:
@@ -75,7 +75,7 @@ func (a *Authenticator) authenticate(ctx context.Context) (context.Context, erro
 			return context.WithValue(ctx, userIDContextKey, a.anonymous), nil
 		}
 		return nil, status.Error(codes.Unauthenticated,
-			"credentials required: send authorization: Bearer <GoFlow or OIDC token> or Basic <e-mail:password>")
+			"credentials required: send authorization: Bearer <BpmnGo or OIDC token> or Basic <e-mail:password>")
 	}
 	userID, ok := a.identify(header)
 	if !ok {

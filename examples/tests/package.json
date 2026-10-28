@@ -1,7 +1,7 @@
 {
-  "name": "goflow-tests",
+  "name": "bpmngo-tests",
   "version": "1.0.0",
-  "description": "GoFlow integration tests — TypeScript / Axios",
+  "description": "BpmnGo integration tests — TypeScript / Axios",
   "scripts": {
     "test": "ts-node --transpile-only run_all.ts",
     "typecheck": "tsc --noEmit -p .",

@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 )
 

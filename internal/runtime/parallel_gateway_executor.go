@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 

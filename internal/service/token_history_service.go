@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/models"
 )
 
 // TokenHistoryStep is a single, human-readable point in a process instance's

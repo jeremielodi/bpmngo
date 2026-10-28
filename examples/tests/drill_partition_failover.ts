@@ -6,16 +6,16 @@
  *     docker compose up -d --build --wait --scale goflow=3
  *   npx ts-node --transpile-only drill_partition_failover.ts
  *
- * Starts instances, kills one GoFlow replica while their jobs are being
+ * Starts instances, kills one BpmnGo replica while their jobs are being
  * completed, and checks that its partitions move to the others and every
  * instance still completes. Restarts the replica at the end.
  */
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { GoFlowClient, sleep } from './client';
+import { BpmnGoClient, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '27_partitions.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 const run = Date.now().toString(36);
 const INSTANCES = Number(process.env.DRILL_INSTANCES || 60);
 

@@ -22,10 +22,10 @@
  *      every inner instance.
  */
 import * as path from 'path';
-import { GoFlowClient, ExternalTask, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, ExternalTask, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '48_scopes_multi_instance.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 type Vars = Record<string, { value?: any }>;
 const plain = (t: ExternalTask) => Object.fromEntries(Object.entries(t.variables).map(([k, v]) => [k, (v as any)?.value]));

@@ -51,11 +51,11 @@
  * endpoints specifically.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const OPERATE_BPMN = path.join(__dirname, 'bpmn', '19_operate_process.bpmn');
 const PARALLEL_BPMN = path.join(__dirname, 'bpmn', '03_meal_preparation.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 interface AuditLogEntry {
   action: string;

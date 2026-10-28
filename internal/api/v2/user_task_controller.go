@@ -3,9 +3,9 @@ package v2
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -25,7 +25,7 @@ func NewUserTaskController(db *sqlx.DB, dispatcher *events.TaskEventDispatcher) 
 	}
 }
 
-// userTaskState maps GoFlow's task status to the state names used by the
+// userTaskState maps BpmnGo's task status to the state names used by the
 // Camunda 8 Tasklist API.
 func userTaskState(status string) string {
 	switch status {

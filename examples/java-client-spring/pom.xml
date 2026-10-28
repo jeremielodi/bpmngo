@@ -6,7 +6,7 @@
 
   <!--
     A Camunda 7 application written against the engine's Java API
-    (RuntimeService, TaskService, ...) running against a remote GoFlow,
+    (RuntimeService, TaskService, ...) running against a remote BpmnGo,
     through the community "Camunda 7 REST client Spring Boot" starter.
     See docs/java-client.md. Run: ./mvnw -q spring-boot:run
   -->
@@ -17,8 +17,8 @@
     <relativePath/>
   </parent>
 
-  <groupId>com.goflow.examples</groupId>
-  <artifactId>goflow-java-client-spring</artifactId>
+  <groupId>com.bpmngo.examples</groupId>
+  <artifactId>bpmngo-java-client-spring</artifactId>
   <version>1.0.0</version>
 
   <properties>

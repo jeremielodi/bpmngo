@@ -22,7 +22,7 @@
  * coverage at all, neither the proto schema nor any call site.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '24_grpc_process.bpmn');
 const PARALLEL_BPMN = path.join(__dirname, 'bpmn', '03_meal_preparation.bpmn');
@@ -30,7 +30,7 @@ const SHORT_TIMER_BPMN = path.join(__dirname, 'bpmn', '26_short_timer.bpmn');
 const ORDER_BPMN = path.join(__dirname, 'bpmn', '10_order_notification.bpmn');
 const SIGNAL_BPMN = path.join(__dirname, 'bpmn', '11_inventory_broadcast.bpmn');
 const USER_TASK_BPMN = path.join(__dirname, 'bpmn', '18_tasklist_process.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 interface RecentEvent {
   eventId: string;

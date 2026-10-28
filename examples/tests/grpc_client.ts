@@ -1,5 +1,5 @@
 /**
- * grpc_client.ts — a minimal, dynamically-loaded gRPC client for GoFlow's
+ * grpc_client.ts — a minimal, dynamically-loaded gRPC client for BpmnGo's
  * Zeebe-protocol-subset gateway (internal/zeebegrpc). Uses
  * @grpc/proto-loader to compile internal/zeebegrpc/proto/gateway.proto at
  * runtime — no codegen needed on the TypeScript side.

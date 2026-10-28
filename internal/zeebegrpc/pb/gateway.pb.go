@@ -3191,7 +3191,7 @@ const file_gateway_proto_rawDesc = "" +
 	"\n" +
 	"ThrowError\x12#.gateway_protocol.ThrowErrorRequest\x1a$.gateway_protocol.ThrowErrorResponse\x12]\n" +
 	"\fSetVariables\x12%.gateway_protocol.SetVariablesRequest\x1a&.gateway_protocol.SetVariablesResponse\x12c\n" +
-	"\x0eDeleteResource\x12'.gateway_protocol.DeleteResourceRequest\x1a(.gateway_protocol.DeleteResourceResponseB5Z3github.com/jeremielodi/goflow/internal/zeebegrpc/pbb\x06proto3"
+	"\x0eDeleteResource\x12'.gateway_protocol.DeleteResourceRequest\x1a(.gateway_protocol.DeleteResourceResponseB5Z3github.com/jeremielodi/bpmngo/internal/zeebegrpc/pbb\x06proto3"
 
 var (
 	file_gateway_proto_rawDescOnce sync.Once

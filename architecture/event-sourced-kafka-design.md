@@ -1,4 +1,4 @@
-# GoFlow v2 — Event-Sourced, Kafka-Backed Engine (Design Scope)
+# BpmnGo v2 — Event-Sourced, Kafka-Backed Engine (Design Scope)
 
 Status: **history.** The partitioned write path described here (per
 definition, a validated set of BPMN shapes) was replaced on 2026-10-20 by a
@@ -838,7 +838,7 @@ replicated commit log) instead of a custom Raft implementation.
 
 ## 2. Non-negotiable constraint
 
-GoFlow's entire value proposition is API compatibility with both Camunda 7
+BpmnGo's entire value proposition is API compatibility with both Camunda 7
 (`/engine-rest/...`) and Camunda 8 (`/v2/...` + the Zeebe gRPC gateway). This
 design assumes **the wire contracts do not change** — a client of either API
 today should not need to change a single line to talk to this engine

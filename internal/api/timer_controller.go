@@ -3,7 +3,7 @@ package api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jmoiron/sqlx"
 )
 

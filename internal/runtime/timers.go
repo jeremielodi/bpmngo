@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/feel"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/timer"
+	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/timer"
 	"github.com/jmoiron/sqlx"
 )
 

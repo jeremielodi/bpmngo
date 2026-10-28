@@ -13,10 +13,10 @@
  *   F) The message boundary of a task completed in time no longer correlates.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '38_boundary_events.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function historicTaskStatuses(instanceId: string, taskKey: string): Promise<string[]> {
   const res = await client.api.get(`/engine-rest/history/task?processInstanceId=${instanceId}`);

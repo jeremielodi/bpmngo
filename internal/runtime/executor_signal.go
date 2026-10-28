@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
 )
 
 // executeSignalCatchEvent parks the execution until a matching signal is broadcast.

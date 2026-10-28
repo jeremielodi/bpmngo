@@ -2,7 +2,7 @@ package v2
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/jeremielodi/goflow/internal/api"
+	"github.com/jeremielodi/bpmngo/internal/api"
 )
 
 type SignalController struct {

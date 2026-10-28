@@ -15,10 +15,10 @@
  *      activities inside it (nested compensation, Camunda 8).
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '50_incidents_message_end.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function start(key: string, vars: Record<string, unknown>) {
   const inst = await client.startProcess(key, vars);

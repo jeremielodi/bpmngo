@@ -1,4 +1,4 @@
-package com.goflow.examples.spring;
+package com.bpmngo.examples.spring;
 
 import org.camunda.bpm.engine.ExternalTaskService;
 import org.camunda.bpm.engine.HistoryService;
@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 
 /**
  * A Camunda 7 application written against the engine's Java API
- * (RuntimeService, TaskService, ...), run against a remote GoFlow: the
+ * (RuntimeService, TaskService, ...), run against a remote BpmnGo: the
  * community starter implements those interfaces with REST calls to
  * feign.client.config.default.url, authenticated with HTTP Basic (see
  * application.properties).

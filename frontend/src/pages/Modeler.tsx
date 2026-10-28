@@ -35,7 +35,7 @@ const BLANK_DIAGRAM = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
-// Extracts the bpmn:process id, used as the deployed filename — GoFlow's
+// Extracts the bpmn:process id, used as the deployed filename — BpmnGo's
 // process key comes from this XML attribute, not the filename itself, but
 // naming the file after it keeps deployments recognizable in the
 // definitions list's "resource name" column.

@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/jeremielodi/goflow/internal/feel"
-	"github.com/jeremielodi/goflow/internal/metrics"
+	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/metrics"
 )
 
 // FEEL expressions (the "=" prefix, Camunda 8 style) can be evaluated by

@@ -1,6 +1,6 @@
-# 🗺️ Plan d'Amélioration Architectural : GoFlow vs Camunda 8
+# 🗺️ Plan d'Amélioration Architectural : BpmnGo vs Camunda 8
 
-Ce document définit la feuille de route technique pour transformer GoFlow d'un moteur monolithique SQL performant en une plateforme d'orchestration de processus distribuée à ultra-haut débit, capable de rivaliser avec ou de dépasser Camunda 8 (Zeebe).
+Ce document définit la feuille de route technique pour transformer BpmnGo d'un moteur monolithique SQL performant en une plateforme d'orchestration de processus distribuée à ultra-haut débit, capable de rivaliser avec ou de dépasser Camunda 8 (Zeebe).
 
 ---
 
@@ -27,7 +27,7 @@ Ce document définit la feuille de route technique pour transformer GoFlow d'un 
   - Découper l'exécution des processus en plusieurs sous-ensembles indépendants (partitions).
   - Distribuer et assigner chaque nouvelle instance de processus à une partition spécifique via le hachage de son UUID.
 - **Consensus Raft Natif en Go**
-  - Intégrer la bibliothèque `hashicorp/raft` pour répliquer le journal d'événements de chaque partition sur plusieurs nœuds GoFlow.
+  - Intégrer la bibliothèque `hashicorp/raft` pour répliquer le journal d'événements de chaque partition sur plusieurs nœuds BpmnGo.
   - Adopter l'architecture *Share-Nothing* : chaque partition possède sa propre goroutine unique (Single-Threaded Actor) éliminant ainsi le besoin de verrous de concurrence globaux (`lock-free`).
 
 ---
@@ -37,7 +37,7 @@ Ce document définit la feuille de route technique pour transformer GoFlow d'un 
 
 - **Support Natif du Protocole gRPC (HTTP/2)**
   - Concevoir les fichiers de spécification `.proto` calqués sur les commandes de Camunda 8 (`ActivateJobs`, `CompleteJob`, `StartProcessInstance`).
-  - Permettre aux clients et SDKs officiels de Camunda 8 (Java, Go, Node.js) de communiquer nativement avec GoFlow sans modification de code.
+  - Permettre aux clients et SDKs officiels de Camunda 8 (Java, Go, Node.js) de communiquer nativement avec BpmnGo sans modification de code.
 - **Streaming gRPC / Long-Polling**
   - Remplacer le mécanisme actuel de `fetchAndLock` par des connexions serpentines gRPC (Server Streaming).
   - Pousser (*Push*) instantanément les nouveaux jobs disponibles vers les workers connectés via les *channels* Go, supprimant totalement la charge des requêtes `SELECT ... SKIP LOCKED` cycliques.
@@ -70,7 +70,7 @@ Ce document définit la feuille de route technique pour transformer GoFlow d'un 
 
 ## 📊 Tableau de Synthèse des Gains Visés
 
-| Caractéristique | Camunda 8 (Zeebe) | GoFlow Actuel | **GoFlow à Terme (Après Plan)** |
+| Caractéristique | Camunda 8 (Zeebe) | BpmnGo Actuel | **BpmnGo à Terme (Après Plan)** |
 | :--- | :--- | :--- | :--- |
 | **Langage / Runtime** | Java / JVM | Go / Natif | Go / Natif |
 | **Empreinte RAM standard** | Élevée (8+ Go requis) | Très faible (~Mo) | Faible (Quelques dizaines de Mo) |

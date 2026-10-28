@@ -40,10 +40,10 @@ type ProcessDefinition struct {
 	WritePath string `db:"write_path" json:"writePath"`
 }
 
-// MarshalJSON adds the Camunda 7 ProcessDefinitionDto fields GoFlow has no
+// MarshalJSON adds the Camunda 7 ProcessDefinitionDto fields BpmnGo has no
 // counterpart for, with Camunda's defaults: Camunda 7 clients (the REST
 // client Spring Boot starter, for one) require suspended and
-// startableInTasklist. GoFlow doesn't suspend definitions.
+// startableInTasklist. BpmnGo doesn't suspend definitions.
 func (d ProcessDefinition) MarshalJSON() ([]byte, error) {
 	type plain ProcessDefinition
 	return json.Marshal(struct {

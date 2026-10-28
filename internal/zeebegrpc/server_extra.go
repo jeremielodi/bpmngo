@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/internal/zeebegrpc/pb"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/zeebegrpc/pb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

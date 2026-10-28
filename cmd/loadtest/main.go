@@ -1,4 +1,4 @@
-// Command loadtest measures how many process instances per second a GoFlow
+// Command loadtest measures how many process instances per second a BpmnGo
 // server sustains. It deploys a minimal process (start -> service task ->
 // end), runs job workers that complete its jobs, and starts instances at
 // increasing rates (open loop: a slow server doesn't slow the generator
@@ -116,7 +116,7 @@ func main() {
 func parseFlags() config {
 	var cfg config
 	var rates string
-	flag.StringVar(&cfg.url, "url", "http://127.0.0.1:8080", "GoFlow base URL")
+	flag.StringVar(&cfg.url, "url", "http://127.0.0.1:8080", "BpmnGo base URL")
 	flag.StringVar(&cfg.email, "email", os.Getenv("LOADTEST_EMAIL"), "login email (or LOADTEST_EMAIL)")
 	flag.StringVar(&cfg.password, "password", os.Getenv("LOADTEST_PASSWORD"), "login password (or LOADTEST_PASSWORD)")
 	flag.StringVar(&rates, "rates", "10,25,50,100,200,400", "comma-separated start rates (instances/s), one step each")

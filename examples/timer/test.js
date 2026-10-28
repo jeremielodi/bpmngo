@@ -12,7 +12,7 @@ const api = axios.create({
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-class GoFlowClient {
+class BpmnGoClient {
     static async deployBpmn(filePath, deploymentName = null) {
         try {
             if (!fs.existsSync(filePath)) {
@@ -223,9 +223,9 @@ async function runTimerTest() {
         const bpmnFilePath = './PurchaseOrderProcessWithTimer.bpmn';
         
         console.log(`📁 Deploying from: ${bpmnFilePath}`);
-        await GoFlowClient.deployBpmn(bpmnFilePath, 'Timer Process Test');
+        await BpmnGoClient.deployBpmn(bpmnFilePath, 'Timer Process Test');
         
-        const processData = await GoFlowClient.startProcess('PurchaseOrderProcessWithTimer', {
+        const processData = await BpmnGoClient.startProcess('PurchaseOrderProcessWithTimer', {
             orderId: 'ORD-12345',
             amount: 1500,
             approver: 'approver'
@@ -234,13 +234,13 @@ async function runTimerTest() {
         const instanceId = processData.processInstanceId;
         console.log(`📋 Process Instance ID: ${instanceId}\n`);
 
-        const approvalTask = await GoFlowClient.waitForTask('Task_Approval', instanceId, 30000);
+        const approvalTask = await BpmnGoClient.waitForTask('Task_Approval', instanceId, 30000);
         console.log('✍️ Approve Order task found - ID:', approvalTask.id);
 
         console.log('\n✅ Approving within 30 seconds...');
         await sleep(5000);
         
-        await GoFlowClient.completeTask(approvalTask.id, {
+        await BpmnGoClient.completeTask(approvalTask.id, {
             approved: true,
             comments: 'Approved by manager'
         });
@@ -257,7 +257,7 @@ async function runTimerTest() {
         while (!completed && attempts < maxAttempts) {
             await sleep(2000);
             attempts++;
-            const instance = await GoFlowClient.getProcessInstance(instanceId);
+            const instance = await BpmnGoClient.getProcessInstance(instanceId);
             if (!instance || instance.status === 'completed') {
                 completed = true;
                 console.log('✅ Process completed by external worker');
@@ -285,9 +285,9 @@ async function runTimerTriggerTest() {
         const bpmnFilePath = './PurchaseOrderProcessWithTimer.bpmn';
 
         console.log(`📁 Deploying from: ${bpmnFilePath}`);
-        await GoFlowClient.deployBpmn(bpmnFilePath, 'Timer Process Test');
+        await BpmnGoClient.deployBpmn(bpmnFilePath, 'Timer Process Test');
 
-        const processData = await GoFlowClient.startProcess('PurchaseOrderProcessWithTimer', {
+        const processData = await BpmnGoClient.startProcess('PurchaseOrderProcessWithTimer', {
             orderId: 'ORD-67890',
             amount: 2500,
             approver: 'approver'
@@ -296,7 +296,7 @@ async function runTimerTriggerTest() {
         const instanceId = processData.processInstanceId;
         console.log(`📋 Process Instance ID: ${instanceId}\n`);
 
-        const approvalTask = await GoFlowClient.waitForTask('Task_Approval', instanceId, 30000);
+        const approvalTask = await BpmnGoClient.waitForTask('Task_Approval', instanceId, 30000);
         console.log('✍️ Approve Order task found - ID:', approvalTask.id);
         console.log('⏰ Timer is set for 30 seconds...');
         console.log('😴 Waiting 35 seconds for timer to fire (no approval)...\n');
@@ -304,7 +304,7 @@ async function runTimerTriggerTest() {
         await sleep(35000);
 
         // Check if approval task was canceled
-        const tasksAfterTimer = await GoFlowClient.getTasks(instanceId);
+        const tasksAfterTimer = await BpmnGoClient.getTasks(instanceId);
         const stillApproving = tasksAfterTimer.find(t => t.taskDefinitionKey === 'Task_Approval');
 
         if (!stillApproving) {
@@ -318,7 +318,7 @@ async function runTimerTriggerTest() {
         // Wait for worker to process escalation
         await sleep(5000);
 
-        const finalTasks = await GoFlowClient.getTasks(instanceId);
+        const finalTasks = await BpmnGoClient.getTasks(instanceId);
         if (finalTasks.length === 0) {
             console.log('🎉 Process completed (escalated path) - Timer test PASSED!\n');
         }
@@ -340,7 +340,7 @@ if (require.main === module) {
         const worker = new ExternalTaskWorker();
         worker.startWorkers();
     } else if (testType === 'deploy') {
-        GoFlowClient.deployBpmn('./PurchaseOrderProcessWithTimer.bpmn', 'Timer Process Test')
+        BpmnGoClient.deployBpmn('./PurchaseOrderProcessWithTimer.bpmn', 'Timer Process Test')
             .then(() => console.log('✅ Deployment complete'))
             .catch(err => console.error('❌ Deploy failed:', err.message));
     } else {
@@ -355,4 +355,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { GoFlowClient, ExternalTaskWorker, runTimerTest, runTimerTriggerTest };
+module.exports = { BpmnGoClient, ExternalTaskWorker, runTimerTest, runTimerTriggerTest };

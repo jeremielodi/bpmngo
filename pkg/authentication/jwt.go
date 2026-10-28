@@ -7,8 +7,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -276,7 +276,7 @@ func (s *JWTService) GetUserIDFromToken(tokenString string) (string, error) {
 }
 
 // clockSkew is how far apart the clocks of the servers issuing and checking
-// a token may be. With several GoFlow instances on several servers, a
+// a token may be. With several BpmnGo instances on several servers, a
 // token issued on one is checked on another; a check with no tolerance
 // refused a token whose "not before" was a moment ahead of the checking
 // server's clock.

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jeremielodi/goflow/internal/common"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
 )
 
 // executeBoundaryTimerNode is called when a timer fires and execution reaches the BoundaryTimerEvent node.

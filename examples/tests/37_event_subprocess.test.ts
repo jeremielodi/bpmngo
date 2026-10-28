@@ -15,10 +15,10 @@
  *      doesn't cut off the other branch.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '37_event_subprocess.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function historicTaskStatuses(instanceId: string, taskKey: string): Promise<string[]> {
   const res = await client.api.get(`/engine-rest/history/task?processInstanceId=${instanceId}`);

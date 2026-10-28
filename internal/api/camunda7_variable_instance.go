@@ -8,12 +8,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/lib/pq"
 )
 
-// c7VariableInstance is Camunda 7's VariableInstanceDto. GoFlow keeps a
+// c7VariableInstance is Camunda 7's VariableInstanceDto. BpmnGo keeps a
 // process instance's variables in one row, at the instance's scope, so
 // executionId and activityInstanceId are the process instance's own id (as
 // for a Camunda 7 process-level variable) and id is "<instance>:<name>".
@@ -35,7 +35,7 @@ type c7VariableInstance struct {
 	ErrorMessage        *string                `json:"errorMessage"`
 }
 
-// c7VariableQuery holds the VariableInstanceQueryDto fields GoFlow serves.
+// c7VariableQuery holds the VariableInstanceQueryDto fields BpmnGo serves.
 type c7VariableQuery struct {
 	VariableName        string   `json:"variableName"`
 	VariableNameIn      []string `json:"variableNameIn"`

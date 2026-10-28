@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/common"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
 )
 

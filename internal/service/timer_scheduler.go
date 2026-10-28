@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/cmdbus"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
-	timerpkg "github.com/jeremielodi/goflow/internal/timer"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	timerpkg "github.com/jeremielodi/bpmngo/internal/timer"
 	"github.com/jmoiron/sqlx"
 )
 

@@ -12,7 +12,7 @@ import (
 )
 
 // Topology describes the cluster the way Zeebe's Topology does: each
-// GoFlow replica is a broker, leading the partitions it owns.
+// BpmnGo replica is a broker, leading the partitions it owns.
 type Topology struct {
 	Partitioned       bool
 	PartitionsCount   int

@@ -1826,7 +1826,7 @@ const file_events_proto_rawDesc = "" +
 	"\x0etask_unclaimed\x18\x1c \x01(\v2 .eventlog_protocol.TaskUnclaimedH\x00R\rtaskUnclaimed\x12I\n" +
 	"\x0etask_completed\x18\x1d \x01(\v2 .eventlog_protocol.TaskCompletedH\x00R\rtaskCompleted\x12I\n" +
 	"\x0etask_cancelled\x18\x1e \x01(\v2 .eventlog_protocol.TaskCancelledH\x00R\rtaskCancelledB\a\n" +
-	"\x05eventB4Z2github.com/jeremielodi/goflow/internal/eventlog/pbb\x06proto3"
+	"\x05eventB4Z2github.com/jeremielodi/bpmngo/internal/eventlog/pbb\x06proto3"
 
 var (
 	file_events_proto_rawDescOnce sync.Once

@@ -146,7 +146,7 @@ class ContextManager {
     }
 }
 
-class GoFlowClient {
+class BpmnGoClient {
     static async deployBpmn(filePath, deploymentName = null) {
         try {
             if (!fs.existsSync(filePath)) {
@@ -293,7 +293,7 @@ async function runPRF() {
         }
         
         console.log(`📁 Deploying from: ${bpmnFilePath}`);
-        await GoFlowClient.deployBpmn(bpmnFilePath, 'PRF Process Test');
+        await BpmnGoClient.deployBpmn(bpmnFilePath, 'PRF Process Test');
         
         // STEP 2: Prepare process variables
         const data = {
@@ -314,14 +314,14 @@ async function runPRF() {
             requester: data.requester
         };
         
-        const requesterData = await GoFlowClient.startProcess('prf_process_requester', data, metadata);
+        const requesterData = await BpmnGoClient.startProcess('prf_process_requester', data, metadata);
         requesterInstanceId = requesterData.processInstanceId;
         console.log(`📋 Requester Process Instance ID: ${requesterInstanceId}\n`);
 
         // STEP 4: Create PRF task (in requester process)
-        const createPrfTask = await GoFlowClient.waitForTask(null, 'Task_CreatePRF', requesterInstanceId);
+        const createPrfTask = await BpmnGoClient.waitForTask(null, 'Task_CreatePRF', requesterInstanceId);
         console.log('✍️ Creating PRF...');
-        await GoFlowClient.completeTask(createPrfTask.id, {}, requesterInstanceId, {
+        await BpmnGoClient.completeTask(createPrfTask.id, {}, requesterInstanceId, {
             taskDefinitionKey: 'Task_CreatePRF',
             assignee: null
         });
@@ -330,9 +330,9 @@ async function runPRF() {
         await sleep(2000);
         
         // STEP 5: Requester signs (in requester process)
-        const signTask = await GoFlowClient.waitForTask(data.maker_name, 'Task_SignPRF', requesterInstanceId);
+        const signTask = await BpmnGoClient.waitForTask(data.maker_name, 'Task_SignPRF', requesterInstanceId);
         console.log('✍️ Signing PRF...');
-        await GoFlowClient.completeTask(signTask.id, {}, requesterInstanceId, {
+        await BpmnGoClient.completeTask(signTask.id, {}, requesterInstanceId, {
             taskDefinitionKey: 'Task_SignPRF',
             assignee: data.maker_name
         });
@@ -351,14 +351,14 @@ async function runPRF() {
         
         // The test will continue with the Supervisor task
         // But note: This task is in the SUPERVISOR process, not the requester process
-        const supervisorTask = await GoFlowClient.waitForTask(data.supervisor, 'Task_SupervisorReview', null);
+        const supervisorTask = await BpmnGoClient.waitForTask(data.supervisor, 'Task_SupervisorReview', null);
         console.log('👔 Supervisor reviewing...');
         
         // Get the process instance ID from the task
         supervisorInstanceId = supervisorTask.processInstanceId;
         console.log(`📋 Supervisor Process Instance ID: ${supervisorInstanceId}`);
         
-        await GoFlowClient.completeTask(supervisorTask.id, { supervisor_reviewed: true }, supervisorInstanceId, {
+        await BpmnGoClient.completeTask(supervisorTask.id, { supervisor_reviewed: true }, supervisorInstanceId, {
             taskDefinitionKey: 'Task_SupervisorReview',
             assignee: data.supervisor
         });
@@ -367,13 +367,13 @@ async function runPRF() {
         await sleep(2000);
         
         // STEP 7: Approver approves (in APPROVER process)
-        const approverTask = await GoFlowClient.waitForTask(data.approver, 'Task_ApproverApproved', null);
+        const approverTask = await BpmnGoClient.waitForTask(data.approver, 'Task_ApproverApproved', null);
         console.log('💼 Approver reviewing...');
         
         approverInstanceId = approverTask.processInstanceId;
         console.log(`📋 Approver Process Instance ID: ${approverInstanceId}`);
         
-        await GoFlowClient.completeTask(approverTask.id, { approver_approved: true }, approverInstanceId, {
+        await BpmnGoClient.completeTask(approverTask.id, { approver_approved: true }, approverInstanceId, {
             taskDefinitionKey: 'Task_ApproverApproved',
             assignee: data.approver
         });
@@ -382,13 +382,13 @@ async function runPRF() {
         await sleep(2000);
         
         // STEP 8: Accountant pays (in ACCOUNTANT process)
-        const accountantTask = await GoFlowClient.waitForTask(data.accountant, 'Task_AccountantPay', null);
+        const accountantTask = await BpmnGoClient.waitForTask(data.accountant, 'Task_AccountantPay', null);
         console.log('💰 Processing payment...');
         
         accountantInstanceId = accountantTask.processInstanceId;
         console.log(`📋 Accountant Process Instance ID: ${accountantInstanceId}`);
         
-        await GoFlowClient.completeTask(accountantTask.id, { 
+        await BpmnGoClient.completeTask(accountantTask.id, { 
             accountant_approved: true, 
             paymentProcessed: true 
         }, accountantInstanceId, {
@@ -398,10 +398,10 @@ async function runPRF() {
         console.log('✅ Payment processed\n');
 
         // Mark all processes as completed
-        await GoFlowClient.completeProcess(requesterInstanceId, 'completed');
-        if (supervisorInstanceId) await GoFlowClient.completeProcess(supervisorInstanceId, 'completed');
-        if (approverInstanceId) await GoFlowClient.completeProcess(approverInstanceId, 'completed');
-        if (accountantInstanceId) await GoFlowClient.completeProcess(accountantInstanceId, 'completed');
+        await BpmnGoClient.completeProcess(requesterInstanceId, 'completed');
+        if (supervisorInstanceId) await BpmnGoClient.completeProcess(supervisorInstanceId, 'completed');
+        if (approverInstanceId) await BpmnGoClient.completeProcess(approverInstanceId, 'completed');
+        if (accountantInstanceId) await BpmnGoClient.completeProcess(accountantInstanceId, 'completed');
         
         const duration = (Date.now() - startTime) / 1000;
         console.log(`\n🏁 ALL PROCESSES COMPLETED SUCCESSFULLY! 🎉 (Duration: ${duration}s)\n`);
@@ -500,4 +500,4 @@ if (command === 'view') {
     runPRF();
 }
 
-module.exports = { GoFlowClient, ContextManager };
+module.exports = { BpmnGoClient, ContextManager };

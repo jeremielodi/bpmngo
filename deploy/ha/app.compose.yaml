@@ -1,11 +1,11 @@
 # Serveur applicatif devant un cluster Postgres haute disponibilité
-# (deploy/ha/node.compose.yaml sur 3 serveurs) : HAProxy envoie GoFlow au
+# (deploy/ha/node.compose.yaml sur 3 serveurs) : HAProxy envoie BpmnGo au
 # primaire du moment, l'historique aux nœuds de lecture.
 #
 #   PG1_ADDR=10.0.0.1 PG2_ADDR=10.0.0.2 PG3_ADDR=10.0.0.3 \
 #   docker compose -f docker-compose.yaml -f deploy/ha/app.compose.yaml up -d
 #
-# Plusieurs instances GoFlow (nginx devant elles, PgBouncer branché sur
+# Plusieurs instances BpmnGo (nginx devant elles, PgBouncer branché sur
 # HAProxy, donc qui suit le primaire ; pas de réplique locale : le cluster
 # a ses réplicas) :
 #

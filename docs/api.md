@@ -72,7 +72,7 @@ GET /engine-rest/process-definition?key=myProcess&latestVersion=true
 GET /engine-rest/process-definition?latestVersion=true
 ```
 
-Each definition also carries Camunda 7's `suspended` (always `false`: GoFlow doesn't suspend definitions), `startableInTasklist` (`true`), `versionTag`, `description`, `category` and `resource`, which Camunda 7 clients expect.
+Each definition also carries Camunda 7's `suspended` (always `false`: BpmnGo doesn't suspend definitions), `startableInTasklist` (`true`), `versionTag`, `description`, `category` and `resource`, which Camunda 7 clients expect.
 
 ### Process permissions
 
@@ -228,7 +228,7 @@ GET|POST /engine-rest/variable-instance/count    → { "count": n }
 | Parameter | Type | Effect |
 |---|---|---|
 | `processInstanceIdIn` | list of UUIDs | Variables of these instances. |
-| `executionIdIn` | list of UUIDs | Same (GoFlow keeps an instance's variables at its own scope, so `executionId` is the process instance id). |
+| `executionIdIn` | list of UUIDs | Same (BpmnGo keeps an instance's variables at its own scope, so `executionId` is the process instance id). |
 | `variableName` / `variableNameIn` | string / list | These names. |
 | `variableNameLike` | string | SQL `LIKE` on the name, case-sensitive (`%` and `_`). |
 | `tenantIdIn` | list | Instances of these tenants. |
@@ -318,10 +318,10 @@ POST /engine-rest/signal
 | Field | Type | Effect |
 |---|---|---|
 | `messageName` | string | **Required.** |
-| `correlationKeys` | object | Process variables the instance must have; values plain (`"123"`) or typed (`{"value", "type"}`). GoFlow matches on the first key. |
+| `correlationKeys` | object | Process variables the instance must have; values plain (`"123"`) or typed (`{"value", "type"}`). BpmnGo matches on the first key. |
 | `businessKey` | string | Only the instance with this business key. |
 | `processInstanceId` | UUID | Only this instance. |
-| `processVariables` | object | Variables set on the instance, plain or typed. `variables` (GoFlow's earlier name) still works. |
+| `processVariables` | object | Variables set on the instance, plain or typed. `variables` (BpmnGo's earlier name) still works. |
 | `all` | boolean | Correlate every waiting execution, not just the first (at most 1000). |
 | `resultEnabled` | boolean | Reply with the list of correlations instead of `204`. |
 | `variablesInResultEnabled` | boolean | Include each instance's variables in that list. |
@@ -346,7 +346,7 @@ GET /engine-rest/history/task/:id
 
 **`GET|POST /engine-rest/history/process-instance`** — newest first (by start date). With `POST`, the filters go in a JSON body (`firstResult` and `maxResults` stay in the query string).
 
-Each instance's `state` is Camunda 7's: `ACTIVE`, `SUSPENDED`, `COMPLETED` or `EXTERNALLY_TERMINATED` (GoFlow's terminated instances were stopped through the API). The response also carries `processDefinitionName`, `processDefinitionVersion`, `tenantId` and `deleteReason`.
+Each instance's `state` is Camunda 7's: `ACTIVE`, `SUSPENDED`, `COMPLETED` or `EXTERNALLY_TERMINATED` (BpmnGo's terminated instances were stopped through the API). The response also carries `processDefinitionName`, `processDefinitionVersion`, `tenantId` and `deleteReason`.
 
 | Parameter | Type | Effect |
 |---|---|---|
@@ -354,7 +354,7 @@ Each instance's `state` is Camunda 7's: `ACTIVE`, `SUSPENDED`, `COMPLETED` or `E
 | `processInstanceIds` | comma-separated UUIDs | These instances. |
 | `processDefinitionKey` | string | Process key, any version. |
 | `businessKey` (or Camunda 7's `processInstanceBusinessKey`) | string | Business key. |
-| `state` | `ACTIVE` \| `SUSPENDED` \| `COMPLETED` \| `EXTERNALLY_TERMINATED`, or GoFlow's `active` \| `suspended` \| `completed` \| `terminated` | Instance state. |
+| `state` | `ACTIVE` \| `SUSPENDED` \| `COMPLETED` \| `EXTERNALLY_TERMINATED`, or BpmnGo's `active` \| `suspended` \| `completed` \| `terminated` | Instance state. |
 | `active`, `suspended`, `completed`, `externallyTerminated` | `true` | Camunda 7's way to ask for one state (ignored when `state` is given). |
 | `finished` / `unfinished` | `true` | Ended / not ended. |
 | `startedAfter` | date | Started strictly after. |
@@ -522,7 +522,7 @@ POST /v2/process-instances
 GET  /v2/process-instances/:id
 POST /v2/process-instances/search
 POST /v2/process-instances/:id/modification   (Move Token)
-POST /v2/process-instances/:id/step-back      (Previous step — GoFlow only)
+POST /v2/process-instances/:id/step-back      (Previous step — BpmnGo only)
 
 POST /v2/jobs/activation                      (fetch-and-lock equivalent)
 POST /v2/jobs/:id/completion
@@ -548,13 +548,13 @@ GET  /v2/topology
 
 ### Search filters
 
-Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. GoFlow supports the filter fields below; Camunda 8's other filter fields, `sort` and `page` are not supported yet and are ignored, so a search returns every match. An empty body means no filter.
+Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. BpmnGo supports the filter fields below; Camunda 8's other filter fields, `sort` and `page` are not supported yet and are ignored, so a search returns every match. An empty body means no filter.
 
 **`POST /v2/process-instances/search`** — live and archived instances.
 
 | Field | Type | Effect |
 |---|---|---|
-| `processDefinitionId` | string | The BPMN process ID (GoFlow's process key), any version. |
+| `processDefinitionId` | string | The BPMN process ID (BpmnGo's process key), any version. |
 | `state` | `ACTIVE` \| `SUSPENDED` \| `COMPLETED` \| `TERMINATED` | Instance state. |
 
 **`POST /v2/user-tasks/search`**
@@ -574,7 +574,7 @@ Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. GoF
 |---|---|---|
 | `processInstanceKey` | UUID | One instance (`400` if not a UUID). |
 | `state` | `ACTIVE` \| `RESOLVED` \| `DELETED` | Incident state. |
-| `errorType` | `failedExternalTask` \| `executionError` \| `unhandledErrorEvent` | GoFlow's incident type (not Camunda 8's `JOB_NO_RETRIES` names). |
+| `errorType` | `failedExternalTask` \| `executionError` \| `unhandledErrorEvent` | BpmnGo's incident type (not Camunda 8's `JOB_NO_RETRIES` names). |
 | `elementId` | string | BPMN element ID. |
 
 **`POST /v2/flownode-instances/search`**

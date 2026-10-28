@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jeremielodi/goflow/internal/dmn"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/dmn"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 

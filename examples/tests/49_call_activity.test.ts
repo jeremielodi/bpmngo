@@ -19,10 +19,10 @@
  *      results collected in order.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '49_call_activity.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 const run = Date.now().toString(36);
 
 type Vars = Record<string, { value?: any }>;

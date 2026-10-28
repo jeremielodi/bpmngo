@@ -26,7 +26,7 @@ services:
   citus-coordinator:
     image: citusdata/citus:12.1
     # Connections to each worker capped below the workers' own limit, and
-    # a few per query: many concurrent GoFlow sessions otherwise exhaust
+    # a few per query: many concurrent BpmnGo sessions otherwise exhaust
     # the workers ("too many clients").
     command: ["postgres", "-c", "max_connections=300", "-c", "citus.max_shared_pool_size=200", "-c", "citus.max_adaptive_executor_pool_size=4"]
     container_name: goflow-citus-coordinator

@@ -12,7 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/events"
 )
 
 type SSEClient struct {

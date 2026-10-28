@@ -1,4 +1,4 @@
-package com.goflow.examples;
+package com.bpmngo.examples;
 
 import org.camunda.community.rest.client.api.DeploymentApi;
 import org.camunda.community.rest.client.api.ExternalTaskApi;
@@ -33,21 +33,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.goflow.examples.Examples.check;
-import static com.goflow.examples.Examples.waitFor;
+import static com.bpmngo.examples.Examples.check;
+import static com.bpmngo.examples.Examples.waitFor;
 
 /**
  * The Camunda 7 REST client generated from Camunda's OpenAPI spec
  * (org.camunda.community:camunda-engine-rest-client-openapi-java): plain
  * Java, typed DTOs, the whole /engine-rest API. Point its base path at
- * GoFlow's /engine-rest and authenticate with HTTP Basic.
+ * BpmnGo's /engine-rest and authenticate with HTTP Basic.
  */
 public class Camunda7OpenApiExample {
 
     public static void main(String[] args) throws Exception {
-        String url = GoFlowRestClient.env("GOFLOW_URL", "http://127.0.0.1:8080");
-        String user = GoFlowRestClient.env("GOFLOW_USER", "admin@goflow.com");
-        String password = GoFlowRestClient.env("GOFLOW_PASSWORD", "admin123");
+        String url = BpmnGoRestClient.env("GOFLOW_URL", "http://127.0.0.1:8080");
+        String user = BpmnGoRestClient.env("GOFLOW_USER", "admin@goflow.com");
+        String password = BpmnGoRestClient.env("GOFLOW_PASSWORD", "admin123");
 
         ApiClient client = new ApiClient();
         client.setBasePath(url + "/engine-rest");

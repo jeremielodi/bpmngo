@@ -6,7 +6,7 @@
 // is ever touched. Live instances, and audit_logs rows not tied to an
 // instance (logins, user/role administration), are kept forever.
 //
-// Disabled unless RETENTION_DAYS is set. Several GoFlow instances can run
+// Disabled unless RETENTION_DAYS is set. Several BpmnGo instances can run
 // it at once: a Postgres advisory lock makes exactly one of them purge per
 // round.
 package retention
@@ -19,12 +19,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/metrics"
+	"github.com/jeremielodi/bpmngo/internal/metrics"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
 
-// advisoryLockKey is an arbitrary constant shared by every GoFlow instance.
+// advisoryLockKey is an arbitrary constant shared by every BpmnGo instance.
 const advisoryLockKey int64 = 0x60f10e_7e7e
 
 type Config struct {
@@ -89,7 +89,7 @@ func Start(ctx context.Context, db *sqlx.DB, cfg Config) {
 
 // RunOnce deletes, batch by batch, every instance that ended more than
 // cfg.Days ago, and returns how many instances it deleted. It returns 0
-// without doing anything if another GoFlow instance holds the purge lock.
+// without doing anything if another BpmnGo instance holds the purge lock.
 func RunOnce(ctx context.Context, db *sqlx.DB, cfg Config) (int, error) {
 	if !cfg.Enabled() {
 		return 0, nil

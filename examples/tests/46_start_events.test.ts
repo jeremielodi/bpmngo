@@ -11,10 +11,10 @@
  *   E) An invalid timer cycle rejects the deployment.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const bpmn = (f: string) => path.join(__dirname, 'bpmn', f);
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function openTasks(taskKey: string) {
   const tasks = await client.getTasks();

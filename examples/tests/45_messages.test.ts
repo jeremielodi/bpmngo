@@ -16,10 +16,10 @@
  *   G) An interrupting message boundary event with a correlation key.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '45_messages.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 const run = Date.now().toString(36);
 
 async function publish(body: Record<string, unknown>) {

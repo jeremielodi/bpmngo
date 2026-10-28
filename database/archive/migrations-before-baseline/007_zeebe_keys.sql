@@ -1,6 +1,6 @@
 -- Migration 007: Zeebe gRPC gateway key mapping
 --
--- Maps GoFlow's internal UUIDs to the int64 "keys" Zeebe's gRPC gateway
+-- Maps BpmnGo's internal UUIDs to the int64 "keys" Zeebe's gRPC gateway
 -- protocol requires (processDefinitionKey/processInstanceKey/job key are
 -- all int64 on the wire) — see internal/zeebegrpc. Keys are assigned
 -- lazily the first time a resource is exposed over gRPC, and must persist

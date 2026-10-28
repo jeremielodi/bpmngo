@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package eventlog_protocol;
 
-option go_package = "github.com/jeremielodi/goflow/internal/eventlog/pb";
+option go_package = "github.com/jeremielodi/bpmngo/internal/eventlog/pb";
 
 import "google/protobuf/timestamp.proto";
 
-// events.proto — Phase 0 ("shadow mode") domain event schema for GoFlow's
+// events.proto — Phase 0 ("shadow mode") domain event schema for BpmnGo's
 // event-sourced engine scoping. See architecture/event-sourced-kafka-design.md
 // for the full context: this schema exists to validate a Kafka-compatible
 // event backbone (Redpanda in this dev stack) alongside the existing

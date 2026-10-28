@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jeremielodi/goflow/internal/parser"
+	"github.com/jeremielodi/bpmngo/internal/parser"
 )
 
 type ProcessGraph struct {
@@ -64,7 +64,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 
 	// ---- Generic (untyped) Tasks ----
 	// As in Camunda 8, a task without a type has nothing to run: the token
-	// passes straight through, like a manual task. (Before, GoFlow made it
+	// passes straight through, like a manual task. (Before, BpmnGo made it
 	// a user task; versions deployed then keep that, their graph being
 	// stored at deploy time.)
 	for _, t := range process.Tasks {
@@ -968,7 +968,7 @@ func linkCompensationHandlers(graph *ProcessGraph, associations []parser.Associa
 // Camunda 8 (zeebe:calledElement): all parent variables go to the child
 // and all child variables come back, unless switched off; zeebe:ioMapping
 // applies. Camunda 7 (camunda:in / camunda:out): every parent variable
-// still goes to the child (GoFlow's behavior so far), camunda:in
+// still goes to the child (BpmnGo's behavior so far), camunda:in
 // source/target add input mappings, camunda:out variables="all" brings
 // every child variable back and camunda:out source/target are output
 // mappings.

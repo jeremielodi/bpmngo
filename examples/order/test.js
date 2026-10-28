@@ -12,7 +12,7 @@ const api = axios.create({
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-class GoFlowClient {
+class BpmnGoClient {
     static async deployBpmn(filePath, deploymentName = null) {
         try {
             if (!fs.existsSync(filePath)) {
@@ -240,9 +240,9 @@ async function testCreditApprovedFulfillmentSuccess() {
 
         const bpmnFilePath = './order_process.bpmn';
         
-        await GoFlowClient.deployBpmn(bpmnFilePath, 'Order Process Test');
+        await BpmnGoClient.deployBpmn(bpmnFilePath, 'Order Process Test');
         
-        const processData = await GoFlowClient.startProcess('OrderProcess', {
+        const processData = await BpmnGoClient.startProcess('OrderProcess', {
             orderId: 'ORD-SUCCESS-001',
             amount: 1000,
             customer: 'John Doe'
@@ -259,7 +259,7 @@ async function testCreditApprovedFulfillmentSuccess() {
         while (!completed && attempts < maxAttempts) {
             await sleep(2000);
             attempts++;
-            const instance = await GoFlowClient.getProcessInstance(instanceId);
+            const instance = await BpmnGoClient.getProcessInstance(instanceId);
             if (!instance || instance.status === 'completed') {
                 completed = true;
                 console.log('✅ Process completed successfully');
@@ -284,9 +284,9 @@ async function testCreditApprovedFulfillmentFailed() {
 
         const bpmnFilePath = './order_process.bpmn';
         
-        await GoFlowClient.deployBpmn(bpmnFilePath, 'Order Process Test');
+        await BpmnGoClient.deployBpmn(bpmnFilePath, 'Order Process Test');
         
-        const processData = await GoFlowClient.startProcess('OrderProcess', {
+        const processData = await BpmnGoClient.startProcess('OrderProcess', {
             orderId: 'ORD-FAIL-001',
             amount: 1000,
             customer: 'John Doe'
@@ -303,7 +303,7 @@ async function testCreditApprovedFulfillmentFailed() {
         while (!completed && attempts < maxAttempts) {
             await sleep(2000);
             attempts++;
-            const instance = await GoFlowClient.getProcessInstance(instanceId);
+            const instance = await BpmnGoClient.getProcessInstance(instanceId);
             if (!instance || instance.status === 'completed') {
                 completed = true;
                 console.log('✅ Process completed (order failed)');
@@ -324,10 +324,10 @@ async function testCreditRejected() {
 
         const bpmnFilePath = './order_process.bpmn';
         
-        await GoFlowClient.deployBpmn(bpmnFilePath, 'Order Process Test');
+        await BpmnGoClient.deployBpmn(bpmnFilePath, 'Order Process Test');
         
         // Amount > 5000 will trigger credit rejection
-        const processData = await GoFlowClient.startProcess('OrderProcess', {
+        const processData = await BpmnGoClient.startProcess('OrderProcess', {
             orderId: 'ORD-REJECT-001',
             amount: 10000,  // This will cause credit rejection
             customer: 'John Doe'
@@ -344,7 +344,7 @@ async function testCreditRejected() {
         while (!completed && attempts < maxAttempts) {
             await sleep(2000);
             attempts++;
-            const instance = await GoFlowClient.getProcessInstance(instanceId);
+            const instance = await BpmnGoClient.getProcessInstance(instanceId);
             if (!instance || instance.status === 'completed') {
                 completed = true;
                 console.log('✅ Process completed (order rejected - credit failed)');
@@ -367,9 +367,9 @@ async function testCustomCreditCheck(creditOk, orderId, amount) {
     // Simplified version - just start process and check
     const bpmnFilePath = './order_process.bpmn';
     
-    await GoFlowClient.deployBpmn(bpmnFilePath, 'Order Process Test');
+    await BpmnGoClient.deployBpmn(bpmnFilePath, 'Order Process Test');
     
-    const processData = await GoFlowClient.startProcess('OrderProcess', {
+    const processData = await BpmnGoClient.startProcess('OrderProcess', {
         orderId: orderId,
         amount: amount,
         customer: 'Custom Test'
@@ -381,7 +381,7 @@ async function testCustomCreditCheck(creditOk, orderId, amount) {
     // Wait a bit to see progress
     await sleep(5000);
     
-    const tasks = await GoFlowClient.getTasks(instanceId);
+    const tasks = await BpmnGoClient.getTasks(instanceId);
     console.log(`Current tasks:`, tasks.map(t => ({ id: t.id, name: t.name, key: t.taskDefinitionKey })));
 }
 
@@ -438,4 +438,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { GoFlowClient, ExternalTaskWorker, testCreditApprovedFulfillmentSuccess, testCreditApprovedFulfillmentFailed, testCreditRejected };
+module.exports = { BpmnGoClient, ExternalTaskWorker, testCreditApprovedFulfillmentSuccess, testCreditApprovedFulfillmentFailed, testCreditRejected };

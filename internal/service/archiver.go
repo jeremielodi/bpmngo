@@ -42,7 +42,7 @@ func ArchiveFinishedInstance(db *sqlx.DB, instanceID uuid.UUID, deleteReason *st
 const archiverBatch = 100
 
 // StartArchiver archives finished instances in the background until ctx
-// is done (no-op with ARCHIVE_MODE=sync). Several GoFlow instances can run
+// is done (no-op with ARCHIVE_MODE=sync). Several BpmnGo instances can run
 // it: each instance is archived under a session advisory lock — held on
 // lockDB, which reaches Postgres directly (see database.NewDirectPostgres)
 // — so two archivers never work on the same one.

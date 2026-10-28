@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/pkg/authentication"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/pkg/authentication"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -248,7 +248,7 @@ func AuthenticationMiddleware(jwtService *authentication.JWTService,
 }
 
 // UserFromBasicAuth checks an "Authorization: Basic <base64(email:password)>"
-// header value against GoFlow's users, and returns the active user it
+// header value against BpmnGo's users, and returns the active user it
 // names, or nil. Shared by the REST middleware and the gRPC gateway.
 func UserFromBasicAuth(db *sqlx.DB, header string) *models.User {
 	if !strings.HasPrefix(header, "Basic ") {

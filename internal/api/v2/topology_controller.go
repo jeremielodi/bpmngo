@@ -3,7 +3,7 @@ package v2
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/jeremielodi/goflow/internal/partition"
+	"github.com/jeremielodi/bpmngo/internal/partition"
 )
 
 // GetTopology handles GET /v2/topology (Camunda 8): the replicas of the
@@ -24,7 +24,7 @@ func GetTopology(c *fiber.Ctx) error {
 			"host":       b.Host,
 			"port":       26500,
 			"partitions": partitions,
-			"version":    "goflow-dev",
+			"version":    "bpmngo-dev",
 		})
 	}
 	writePath := "direct"
@@ -36,7 +36,7 @@ func GetTopology(c *fiber.Ctx) error {
 		"clusterSize":       len(topo.Brokers),
 		"partitionsCount":   topo.PartitionsCount,
 		"replicationFactor": topo.ReplicationFactor,
-		"gatewayVersion":    "goflow-dev",
+		"gatewayVersion":    "bpmngo-dev",
 		"writePath":         writePath,
 	})
 }

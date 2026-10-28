@@ -1,6 +1,6 @@
 package common
 
-import "github.com/jeremielodi/goflow/internal/engine"
+import "github.com/jeremielodi/bpmngo/internal/engine"
 
 // EvaluateIOMappings evaluates each mapping's Source expression against vars
 // and returns a new map of Target -> evaluated value. Used for zeebe:ioMapping

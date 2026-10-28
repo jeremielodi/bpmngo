@@ -1,10 +1,10 @@
 # Postgres en haute disponibilité (Patroni + etcd + HAProxy), en test sur une
-# seule machine : 3 nœuds Postgres, 3 nœuds etcd, GoFlow branché sur HAProxy.
+# seule machine : 3 nœuds Postgres, 3 nœuds etcd, BpmnGo branché sur HAProxy.
 #
 #   docker compose -f docker-compose.yaml -f deploy/ha/docker-compose.ha.yaml up -d
 #
 # Patroni élit le primaire (verrou dans etcd) et, s'il tombe, promeut un
-# réplica en moins de 30 secondes ; HAProxy envoie toujours GoFlow au
+# réplica en moins de 30 secondes ; HAProxy envoie toujours BpmnGo au
 # primaire du moment (port 5000) et les lectures historiques aux réplicas
 # (port 5001). La réplication est synchrone : une écriture durable confirmée
 # est sur deux nœuds, une bascule ne la perd pas.

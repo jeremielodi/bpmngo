@@ -1,6 +1,6 @@
 # Engine Features
 
-What the GoFlow engine provides besides the BPMN elements ([BPMN 2.0 Support](bpmn-support.md)). Back to the [README](../README.md).
+What the BpmnGo engine provides besides the BPMN elements ([BPMN 2.0 Support](bpmn-support.md)). Back to the [README](../README.md).
 
 | Feature | Status |
 |---|---|

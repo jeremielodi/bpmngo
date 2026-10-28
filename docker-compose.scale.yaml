@@ -1,10 +1,10 @@
-# Plusieurs instances GoFlow derrière un load balancer nginx, avec PgBouncer
+# Plusieurs instances BpmnGo derrière un load balancer nginx, avec PgBouncer
 # devant Postgres.
 #
 #   docker compose -f docker-compose.yaml -f docker-compose.scale.yaml up -d --scale goflow=3
 #
 # Ce fichier s'ajoute à docker-compose.yaml sans le modifier : sans lui,
-# GoFlow tourne comme avant, en une seule instance connectée directement à
+# BpmnGo tourne comme avant, en une seule instance connectée directement à
 # Postgres. Les instances partagent la même base ; tout ce qui tourne en
 # tâche de fond (timers, archivage, messages, conditions) est déjà sûr à
 # plusieurs, et les événements de tâches (SSE, WebSocket) sont relayés entre

@@ -8,13 +8,13 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/cmdbus"
-	"github.com/jeremielodi/goflow/internal/common"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -42,7 +42,7 @@ func (mc *MessageController) Dispatcher() *events.TaskEventDispatcher { return m
 // CorrelateMessageRequest is Camunda 7's CorrelationMessageDto: values plain
 // ({"orderId": "A-1"}) or typed ({"orderId": {"value": "A-1", "type":
 // "String"}}), the variables to set under Camunda 7's "processVariables" (or
-// GoFlow's older "variables"), the instance targeted by processInstanceId or
+// BpmnGo's older "variables"), the instance targeted by processInstanceId or
 // businessKey.
 type CorrelateMessageRequest struct {
 	MessageName       string                 `json:"messageName"`

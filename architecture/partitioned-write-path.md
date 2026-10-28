@@ -9,7 +9,7 @@ history).
 
 Camunda 8 runs every process instance on one partition. The partition's
 leader is the only broker that writes the instance, and it applies the
-instance's commands one after the other. GoFlow can now run the same way:
+instance's commands one after the other. BpmnGo can now run the same way:
 
 ```
 WRITE_PATH=partitioned   # default: direct
@@ -23,7 +23,7 @@ In partitioned mode:
   of `goflow.partition-commands`. The command's key picks the partition:
   the instance id, or the correlation key for a message, or the name for a
   signal;
-- the GoFlow replicas form one Kafka consumer group. Kafka gives each
+- the BpmnGo replicas form one Kafka consumer group. Kafka gives each
   partition to exactly one replica, which runs its commands in order, one
   at a time. When a replica stops or a new one joins, the partition moves;
 - the caller (HTTP handler, gRPC handler, worker) waits for the outcome on

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/pkg/authentication"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/pkg/authentication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -40,7 +40,7 @@ func TestAuthenticate(t *testing.T) {
 		header    string
 		want      uuid.UUID // uuid.Nil: refused with Unauthenticated
 	}{
-		{"valid GoFlow JWT", uuid.Nil, "Bearer " + valid, user.ID},
+		{"valid BpmnGo JWT", uuid.Nil, "Bearer " + valid, user.ID},
 		{"valid JWT, anonymous allowed too", anonymous, "Bearer " + valid, user.ID},
 		{"no credentials", uuid.Nil, "", uuid.Nil},
 		{"no credentials, anonymous allowed", anonymous, "", anonymous},

@@ -1,4 +1,4 @@
-// Package partition runs GoFlow the way Camunda 8 runs Zeebe: every
+// Package partition runs BpmnGo the way Camunda 8 runs Zeebe: every
 // command about a process instance goes to the Kafka partition of that
 // instance, and the one replica owning the partition runs it — commands
 // of one instance never run concurrently, whichever replica received
@@ -23,7 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 
-	"github.com/jeremielodi/goflow/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 )
 
 const (

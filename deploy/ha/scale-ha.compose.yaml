@@ -1,4 +1,4 @@
-# Plusieurs instances GoFlow (docker-compose.scale.yaml : nginx, PgBouncer)
+# Plusieurs instances BpmnGo (docker-compose.scale.yaml : nginx, PgBouncer)
 # devant le cluster Postgres haute disponibilité (Patroni + HAProxy).
 #
 # En test sur une machine :
@@ -9,7 +9,7 @@
 #
 # PgBouncer passe par HAProxy (port 5000) et suit donc le primaire : à une
 # bascule, HAProxy coupe ses connexions vers l'ancien primaire, il en rouvre
-# vers le nouveau ; les connexions des instances GoFlow vers PgBouncer
+# vers le nouveau ; les connexions des instances BpmnGo vers PgBouncer
 # restent ouvertes. Le travail de session (LISTEN, verrous) va directement à
 # HAProxy, les lectures historiques aux nœuds de lecture (port 5001). La
 # réplique locale de docker-compose.scale.yaml n'a plus de raison d'être.

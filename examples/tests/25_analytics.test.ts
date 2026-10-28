@@ -14,10 +14,10 @@
  * still reports the incident after both instances have archived.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '24_grpc_process.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   await client.loginAsSuperUser();

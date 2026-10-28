@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jeremielodi/goflow/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/models"
 )
 
 // ParseTimerDefinition parses BPMN timer definition from XML

@@ -1,7 +1,7 @@
 /**
  * Suite 18 — Tasklist-equivalent (Camunda 8 v2 API)
  *
- * Verifies GoFlow's Phase 4 additions: richer POST /v2/user-tasks/search
+ * Verifies BpmnGo's Phase 4 additions: richer POST /v2/user-tasks/search
  * filters (state, candidateGroup, priority, processInstanceKey, elementId),
  * per-task priority resolved from zeebe:priorityDefinition (FEEL expression),
  * and linked forms (zeebe:formDefinition formId, deployed as a separate
@@ -22,11 +22,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import FormData from 'form-data';
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '18_tasklist_process.bpmn');
 const FORM = path.join(__dirname, 'bpmn', '18_review_form.form');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function searchUserTasks(filter: Record<string, unknown>): Promise<any[]> {
   const res = await client.api.post('/v2/user-tasks/search', { filter });

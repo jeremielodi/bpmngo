@@ -11,10 +11,10 @@
  *   D) An uncaught escalation lets the token carry on, without an incident.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '41_escalation.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function historicTaskStatus(instanceId: string, taskKey: string): Promise<string | undefined> {
   const res = await client.api.get(`/engine-rest/history/task?processInstanceId=${instanceId}`);

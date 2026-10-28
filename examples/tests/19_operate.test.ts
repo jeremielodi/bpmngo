@@ -1,7 +1,7 @@
 /**
  * Suite 19 — Operate-equivalent (Camunda 8 v2 API)
  *
- * Verifies GoFlow's Phase 5 additions: POST /v2/flownode-instances/search,
+ * Verifies BpmnGo's Phase 5 additions: POST /v2/flownode-instances/search,
  * POST /v2/variables/search, POST /v2/incidents/search, and process instance
  * modification (POST /v2/process-instances/:id/modification) — moving a
  * running token from one element to another, cancelling the source
@@ -22,11 +22,11 @@
  *      filterable by state and errorType.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const OPERATE_BPMN = path.join(__dirname, 'bpmn', '19_operate_process.bpmn');
 const SUPPORT_TICKET_BPMN = path.join(__dirname, 'bpmn', '07_support_ticket.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function searchUserTasks(filter: Record<string, unknown>): Promise<any[]> {
   const res = await client.api.post('/v2/user-tasks/search', { filter });

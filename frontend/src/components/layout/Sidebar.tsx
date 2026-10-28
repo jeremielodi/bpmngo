@@ -54,7 +54,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-gray-800">
         <Workflow className="w-6 h-6 text-blue-400" />
-        <span className="text-white font-bold text-base tracking-tight">GoFlow</span>
+        <span className="text-white font-bold text-base tracking-tight">BpmnGo</span>
       </div>
 
       {/* Nav */}

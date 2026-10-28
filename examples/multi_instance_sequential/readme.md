@@ -17,7 +17,7 @@ testing server performances:
 
 How to Run:
 bash
-# Make sure your GoFlow server is running
+# Make sure your BpmnGo server is running
 cd /d/apps/camunda-like
 go run main.go
 

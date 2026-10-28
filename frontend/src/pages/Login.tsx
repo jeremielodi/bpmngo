@@ -34,7 +34,7 @@ export default function Login() {
           <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
             <Workflow className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">GoFlow</h1>
+          <h1 className="text-2xl font-bold text-white">BpmnGo</h1>
           <p className="text-gray-400 text-sm mt-1">BPMN Workflow Engine</p>
         </div>
 

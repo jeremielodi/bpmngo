@@ -6,12 +6,12 @@ import (
 	"errors"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -49,7 +49,7 @@ func (ctrl *IncidentController) checkIncidentAccess(c *fiber.Ctx, instanceID uui
 // zeebe_keys table jobs/instances already use) to an incident's JSON
 // representation, additively — no existing field changes shape. This is
 // the only way a gRPC caller can discover an incident's int64 key today,
-// since GoFlow has no gRPC-side incident listing to mint one on
+// since BpmnGo has no gRPC-side incident listing to mint one on
 // (real Zeebe's own Gateway protocol has none either — real clients learn
 // incident keys from Operate/exporters, outside the Gateway).
 func (ctrl *IncidentController) withZeebeKey(inc *models.Incident) (map[string]interface{}, error) {

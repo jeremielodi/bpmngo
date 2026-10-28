@@ -1,7 +1,7 @@
 /**
  * Suite 21 — OIDC Authentication (Camunda 8 Phase 8)
  *
- * GoFlow can accept bearer tokens from an external OIDC provider (Keycloak,
+ * BpmnGo can accept bearer tokens from an external OIDC provider (Keycloak,
  * Auth0, etc.) as an alternative to its own JWT login — see
  * pkg/authentication/oidc.go (JWKS-based RS256 validation + auto-
  * provisioning) and pkg/middleware/oidc_user.go (ResolveOIDCUser).
@@ -13,7 +13,7 @@
  *
  * This docker-compose stack does NOT set OIDC_ISSUER/OIDC_JWKS_URL, so
  * OIDC is disabled here (NewOIDCService returns nil) exactly like it would
- * be for any GoFlow deployment that hasn't configured an IdP. What this
+ * be for any BpmnGo deployment that hasn't configured an IdP. What this
  * suite verifies end-to-end against the running server is:
  *   A) With OIDC disabled, an RS256-signed bearer token (which is neither a
  *      valid internal JWT nor validatable OIDC, since there's no provider
@@ -25,16 +25,16 @@
  *      must not break).
  *
  * Full E2E against a real IdP (token issued by an actual Keycloak/Auth0,
- * GoFlow configured with its real OIDC_ISSUER/OIDC_JWKS_URL/OIDC_AUDIENCE)
+ * BpmnGo configured with its real OIDC_ISSUER/OIDC_JWKS_URL/OIDC_AUDIENCE)
  * is a manual verification step, as noted in the roadmap plan itself —
  * standing up a dev IdP isn't practical inside this automated suite.
  */
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 // A structurally valid RS256 JWT (header.payload.signature, all base64url)
-// that isn't signed by anything GoFlow trusts — with OIDC disabled there's
+// that isn't signed by anything BpmnGo trusts — with OIDC disabled there's
 // no JWKS to even check it against, so it must be rejected the same way an
 // internal-JWT-shaped garbage token always was.
 const FOREIGN_RS256_TOKEN =

@@ -17,7 +17,7 @@
  */
 import { execSync, spawn } from 'child_process';
 import * as path from 'path';
-import { GoFlowClient, sleep } from './client';
+import { BpmnGoClient, sleep } from './client';
 
 const BASE_URL = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
 const noTimers = process.argv.includes('--no-timers');
@@ -27,7 +27,7 @@ const noTimers = process.argv.includes('--no-timers');
 async function waitForApp(timeoutMs = 120_000): Promise<void> {
   const axios = (await import('axios')).default;
   const start = Date.now();
-  process.stdout.write('  Waiting for GoFlow app');
+  process.stdout.write('  Waiting for BpmnGo app');
   while (Date.now() - start < timeoutMs) {
     try {
       await axios.get(`${BASE_URL}/health`, { timeout: 2000 });
@@ -38,7 +38,7 @@ async function waitForApp(timeoutMs = 120_000): Promise<void> {
       await sleep(3000);
     }
   }
-  throw new Error('GoFlow app did not become healthy within timeout');
+  throw new Error('BpmnGo app did not become healthy within timeout');
 }
 
 // ─── Run a test file as a child process ───────────────────────────────────────
@@ -60,7 +60,7 @@ function runFile(file: string): Promise<number> {
 
 async function main() {
   console.log('\n' + '═'.repeat(60));
-  console.log('  GoFlow Integration Test Suite');
+  console.log('  BpmnGo Integration Test Suite');
   console.log('═'.repeat(60));
 
   // 1. Tear down existing containers + volumes, then rebuild fresh (SKIP_SETUP=1:
@@ -78,7 +78,7 @@ async function main() {
 
     console.log('📦  Starting Docker services (fresh build)…');
     // GOFLOW_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
-    // runs the suites against several GoFlow instances behind the load balancer.
+    // runs the suites against several BpmnGo instances behind the load balancer.
     const replicas = process.env.GOFLOW_REPLICAS ? ` --scale goflow=${process.env.GOFLOW_REPLICAS}` : '';
     try {
       execSync(`docker compose up -d --build --wait${replicas}`, {
@@ -96,7 +96,7 @@ async function main() {
   await waitForApp();
 
   // 3. Quick connectivity check
-  const client = new GoFlowClient();
+  const client = new BpmnGoClient();
   await client.loginAsSuperUser();
   console.log('  Auth OK — superuser login successful\n');
 

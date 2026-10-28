@@ -17,10 +17,10 @@
  *   G) An error end event nothing catches raises an incident.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '36_bpmn_elements.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 // Final status of a task once its instance has finished (live tasks are
 // archived into history when the instance ends).

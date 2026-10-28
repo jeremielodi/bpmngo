@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/google/cel-go/cel"
-	"github.com/jeremielodi/goflow/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/engine"
 )
 
 var (

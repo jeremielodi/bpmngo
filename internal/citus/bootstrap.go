@@ -1,4 +1,4 @@
-// Package citus provides an idempotent, boot-time bootstrap for GoFlow's
+// Package citus provides an idempotent, boot-time bootstrap for BpmnGo's
 // optional Citus-backed distributed-storage deployment (see
 // architecture/citus-distributed-storage-design.md and
 // docker-compose.citus.yml). Mirrors internal/eventlog.EnsureTopics's

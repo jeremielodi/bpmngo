@@ -5,16 +5,16 @@
   <modelVersion>4.0.0</modelVersion>
 
   <!--
-    Java clients of a remote GoFlow server — see docs/java-client.md.
+    Java clients of a remote BpmnGo server — see docs/java-client.md.
     Three ways, one class each:
       RestExample               plain REST (java.net.http + Jackson)
       ExternalTaskWorkerExample Camunda 7 External Task Client (REST)
       ZeebeClientExample        Camunda 8 Java client (gRPC, port 26500)
-    Run one: ./mvnw -q compile exec:java -Dexec.mainClass=com.goflow.examples.RestExample
+    Run one: ./mvnw -q compile exec:java -Dexec.mainClass=com.bpmngo.examples.RestExample
     (integration suite 54, examples/tests/54_java_clients.test.ts, runs them all)
   -->
-  <groupId>com.goflow.examples</groupId>
-  <artifactId>goflow-java-client</artifactId>
+  <groupId>com.bpmngo.examples</groupId>
+  <artifactId>bpmngo-java-client</artifactId>
   <version>1.0.0</version>
 
   <properties>
@@ -51,7 +51,7 @@
       <version>7.24.0</version>
     </dependency>
 
-    <!-- Camunda 8 Java client: gRPC, Zeebe 8.3 protocol (what GoFlow serves) -->
+    <!-- Camunda 8 Java client: gRPC, Zeebe 8.3 protocol (what BpmnGo serves) -->
     <dependency>
       <groupId>io.camunda</groupId>
       <artifactId>zeebe-client-java</artifactId>

@@ -1,5 +1,5 @@
 // load-test.js
-// Performance and load testing for GoFlow server
+// Performance and load testing for BpmnGo server
 //
 // Run:
 //   node load-test.js                    # Run all tests
@@ -150,7 +150,7 @@ class ResultsCollector {
 // API CLIENT
 // ============================================================
 
-class GoFlowClient {
+class BpmnGoClient {
     static async deployBpmn(filePath, deploymentName) {
         if (!fs.existsSync(filePath)) {
             throw new Error(`BPMN file not found: ${filePath}`);
@@ -215,7 +215,7 @@ async function simplePerformanceTest() {
     console.log(`   Concurrent requests: 1\n`);
     
     // Deploy BPMN once
-    await GoFlowClient.deployBpmn(BPMN_FILE, 'Load Test');
+    await BpmnGoClient.deployBpmn(BPMN_FILE, 'Load Test');
     
     collector.start();
     
@@ -223,7 +223,7 @@ async function simplePerformanceTest() {
     let requestCount = 0;
     
     while (Date.now() < endTime) {
-        const result = await GoFlowClient.startProcess(PROCESS_KEY, {
+        const result = await BpmnGoClient.startProcess(PROCESS_KEY, {
             testId: `load-test-${requestCount++}`,
             startTime: new Date().toISOString()
         });
@@ -254,7 +254,7 @@ async function runConcurrentRequests(concurrency, duration, collector) {
         if (completed) return;
         
         activeRequests++;
-        const result = await GoFlowClient.startProcess(PROCESS_KEY, {
+        const result = await BpmnGoClient.startProcess(PROCESS_KEY, {
             testId: `concurrent-${Date.now()}-${requestId++}`,
             startTime: new Date().toISOString()
         });
@@ -288,7 +288,7 @@ async function parallelRequestsTest() {
     console.log(`   Testing concurrency levels: ${CONFIG.concurrencyLevels.join(', ')}\n`);
     
     // Deploy BPMN once
-    await GoFlowClient.deployBpmn(BPMN_FILE, 'Load Test');
+    await BpmnGoClient.deployBpmn(BPMN_FILE, 'Load Test');
     
     const results = [];
     
@@ -339,7 +339,7 @@ async function stressTest() {
     console.log(`   Step size: ${CONFIG.stepSize}`);
     console.log(`   Step duration: ${CONFIG.stepDuration / 1000}s\n`);
     
-    await GoFlowClient.deployBpmn(BPMN_FILE, 'Load Test');
+    await BpmnGoClient.deployBpmn(BPMN_FILE, 'Load Test');
     
     collector.start();
     
@@ -392,7 +392,7 @@ async function durationTest() {
     console.log(`   Duration: ${duration / 1000}s`);
     console.log(`   Concurrency: ${concurrency}\n`);
     
-    await GoFlowClient.deployBpmn(BPMN_FILE, 'Load Test');
+    await BpmnGoClient.deployBpmn(BPMN_FILE, 'Load Test');
     
     collector.start();
     await runConcurrentRequests(concurrency, duration, collector);
@@ -414,7 +414,7 @@ async function connectionPoolTest() {
     console.log('\n🔌 Testing connection pool...');
     console.log('   Testing rapid sequential requests\n');
     
-    await GoFlowClient.deployBpmn(BPMN_FILE, 'Load Test');
+    await BpmnGoClient.deployBpmn(BPMN_FILE, 'Load Test');
     
     collector.start();
     
@@ -427,7 +427,7 @@ async function connectionPoolTest() {
         const batchStart = Date.now();
         
         for (let j = 0; j < batchSize && i + j < requestCount; j++) {
-            batch.push(GoFlowClient.startProcess(PROCESS_KEY, {
+            batch.push(BpmnGoClient.startProcess(PROCESS_KEY, {
                 testId: `pool-test-${i + j}`,
                 startTime: new Date().toISOString()
             }));
@@ -458,10 +458,10 @@ async function connectionPoolTest() {
 async function checkServerHealth() {
     console.log('\n🏥 Checking server health...');
     
-    const isHealthy = await GoFlowClient.healthCheck();
+    const isHealthy = await BpmnGoClient.healthCheck();
     if (!isHealthy) {
         console.error('❌ Server is not responding!');
-        console.error('   Make sure your GoFlow server is running on port 8080');
+        console.error('   Make sure your BpmnGo server is running on port 8080');
         process.exit(1);
     }
     

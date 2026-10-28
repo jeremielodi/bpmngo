@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-shot setup of a new Patroni cluster for GoFlow, through HAProxy (so
+# One-shot setup of a new Patroni cluster for BpmnGo, through HAProxy (so
 # on the current primary): creates the goflow role and database if they
 # don't exist, and loads database/01_schema.sql and 02_config.sql (the
 # base permissions) into an empty database.
@@ -22,8 +22,8 @@ EOSQL
 # database into (see the README, Postgres high availability).
 if [ "${GOFLOW_SKIP_SCHEMA:-false}" != "true" ] &&
 	[ "$(psql_su -d goflow -Atc "SELECT to_regclass('public.process_definitions') IS NULL")" = "t" ]; then
-	echo "Loading the GoFlow schema"
+	echo "Loading the BpmnGo schema"
 	PGPASSWORD="$GOFLOW_PASSWORD" psql -h "${PG_HOST:-haproxy}" -p "${PG_PORT:-5000}" -U goflow -d goflow \
 		-v ON_ERROR_STOP=1 -q -f /schema/01_schema.sql -f /schema/02_config.sql
 fi
-echo "GoFlow database ready"
+echo "BpmnGo database ready"

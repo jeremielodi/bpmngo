@@ -1,4 +1,4 @@
-package com.goflow.examples;
+package com.bpmngo.examples;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.camunda.zeebe.client.CredentialsProvider;
@@ -17,15 +17,15 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.goflow.examples.Examples.check;
-import static com.goflow.examples.Examples.waitFor;
+import static com.bpmngo.examples.Examples.check;
+import static com.bpmngo.examples.Examples.waitFor;
 
 /**
- * The Camunda 8 Java client (zeebe-client-java 8.3) against GoFlow's gRPC
+ * The Camunda 8 Java client (zeebe-client-java 8.3) against BpmnGo's gRPC
  * gateway on port 26500: topology, deployment, a job worker, instance
  * creation and message publication.
  *
- * GoFlow user tasks are not jobs, so the user task is completed over REST
+ * BpmnGo user tasks are not jobs, so the user task is completed over REST
  * (/v2/user-tasks). gRPC keys are numbers and REST ids are UUIDs, with no
  * mapping between them over the API: the task is found by its instance's
  * orderId variable.
@@ -33,17 +33,17 @@ import static com.goflow.examples.Examples.waitFor;
 public class ZeebeClientExample {
 
     public static void main(String[] args) {
-        GoFlowRestClient goflow = GoFlowRestClient.fromEnv();
-        String gateway = GoFlowRestClient.env("GOFLOW_GRPC", "127.0.0.1:26500");
+        BpmnGoRestClient bpmngo = BpmnGoRestClient.fromEnv();
+        String gateway = BpmnGoRestClient.env("GOFLOW_GRPC", "127.0.0.1:26500");
 
-        // Send GoFlow's JWT as gRPC metadata: the gateway refuses calls without
+        // Send BpmnGo's JWT as gRPC metadata: the gateway refuses calls without
         // valid credentials (UNAUTHENTICATED), and applies this user's
         // per-process permissions.
         CredentialsProvider jwt = new CredentialsProvider() {
             @Override
             public void applyCredentials(Metadata headers) {
                 headers.put(Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER),
-                        "Bearer " + goflow.accessToken());
+                        "Bearer " + bpmngo.accessToken());
             }
 
             @Override
@@ -56,7 +56,7 @@ public class ZeebeClientExample {
         AtomicInteger charged = new AtomicInteger();
         try (ZeebeClient zeebe = ZeebeClient.newClientBuilder()
                 .gatewayAddress(gateway)
-                .usePlaintext() // GoFlow's gateway has no TLS: put one in front (see docs/java-client.md)
+                .usePlaintext() // BpmnGo's gateway has no TLS: put one in front (see docs/java-client.md)
                 .credentialsProvider(jwt)
                 .defaultRequestTimeout(Duration.ofSeconds(15))
                 .build()) {
@@ -93,9 +93,9 @@ public class ZeebeClientExample {
                 check(instance.getProcessInstanceKey() > 0, "created instance key " + instance.getProcessInstanceKey());
 
                 // The user task, over REST.
-                JsonNode task = waitFor("approveOrder task", Duration.ofSeconds(10), () -> findTask(goflow, orderId));
-                goflow.post("/v2/user-tasks/" + task.path("userTaskKey").asText() + "/assignment", Map.of("assignee", "bob"));
-                goflow.post("/v2/user-tasks/" + task.path("userTaskKey").asText() + "/completion", Map.of("variables", Map.of()));
+                JsonNode task = waitFor("approveOrder task", Duration.ofSeconds(10), () -> findTask(bpmngo, orderId));
+                bpmngo.post("/v2/user-tasks/" + task.path("userTaskKey").asText() + "/assignment", Map.of("assignee", "bob"));
+                bpmngo.post("/v2/user-tasks/" + task.path("userTaskKey").asText() + "/completion", Map.of("variables", Map.of()));
                 String instanceId = task.path("processInstanceKey").asText();
 
                 waitFor("charge-card job", Duration.ofSeconds(20),
@@ -108,10 +108,10 @@ public class ZeebeClientExample {
                             .correlationKey(orderId)
                             .variables(Map.of("paidAt", "2026-10-24T10:00:00Z"))
                             .send().join();
-                    return completed(goflow, instanceId) ? Optional.of(true) : Optional.empty();
+                    return completed(bpmngo, instanceId) ? Optional.of(true) : Optional.empty();
                 });
                 waitFor("instance completed", Duration.ofSeconds(15),
-                        () -> completed(goflow, instanceId) ? Optional.of(true) : Optional.empty());
+                        () -> completed(bpmngo, instanceId) ? Optional.of(true) : Optional.empty());
                 check(true, "instance completed");
             }
         }
@@ -119,11 +119,11 @@ public class ZeebeClientExample {
     }
 
     /** The open approveOrder task of the instance whose orderId is the given one. */
-    private static Optional<JsonNode> findTask(GoFlowRestClient goflow, String orderId) {
-        JsonNode tasks = goflow.post("/v2/user-tasks/search",
+    private static Optional<JsonNode> findTask(BpmnGoRestClient bpmngo, String orderId) {
+        JsonNode tasks = bpmngo.post("/v2/user-tasks/search",
                 Map.of("filter", Map.of("elementId", "approveOrder", "state", "CREATED"))).path("items");
         for (JsonNode t : tasks) {
-            JsonNode vars = goflow.post("/v2/variables/search", Map.of("filter", Map.of(
+            JsonNode vars = bpmngo.post("/v2/variables/search", Map.of("filter", Map.of(
                     "processInstanceKey", t.path("processInstanceKey").asText(), "name", "orderId"))).path("items");
             if (vars.size() == 1 && orderId.equals(vars.get(0).path("value").asText())) {
                 return Optional.of(t);
@@ -132,7 +132,7 @@ public class ZeebeClientExample {
         return Optional.empty();
     }
 
-    private static boolean completed(GoFlowRestClient goflow, String instanceId) {
-        return List.of("COMPLETED").contains(goflow.get("/v2/process-instances/" + instanceId).path("state").asText());
+    private static boolean completed(BpmnGoRestClient bpmngo, String instanceId) {
+        return List.of("COMPLETED").contains(bpmngo.get("/v2/process-instances/" + instanceId).path("state").asText());
     }
 }

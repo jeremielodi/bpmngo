@@ -1,4 +1,4 @@
-Based on the search results and the current state of your GoFlow engine, here are the most important features to implement next, organized by priority.
+Based on the search results and the current state of your BpmnGo engine, here are the most important features to implement next, organized by priority.
 
 Priority 1: Core BPMN Completeness
 These are the most requested and essential features for a production-ready BPMN engine.
@@ -115,7 +115,7 @@ Priority	Feature	Est. Effort	Industry Relevance
 4	Signal Events	2-3 days	Cross-process
 4	Agentic/AI	5-7 days	Future trend 
 Recommendation
-Based on your GoFlow engine's current capabilities (timer cycles, external tasks, user tasks), I recommend starting with:
+Based on your BpmnGo engine's current capabilities (timer cycles, external tasks, user tasks), I recommend starting with:
 
 Multi-instance Tasks - Most requested feature for approval workflows
 

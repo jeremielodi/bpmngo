@@ -3,7 +3,7 @@ package v2
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -26,7 +26,7 @@ type SearchIncidentsRequest struct {
 	} `json:"filter"`
 }
 
-// incidentState maps GoFlow's incident state to the Camunda 8 naming.
+// incidentState maps BpmnGo's incident state to the Camunda 8 naming.
 func incidentState(state string) string {
 	switch state {
 	case "open":

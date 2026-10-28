@@ -1,7 +1,7 @@
 // pkg/authentication/oidc.go
 //
 // Minimal OIDC (OpenID Connect) bearer-token validator, used as an
-// alternative to the internal JWT service so GoFlow can sit behind an
+// alternative to the internal JWT service so BpmnGo can sit behind an
 // external identity provider (Keycloak, Auth0, Azure AD, etc.) instead of
 // (or alongside) its own password-based login. Only JWKS-based RS256 token
 // validation is implemented here — no authorization-code/redirect flow,
@@ -39,7 +39,7 @@ type jwks struct {
 	Keys []jwk `json:"keys"`
 }
 
-// OIDCClaims is the subset of ID/access token claims GoFlow cares about.
+// OIDCClaims is the subset of ID/access token claims BpmnGo cares about.
 type OIDCClaims struct {
 	Email string `json:"email,omitempty"`
 	jwt.RegisteredClaims

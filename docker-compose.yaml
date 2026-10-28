@@ -1,12 +1,17 @@
 # docker-compose.yaml
 
+# Nom du projet Compose figé : les volumes (goflow_postgres_data, …) et le
+# réseau gardent leur nom quel que soit le dossier du clone. Ne pas changer
+# sans migrer les données (dump/restore). COMPOSE_PROJECT_NAME le remplace.
+name: goflow
+
 services:
   # PostgreSQL
   postgres:
     image: postgres:16
     container_name: goflow-postgres
     # max_connections doit couvrir DB_MAX_OPEN_CONNS × le nombre d'instances
-    # GoFlow (+ quelques connexions d'admin).
+    # BpmnGo (+ quelques connexions d'admin).
     command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"]
     environment:
       POSTGRES_DB: goflow
@@ -66,7 +71,7 @@ services:
       - goflow-network
     restart: unless-stopped
 
-  # GoFlow Application
+  # BpmnGo Application
   goflow:
     build: .
     container_name: goflow-app
@@ -82,7 +87,7 @@ services:
       DB_USER: goflow
       DB_PASS: ${POSTGRES_PASSWORD:-goflow123}
       DB_NAME: goflow
-      # Taille du pool de connexions par instance GoFlow
+      # Taille du pool de connexions par instance BpmnGo
       DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-80}
 
       # Event log (shadow mode — see internal/eventlog)
@@ -153,7 +158,7 @@ services:
       - goflow-network
     restart: unless-stopped
 
-  # GoFlow Frontend (React + nginx)
+  # BpmnGo Frontend (React + nginx)
   frontend:
     build:
       context: ./frontend

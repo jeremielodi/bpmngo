@@ -6,8 +6,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/api"
-	"github.com/jeremielodi/goflow/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/api"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
 )
 
 type MessageController struct {
@@ -60,7 +60,7 @@ func (mc *MessageController) PublishMessage(c *fiber.Ctx) error {
 		"correlatedProcessInstanceKeys": nonNilIDs(res.Correlated),
 		"startedProcessInstanceKeys":    nonNilIDs(res.Started),
 	}
-	// Kept from GoFlow's earlier 1:1 response.
+	// Kept from BpmnGo's earlier 1:1 response.
 	if len(res.Correlated) > 0 {
 		body["processInstanceKey"] = res.Correlated[0]
 	} else if len(res.Started) > 0 {

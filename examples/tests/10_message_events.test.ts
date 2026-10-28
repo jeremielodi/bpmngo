@@ -11,10 +11,10 @@
  *   D) businessKey / processInstanceId target one instance; all correlates every waiting one
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '10_order_notification.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 const BASE = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
 
 async function correlateMessage(

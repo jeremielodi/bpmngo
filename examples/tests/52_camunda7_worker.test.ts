@@ -20,10 +20,10 @@
  */
 import * as path from 'path';
 import axios from 'axios';
-import { GoFlowClient, runSuite, assert, sleep, BASE_URL } from './client';
+import { BpmnGoClient, runSuite, assert, sleep, BASE_URL } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '52_camunda7_worker.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 const run = Date.now().toString(36);
 const c7 = axios.create({
   baseURL: `${BASE_URL}/engine-rest`,

@@ -1,4 +1,4 @@
-// Package metrics exposes GoFlow's Prometheus metrics on GET /metrics:
+// Package metrics exposes BpmnGo's Prometheus metrics on GET /metrics:
 // Go runtime/process metrics (default collectors), HTTP request counts and
 // latencies, the database connection pool, engine state read from Postgres
 // at scrape time (running instances, pending jobs, open incidents...),
@@ -49,7 +49,7 @@ var (
 	}, []string{"table"})
 )
 
-// Register installs every GoFlow collector on the default registry, which
+// Register installs every BpmnGo collector on the default registry, which
 // already carries the Go runtime and process collectors.
 func Register(db *sqlx.DB) {
 	prometheus.MustRegister(

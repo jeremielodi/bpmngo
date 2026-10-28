@@ -24,7 +24,7 @@ type ProcessInstance struct {
 }
 
 // MarshalJSON adds Camunda 7's ProcessInstanceDto fields (definitionId,
-// ended, suspended, caseInstanceId, links) to GoFlow's own, so a Camunda
+// ended, suspended, caseInstanceId, links) to BpmnGo's own, so a Camunda
 // 7 client reads instances unchanged.
 func (p ProcessInstance) MarshalJSON() ([]byte, error) {
 	type plain ProcessInstance

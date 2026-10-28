@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jeremielodi/goflow/internal/common"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 )
 
 // executeEventBasedGateway parks the execution and creates subscriptions for all

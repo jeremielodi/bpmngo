@@ -8,11 +8,11 @@
  *   C) After sub-process completes, main process resumes and completes
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN_MAIN = path.join(__dirname, 'bpmn', '13_call_activity_main.bpmn');
 const BPMN_SUB = path.join(__dirname, 'bpmn', '13_credit_check_process.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 const BASE = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
 
 async function completeExternalTaskForAny(token: string, topic: string): Promise<number> {

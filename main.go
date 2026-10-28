@@ -12,27 +12,27 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/api"
-	apiv2 "github.com/jeremielodi/goflow/internal/api/v2"
-	"github.com/jeremielodi/goflow/internal/citus"
-	"github.com/jeremielodi/goflow/internal/cmdbus"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/listeners"
-	"github.com/jeremielodi/goflow/internal/metrics"
-	"github.com/jeremielodi/goflow/internal/partition"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/retention"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/internal/worker"
-	"github.com/jeremielodi/goflow/internal/zeebegrpc"
-	"github.com/jeremielodi/goflow/internal/zeebegrpc/pb"
-	"github.com/jeremielodi/goflow/pkg/authentication"
-	"github.com/jeremielodi/goflow/pkg/common"
-	"github.com/jeremielodi/goflow/pkg/database"
-	"github.com/jeremielodi/goflow/pkg/middleware"
+	"github.com/jeremielodi/bpmngo/internal/api"
+	apiv2 "github.com/jeremielodi/bpmngo/internal/api/v2"
+	"github.com/jeremielodi/bpmngo/internal/citus"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/listeners"
+	"github.com/jeremielodi/bpmngo/internal/metrics"
+	"github.com/jeremielodi/bpmngo/internal/partition"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/retention"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/worker"
+	"github.com/jeremielodi/bpmngo/internal/zeebegrpc"
+	"github.com/jeremielodi/bpmngo/internal/zeebegrpc/pb"
+	"github.com/jeremielodi/bpmngo/pkg/authentication"
+	"github.com/jeremielodi/bpmngo/pkg/common"
+	"github.com/jeremielodi/bpmngo/pkg/database"
+	"github.com/jeremielodi/bpmngo/pkg/middleware"
 	"github.com/jmoiron/sqlx"
 	"google.golang.org/grpc"
 )
@@ -136,7 +136,7 @@ func main() {
 	}
 
 	// Cross-instance job wake-ups: a dedicated LISTEN connection means a job
-	// created on one GoFlow instance wakes gRPC ActivateJobs long-polls on
+	// created on one BpmnGo instance wakes gRPC ActivateJobs long-polls on
 	// every instance sharing this database, not just the one that created
 	// it — required for the app tier to scale horizontally without
 	// degrading gRPC job dispatch latency down to the fallback poll.
@@ -224,7 +224,7 @@ func main() {
 	// })
 	taskEventDispatcher.Register(webhookListener)
 
-	// Several GoFlow instances behind a load balancer (docker-compose.scale.yaml):
+	// Several BpmnGo instances behind a load balancer (docker-compose.scale.yaml):
 	// task events are relayed between them, so an SSE/WebSocket client sees
 	// them whichever instance it is connected to.
 	if strings.EqualFold(os.Getenv("TASK_EVENTS_FANOUT"), "true") {
@@ -252,7 +252,7 @@ func main() {
 
 	// Create worker pool for processing requests asynchronously
 	// Parameters: db, pool name, number of workers, queue size
-	workerPool := worker.NewWorkerPool(db, "GoFlow-Main", 25, 1000, taskEventDispatcher)
+	workerPool := worker.NewWorkerPool(db, "BpmnGo-Main", 25, 1000, taskEventDispatcher)
 	workerPool.Start()
 	defer workerPool.Stop()
 
@@ -386,7 +386,7 @@ func main() {
 
 	// Health check endpoints
 	app.Get("/", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"title": "Information", "message": "Goflow server is running successfully"})
+		return c.JSON(fiber.Map{"title": "Information", "message": "BpmnGo server is running successfully"})
 	})
 
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -395,7 +395,7 @@ func main() {
 		if err := db.PingContext(ctx); err != nil {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"title": "Error", "message": "database unreachable", "database": "down"})
 		}
-		return c.JSON(fiber.Map{"title": "Information", "message": "Goflow server is running successfully", "database": "ok"})
+		return c.JSON(fiber.Map{"title": "Information", "message": "BpmnGo server is running successfully", "database": "ok"})
 	})
 
 	// Prometheus metrics. Registered before the auth middleware below so a
@@ -523,7 +523,7 @@ func main() {
 
 	// Camunda 7 compatible
 	app.Get("/engine-rest/engine", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"title": "Information", "message": "Goflow server is running successfully"})
+		return c.JSON(fiber.Map{"title": "Information", "message": "BpmnGo server is running successfully"})
 	})
 
 	app.Post("/engine-rest/v2/deployment/create", processDefinitionCtrl.DeployBPMN)
@@ -712,7 +712,7 @@ func main() {
 	app.Get("/metrics/pool", func(c *fiber.Ctx) error {
 		metrics := workerPool.GetMetrics()
 		return c.JSON(fiber.Map{
-			"name":            "GoFlow-Main",
+			"name":            "BpmnGo-Main",
 			"jobs_submitted":  metrics.JobsSubmitted,
 			"jobs_processed":  metrics.JobsProcessed,
 			"jobs_failed":     metrics.JobsFailed,
@@ -771,7 +771,7 @@ func main() {
 	// START SERVER
 	// ============================================================
 
-	log.Println("🚀 GoFlow server starting on :8080")
+	log.Println("🚀 BpmnGo server starting on :8080")
 	log.Printf("   Worker Pool: 10 workers, queue size 1000")
 	log.Printf("   Timer Scheduler: running")
 	log.Printf("   Event Streams: SSE (/events/tasks), WebSocket (/ws/tasks)")

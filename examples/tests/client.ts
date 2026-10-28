@@ -145,7 +145,7 @@ export class TaskSSEClient {
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
-export class GoFlowClient {
+export class BpmnGoClient {
   public readonly api: AxiosInstance;
   public workerId: string;
   private token: string | null = null;

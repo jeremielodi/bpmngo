@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jeremielodi/goflow/internal/parser"
+	"github.com/jeremielodi/bpmngo/internal/parser"
 )
 
 // subProcessInfo describes one embedded sub-process found while flattening.

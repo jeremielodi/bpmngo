@@ -19,11 +19,11 @@
  */
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '53_step_back.bpmn');
 const PARALLEL_BPMN = path.join(__dirname, 'bpmn', '53_step_back_parallel.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 function psql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U goflow -d goflow -tAc "${sql}"`, {
@@ -55,7 +55,7 @@ async function lockJob(instanceId: string) {
   throw new Error(`no step_back_check job for ${instanceId}`);
 }
 
-function stepBack(c: GoFlowClient, instanceId: string, body: Record<string, unknown>) {
+function stepBack(c: BpmnGoClient, instanceId: string, body: Record<string, unknown>) {
   return c.api.post(`/v2/process-instances/${instanceId}/step-back`, body).catch(e => e.response);
 }
 
@@ -198,7 +198,7 @@ async function run() {
           const id = await startToApprove({});
           const email = `step-back-viewer-${Date.now()}@goflow.com`;
           const created = await client.api.post('/users', { email, full_name: email, password: 'password123' });
-          const viewer = new GoFlowClient();
+          const viewer = new BpmnGoClient();
           await viewer.login(email, 'password123');
           await client.api.post('/engine-rest/process-definition/key/StepBackProcess/permissions', {
             granteeType: 'user', granteeId: created.data.user.id, permission: 'VIEW',

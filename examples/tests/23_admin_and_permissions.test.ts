@@ -49,7 +49,7 @@
  */
 import * as path from 'path';
 import { execSync } from 'child_process';
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
 function psql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U goflow -d goflow -tAc "${sql}"`, {
@@ -58,20 +58,20 @@ function psql(sql: string): string {
 }
 
 const BPMN = path.join(__dirname, 'bpmn', '23_permission_process.bpmn');
-const superuser = new GoFlowClient();
+const superuser = new BpmnGoClient();
 
-async function createUser(email: string): Promise<{ id: string; client: GoFlowClient }> {
+async function createUser(email: string): Promise<{ id: string; client: BpmnGoClient }> {
   const res = await superuser.api.post('/users', {
     email,
     full_name: email,
     password: 'password123',
   });
-  const client = new GoFlowClient();
+  const client = new BpmnGoClient();
   await client.login(email, 'password123');
   return { id: res.data.user.id, client };
 }
 
-async function deploy(client: GoFlowClient): Promise<void> {
+async function deploy(client: BpmnGoClient): Promise<void> {
   const fs = require('fs');
   const FormData = require('form-data');
   const form = new FormData();
@@ -207,7 +207,7 @@ async function run() {
           // with the new one (and confirming the old one no longer works),
           // not just checking for a 200.
           await superuser.api.put(`/users/${userId}/reset-password`, { new_password: 'resetpass456' });
-          const freshClient = new GoFlowClient();
+          const freshClient = new BpmnGoClient();
           const loginNew = await freshClient.login('lifecycle-user@goflow.com', 'resetpass456');
           assert(!!loginNew.access_token, 'expected login with the admin-reset password to succeed');
           const loginOld = await freshClient.login('lifecycle-user@goflow.com', 'password123').catch(e => e.response);
@@ -311,7 +311,7 @@ async function run() {
           await superuser.api.post(`/users/${strangerId}/roles/${role.data.role.id}`);
           await superuser.api.post(`/users/${granteeId}/roles/${role.data.role.id}`);
 
-          const search = (c: GoFlowClient, what: string, filter: Record<string, unknown>) =>
+          const search = (c: BpmnGoClient, what: string, filter: Record<string, unknown>) =>
             c.api.post(`/v2/${what}/search`, { filter }).catch((e: any) => e.response);
           const keys = (res: any) => (res.data.items as any[]).map(i => i.processInstanceKey);
 

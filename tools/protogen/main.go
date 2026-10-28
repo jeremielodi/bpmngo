@@ -1,4 +1,4 @@
-// Command protogen compiles GoFlow's .proto files and invokes the
+// Command protogen compiles BpmnGo's .proto files and invokes the
 // protoc-gen-go / protoc-gen-go-grpc plugins directly, entirely in Go — no
 // protoc or buf CLI binary required. Used because this environment's network
 // made downloading those large binaries unreliable; protocompile (a pure-Go

@@ -1,7 +1,7 @@
 /**
  * Suite 54 — Java clients (examples/java-client, see docs/java-client.md)
  *
- * Runs the Java examples against the GoFlow under test, through the Maven
+ * Runs the Java examples against the BpmnGo under test, through the Maven
  * Wrapper (it downloads Maven on first use; a JDK 17+ must be installed).
  * Each example drives one order through java-order.bpmn, checks every step
  * and prints "<Name> OK"; any failed check exits non-zero.
@@ -49,7 +49,7 @@ function mvnw(args: string[], env: Record<string, string> = {}, timeoutMs = 300_
 }
 
 async function runExample(mainClass: string, env: Record<string, string> = {}) {
-  const { code, out } = await mvnw(['exec:java', `-Dexec.mainClass=com.goflow.examples.${mainClass}`], env);
+  const { code, out } = await mvnw(['exec:java', `-Dexec.mainClass=com.bpmngo.examples.${mainClass}`], env);
   const tail = out.trim().split('\n').slice(-15).join('\n');
   assert(code === 0 && out.includes(`${mainClass} OK`), `${mainClass} failed (exit ${code}):\n${tail}`);
 }

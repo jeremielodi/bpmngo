@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
 )
 

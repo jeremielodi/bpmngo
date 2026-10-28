@@ -1,4 +1,4 @@
-// Package eventlog is GoFlow's Phase 0 ("shadow mode") event-sourcing
+// Package eventlog is BpmnGo's Phase 0 ("shadow mode") event-sourcing
 // scaffolding — see architecture/event-sourced-kafka-design.md. It publishes
 // a domain event to a Kafka-compatible log (Redpanda in this dev stack)
 // right after each existing Postgres transaction commits, purely to
@@ -25,7 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/jeremielodi/goflow/internal/eventlog/pb"
+	"github.com/jeremielodi/bpmngo/internal/eventlog/pb"
 )
 
 // Topic carries every event type for every process instance, partitioned by
@@ -40,7 +40,7 @@ const publishTimeout = 5 * time.Second
 
 // Producer publishes domain events without ever blocking its caller:
 // send queues the event, and a single sender goroutine writes the queue to
-// Kafka in order, batching whatever is waiting. Events of one GoFlow
+// Kafka in order, batching whatever is waiting. Events of one BpmnGo
 // instance therefore reach their partition in the order they happened
 // (they used to be written by one goroutine each, in no particular order).
 type Producer struct {

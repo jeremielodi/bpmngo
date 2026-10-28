@@ -3,7 +3,7 @@
  *
  * /engine-rest/task/... with Camunda 7's paths, formats and status codes,
  * called the way a Camunda 7 application does (HTTP Basic auth, typed
- * variables), so it runs against GoFlow unchanged.
+ * variables), so it runs against BpmnGo unchanged.
  *
  * Tests:
  *   A) GET /task filters (processInstanceId, taskDefinitionKey,
@@ -20,11 +20,11 @@
  */
 import * as path from 'path';
 import axios from 'axios';
-import { GoFlowClient, runSuite, assert, BASE_URL } from './client';
+import { BpmnGoClient, runSuite, assert, BASE_URL } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '51_camunda7_tasks.bpmn');
-const client = new GoFlowClient();
-// A Camunda 7 client: Basic auth, no GoFlow token.
+const client = new BpmnGoClient();
+// A Camunda 7 client: Basic auth, no BpmnGo token.
 const c7 = axios.create({
   baseURL: `${BASE_URL}/engine-rest`,
   auth: { username: 'admin@goflow.com', password: 'admin123' },

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// In Docker/production: VITE_API_URL is empty → relative URLs → nginx proxies to GoFlow
+// In Docker/production: VITE_API_URL is empty → relative URLs → nginx proxies to BpmnGo
 // In dev: VITE_API_URL=http://localhost:8080 OR Vite's proxy handles /engine-rest etc.
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 

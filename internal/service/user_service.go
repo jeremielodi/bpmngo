@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"

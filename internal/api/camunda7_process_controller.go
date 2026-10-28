@@ -8,11 +8,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 )
 
 // Camunda7ProcessController serves Camunda 7's process definition
@@ -101,7 +101,7 @@ func (pc *Camunda7ProcessController) GetDefinition(c *fiber.Ctx) error {
 // .../key/:key/tenant-id/:tenant/start, .../:id/start and the
 // submit-form variants: {"variables": {name: {value, type}},
 // "businessKey", "withVariablesInReturn"}. The answer is Camunda 7's
-// ProcessInstanceWithVariablesDto, plus GoFlow's own fields
+// ProcessInstanceWithVariablesDto, plus BpmnGo's own fields
 // (processInstanceId, executionId, processKey, version, definitionId).
 func (pc *Camunda7ProcessController) Start(c *fiber.Ctx) error {
 	var body struct {
@@ -145,7 +145,7 @@ func (pc *Camunda7ProcessController) Start(c *fiber.Ctx) error {
 		"suspended":      false,
 		"tenantId":       tenantID,
 		"links":          []interface{}{},
-		// GoFlow
+		// BpmnGo
 		"processInstanceId": instanceID,
 		"executionId":       execID,
 		"processKey":        def.ProcessKey,

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Failover drill for the Patroni cluster (deploy/ha): starts GoFlow process
+# Failover drill for the Patroni cluster (deploy/ha): starts BpmnGo process
 # instances waiting on a user task, stops the current Postgres primary,
 # waits for Patroni to promote a replica, then checks that every instance
 # is still there, that their tasks complete, and that new instances run.
 #
-#   scripts/ha-failover-test.sh [GoFlow URL] [admin email] [admin password]
+#   scripts/ha-failover-test.sh [BpmnGo URL] [admin email] [admin password]
 #
 # Needs curl, docker and the containers of deploy/ha/docker-compose.ha.yaml
 # (goflow-pg1..3). Creates real instances: not for a production database.
@@ -57,10 +57,10 @@ until [ -n "$NEW" ] && [ "$NEW" != "$OLD" ]; do sleep 1; NEW="$(primary || true)
 t1=$(date +%s)
 echo "New primary: $NEW, promoted in $((t1 - t0)) s"
 
-# GoFlow reconnects through HAProxy: retry until a start succeeds.
+# BpmnGo reconnects through HAProxy: retry until a start succeeds.
 until id="$(start 2>/dev/null)" && [ -n "$id" ]; do sleep 1; done
 t2=$(date +%s)
-echo "GoFlow writing again $((t2 - t0)) s after the primary stopped"
+echo "BpmnGo writing again $((t2 - t0)) s after the primary stopped"
 ids+=("$id")
 
 complete_all() {

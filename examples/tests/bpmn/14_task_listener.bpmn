@@ -15,7 +15,7 @@
     SCENARIO: A review needs sign-off from a human reviewer, then an external
               worker runs a notification step, then a second human approves.
     FEATURES TESTED:
-      - GoFlow's TaskEventDispatcher notifies listeners (SSE clients here) on
+      - BpmnGo's TaskEventDispatcher notifies listeners (SSE clients here) on
         TASK_CREATED / TASK_CLAIMED / TASK_UNCLAIMED / TASK_COMPLETED
       - Listener events still fire correctly when a step is driven by an
         external task worker (fetchAndLock/complete) rather than a human

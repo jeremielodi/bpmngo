@@ -1,6 +1,6 @@
 # BPMN 2.0 Support
 
-Which BPMN 2.0 elements GoFlow runs, with Camunda 8 semantics. Back to the [README](../README.md).
+Which BPMN 2.0 elements BpmnGo runs, with Camunda 8 semantics. Back to the [README](../README.md).
 
 | Element | Status |
 |---|---|

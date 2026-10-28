@@ -11,10 +11,10 @@
  *      of the scope the error interrupted.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '43_compensation.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function openTasks(instanceId: string, key: string) {
   return (await client.getTasks(instanceId)).filter(t => t.taskDefinitionKey === key);

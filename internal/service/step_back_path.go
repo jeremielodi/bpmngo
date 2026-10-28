@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/models"
 )
 
 // IsStepBackTarget reports whether a token can be stepped back to n: only

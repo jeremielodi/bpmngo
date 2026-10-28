@@ -13,10 +13,10 @@
  *   D) Process variables survive across timer boundaries
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '04_oven_timer.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 // PT4S + PT6S = 10s of timer waiting in the BPMN.
 // Adjust those durations in the BPMN file to speed up local runs.

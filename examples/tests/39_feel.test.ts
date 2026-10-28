@@ -12,10 +12,10 @@
  *   B) A variable that was never set is null in a condition, not an error.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '39_feel.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   if ((process.env.FEEL_MODE ?? '').toLowerCase() !== 'feel') {

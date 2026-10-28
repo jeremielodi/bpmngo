@@ -11,7 +11,7 @@ type TaskEventListener interface {
 	OnTaskEvent(ctx context.Context, event *TaskEvent) error
 }
 
-// Fanout relays the events a GoFlow instance dispatches to the other
+// Fanout relays the events a BpmnGo instance dispatches to the other
 // instances sharing its database (see repository.StartTaskEventFanout).
 type Fanout interface {
 	Publish(event *TaskEvent)
@@ -19,7 +19,7 @@ type Fanout interface {
 
 // TaskEventDispatcher distribue les événements aux listeners.
 //
-// With several GoFlow instances behind a load balancer, a client watching
+// With several BpmnGo instances behind a load balancer, a client watching
 // task events (SSE, WebSocket) is connected to one of them while the event
 // may happen on another: viewers (RegisterViewer) also get the events the
 // other instances relay through the fanout. Other listeners (Register —

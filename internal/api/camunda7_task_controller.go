@@ -13,17 +13,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/pkg/common"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/pkg/common"
 )
 
 // Camunda7TaskController serves Camunda 7's task REST API
 // (/engine-rest/task/...) with its paths, query parameters, response
-// shapes and status codes, so a Camunda 7 application can drive GoFlow's
+// shapes and status codes, so a Camunda 7 application can drive BpmnGo's
 // user tasks without changes.
 type Camunda7TaskController struct {
 	db         *sqlx.DB

@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
 
 // TaskEventsChannel is the NOTIFY channel task events are relayed on
-// between GoFlow instances sharing a database.
+// between BpmnGo instances sharing a database.
 const TaskEventsChannel = "goflow_task_events"
 
 // Postgres caps a NOTIFY payload at 8000 bytes.
@@ -46,7 +46,7 @@ func (f *taskEventFanout) Publish(event *events.TaskEvent) {
 	}
 }
 
-// StartTaskEventFanout relays task events between the GoFlow instances
+// StartTaskEventFanout relays task events between the BpmnGo instances
 // sharing this database: the events dispatched here are published with
 // NOTIFY, and those the other instances publish are delivered to this
 // instance's viewers (SSE, WebSocket — see events.TaskEventDispatcher).

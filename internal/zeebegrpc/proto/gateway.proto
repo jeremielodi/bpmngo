@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package gateway_protocol;
 
-option go_package = "github.com/jeremielodi/goflow/internal/zeebegrpc/pb";
+option go_package = "github.com/jeremielodi/bpmngo/internal/zeebegrpc/pb";
 
-// gateway.proto — GoFlow's implementation of a subset of Zeebe's Gateway
+// gateway.proto — BpmnGo's implementation of a subset of Zeebe's Gateway
 // Protocol (see https://github.com/camunda/camunda, module
 // zeebe/gateway-protocol). Implements the 6 RPCs that make up Zeebe's
 // core client loop (Topology, DeployResource, CreateProcessInstance,
 // ActivateJobs, CompleteJob, FailJob) plus 7 more that each reuse an
-// existing GoFlow service/engine function with no new business logic
+// existing BpmnGo service/engine function with no new business logic
 // (PublishMessage, CancelProcessInstance, EvaluateDecision,
 // ResolveIncident, ModifyProcessInstance, UpdateJobRetries,
 // BroadcastSignal). Any other method a real Zeebe client SDK calls
@@ -37,7 +37,7 @@ option go_package = "github.com/jeremielodi/goflow/internal/zeebegrpc/pb";
 // against predates that addition — its ModifyProcessInstanceRequest only
 // has activateInstructions/terminateInstructions, and its
 // TerminateInstruction has no elementId, only an opaque
-// elementInstanceKey GoFlow has no mapping for. So this implementation
+// elementInstanceKey BpmnGo has no mapping for. So this implementation
 // only supports one implied move per call, deriving the source element
 // from the instance's single active execution — see the ModifyProcessInstance
 // handler in internal/zeebegrpc/server.go for the full rationale.
@@ -48,7 +48,7 @@ option go_package = "github.com/jeremielodi/goflow/internal/zeebegrpc/pb";
 // are keyed by field number+type, not name). This file is authored
 // independently rather than vendoring Camunda's source file, since exact
 // field numbers/types are the only part that's functionally unavoidable
-// for compatibility (the same category of thing GoFlow already does
+// for compatibility (the same category of thing BpmnGo already does
 // throughout this codebase by matching Camunda 7/8's exact REST paths
 // and JSON shapes). Fields from newer/advanced Zeebe features not needed
 // for the core loop (start instructions, task listeners, tags, business
@@ -82,7 +82,7 @@ service Gateway {
 }
 
 // ── Topology ────────────────────────────────────────────────────────────
-// GoFlow is a single-node monolith, so this always reports one synthetic
+// BpmnGo is a single-node monolith, so this always reports one synthetic
 // broker owning one partition as LEADER/HEALTHY — real client SDKs
 // commonly call this first as a connectivity check.
 
@@ -245,7 +245,7 @@ message FailJobResponse {}
 // Maps 1:1 onto internal/api.MessageController.Correlate, the same
 // function the existing /engine-rest/message and /v2/messages/publication
 // REST endpoints already share. Zeebe correlates by a single opaque
-// correlationKey string rather than a named process variable; GoFlow's
+// correlationKey string rather than a named process variable; BpmnGo's
 // subscriptions are keyed by variable name, so (matching what the v2 REST
 // handler already does) this is correlated against a synthetic
 // "correlationKey" variable when set.
@@ -280,7 +280,7 @@ message CancelProcessInstanceResponse {}
 // ── EvaluateDecision ────────────────────────────────────────────────────
 // Maps onto internal/dmn.EvaluateDecisionTable, the same pure evaluator
 // the existing POST /v2/decisions/:key/evaluation REST endpoint uses.
-// GoFlow has no int64 key assigned to decisions yet (DeployResource's
+// BpmnGo has no int64 key assigned to decisions yet (DeployResource's
 // response only assigns keys to process definitions) — only decisionId
 // (the DMN decision's string id) is supported; decisionKey is accepted on
 // the wire for shape-completeness but not resolvable, matching how a real
@@ -301,7 +301,7 @@ message EvaluateDecisionResponse {
   string decisionRequirementsId = 5;
   int64 decisionRequirementsKey = 6;
   string decisionOutput = 7;
-  // field 8 (evaluatedDecisions) intentionally omitted — GoFlow's
+  // field 8 (evaluatedDecisions) intentionally omitted — BpmnGo's
   // evaluator doesn't produce a full decision-requirements-graph trace.
   string failedDecisionId = 9;
   string failureMessage = 10;
@@ -328,7 +328,7 @@ message ResolveIncidentResponse {}
 // See the file-level comment above for why this only supports one
 // implied move per call via activateInstructions[0], deriving the source
 // element from the instance's single active execution rather than from
-// terminateInstructions (whose only field, elementInstanceKey, GoFlow has
+// terminateInstructions (whose only field, elementInstanceKey, BpmnGo has
 // no mapping for).
 
 message ModifyProcessInstanceRequest {

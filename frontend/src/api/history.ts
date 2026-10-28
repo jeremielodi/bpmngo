@@ -2,8 +2,8 @@ import { apiClient } from './client';
 import type { HistoricProcessInstance, HistoricActivityInstance } from '../types';
 
 // The history API speaks Camunda 7 (ACTIVE, COMPLETED, EXTERNALLY_TERMINATED…);
-// the pages work with GoFlow's lowercase states.
-const goflowState = (state: string): HistoricProcessInstance['state'] => {
+// the pages work with BpmnGo's lowercase states.
+const bpmngoState = (state: string): HistoricProcessInstance['state'] => {
   switch (state) {
     case 'EXTERNALLY_TERMINATED':
     case 'INTERNALLY_TERMINATED':
@@ -13,7 +13,7 @@ const goflowState = (state: string): HistoricProcessInstance['state'] => {
   }
 };
 
-const withGoflowState = (h: HistoricProcessInstance): HistoricProcessInstance => ({ ...h, state: goflowState(h.state) });
+const withBpmnGoState = (h: HistoricProcessInstance): HistoricProcessInstance => ({ ...h, state: bpmngoState(h.state) });
 
 export const listHistoricInstances = async (params?: {
   processDefinitionKey?: string;
@@ -24,12 +24,12 @@ export const listHistoricInstances = async (params?: {
   maxResults?: number;
 }): Promise<HistoricProcessInstance[]> => {
   const res = await apiClient.get('/engine-rest/history/process-instance', { params });
-  return (res.data as HistoricProcessInstance[]).map(withGoflowState);
+  return (res.data as HistoricProcessInstance[]).map(withBpmnGoState);
 };
 
 export const getHistoricInstance = async (id: string): Promise<HistoricProcessInstance> => {
   const res = await apiClient.get(`/engine-rest/history/process-instance/${id}`);
-  return withGoflowState(res.data);
+  return withBpmnGoState(res.data);
 };
 
 export const listHistoricActivities = async (

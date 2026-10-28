@@ -12,7 +12,7 @@ const api = axios.create({
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-class GoFlowClient {
+class BpmnGoClient {
     static async deployBpmn(filePath, deploymentName = null) {
         if (!fs.existsSync(filePath)) {
             throw new Error(`File not found: ${filePath}`);
@@ -125,14 +125,14 @@ async function testParallelMultiInstance() {
     console.log('='.repeat(60) + '\n');
 
     // Deploy BPMN
-    await GoFlowClient.deployBpmn('./MultiInstanceTest.bpmn', 'Multi-Instance Test');
+    await BpmnGoClient.deployBpmn('./MultiInstanceTest.bpmn', 'Multi-Instance Test');
 
     // Start worker
     const worker = new ExternalTaskWorker();
     worker.start();
 
     // Start process
-    const processData = await GoFlowClient.startProcess('MultiInstanceProcess', {
+    const processData = await BpmnGoClient.startProcess('MultiInstanceProcess', {
         startTime: new Date().toISOString()
     });
 
@@ -147,7 +147,7 @@ async function testParallelMultiInstance() {
     while ((Date.now() - startTime) < maxWaitTime) {
         await sleep(2000);
         
-        const jobs = await GoFlowClient.getJobs(instanceId, 'process_item');
+        const jobs = await BpmnGoClient.getJobs(instanceId, 'process_item');
         const completedJobs = jobs.filter(j => j.status === 'completed');
         
         if (completedJobs.length > lastCompletedCount) {
@@ -163,13 +163,13 @@ async function testParallelMultiInstance() {
 
     // Check process completion
     await sleep(3000);
-    const processInstance = await GoFlowClient.getProcessInstance(instanceId);
+    const processInstance = await BpmnGoClient.getProcessInstance(instanceId);
     
     console.log('\n' + '='.repeat(60));
     console.log('📊 FINAL RESULTS');
     console.log('='.repeat(60));
     
-    const finalJobs = await GoFlowClient.getJobs(instanceId, 'process_item');
+    const finalJobs = await BpmnGoClient.getJobs(instanceId, 'process_item');
     console.log(`Total jobs created: ${finalJobs.length}`);
     console.log(`Completed: ${finalJobs.filter(j => j.status === 'completed').length}`);
     
@@ -199,4 +199,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { GoFlowClient, ExternalTaskWorker };
+module.exports = { BpmnGoClient, ExternalTaskWorker };

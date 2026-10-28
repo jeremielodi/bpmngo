@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jeremielodi/goflow/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/common"
 )
 
 // EvaluateDecisionTable evaluates a decision table against variables.

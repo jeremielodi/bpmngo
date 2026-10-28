@@ -1,4 +1,4 @@
-package com.goflow.examples;
+package com.bpmngo.examples;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,16 +17,16 @@ import java.util.StringJoiner;
 import java.util.UUID;
 
 /**
- * A small GoFlow REST client: logs in, keeps the JWT fresh, and sends JSON.
+ * A small BpmnGo REST client: logs in, keeps the JWT fresh, and sends JSON.
  *
- * GoFlow's access token lives 15 minutes and its refresh token 7 days, so a
+ * BpmnGo's access token lives 15 minutes and its refresh token 7 days, so a
  * long-running client must refresh: {@link #accessToken()} refreshes the
  * token a few minutes before it expires (and logs in again if the refresh
  * token is gone too), and a 401 triggers one refresh and a retry.
  *
  * Thread-safe: share one instance across a worker's threads.
  */
-public class GoFlowRestClient {
+public class BpmnGoRestClient {
 
     /** Refresh the access token this long before its 15-minute lifetime ends. */
     private static final Duration ACCESS_TOKEN_LIFETIME = Duration.ofMinutes(15);
@@ -42,15 +42,15 @@ public class GoFlowRestClient {
     private String refreshToken;
     private Instant accessTokenExpiry = Instant.EPOCH;
 
-    public GoFlowRestClient(String baseUrl, String email, String password) {
+    public BpmnGoRestClient(String baseUrl, String email, String password) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.email = email;
         this.password = password;
     }
 
     /** Reads GOFLOW_URL, GOFLOW_USER and GOFLOW_PASSWORD (defaults: a local dev server). */
-    public static GoFlowRestClient fromEnv() {
-        return new GoFlowRestClient(
+    public static BpmnGoRestClient fromEnv() {
+        return new BpmnGoRestClient(
                 env("GOFLOW_URL", "http://127.0.0.1:8080"),
                 env("GOFLOW_USER", "admin@goflow.com"),
                 env("GOFLOW_PASSWORD", "admin123"));
@@ -87,7 +87,7 @@ public class GoFlowRestClient {
         try {
             storeTokens(send("POST", "/auth/refresh", Map.of("refresh_token", refreshToken), false));
             return true;
-        } catch (GoFlowException e) {
+        } catch (BpmnGoException e) {
             return false;
         }
     }
@@ -96,7 +96,7 @@ public class GoFlowRestClient {
         accessToken = res.path("access_token").asText(null);
         refreshToken = res.path("refresh_token").asText(refreshToken);
         if (accessToken == null) {
-            throw new GoFlowException(0, "login response has no access_token: " + res);
+            throw new BpmnGoException(0, "login response has no access_token: " + res);
         }
         accessTokenExpiry = Instant.now().plus(ACCESS_TOKEN_LIFETIME);
     }
@@ -139,12 +139,12 @@ public class GoFlowRestClient {
             res = exchange(method, path, body, true);
         }
         if (res.statusCode() >= 400) {
-            throw new GoFlowException(res.statusCode(), method + " " + path + " → " + res.statusCode() + ": " + res.body());
+            throw new BpmnGoException(res.statusCode(), method + " " + path + " → " + res.statusCode() + ": " + res.body());
         }
         try {
             return res.body().isBlank() ? json.nullNode() : json.readTree(res.body());
         } catch (IOException e) {
-            throw new GoFlowException(res.statusCode(), method + " " + path + " returned non-JSON: " + res.body());
+            throw new BpmnGoException(res.statusCode(), method + " " + path + " returned non-JSON: " + res.body());
         }
     }
 
@@ -164,10 +164,10 @@ public class GoFlowRestClient {
             }
             return http.send(req.build(), HttpResponse.BodyHandlers.ofString());
         } catch (IOException e) {
-            throw new GoFlowException(0, method + " " + path + " failed: " + e.getMessage());
+            throw new BpmnGoException(0, method + " " + path + " failed: " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new GoFlowException(0, method + " " + path + " interrupted");
+            throw new BpmnGoException(0, method + " " + path + " interrupted");
         }
     }
 
@@ -175,7 +175,7 @@ public class GoFlowRestClient {
 
     /** POST /engine-rest/deployment/create with one BPMN file. */
     public JsonNode deploy(String fileName, byte[] bpmn, String deploymentName) {
-        String boundary = "----goflow" + UUID.randomUUID();
+        String boundary = "----bpmngo" + UUID.randomUUID();
         byte[] head = ("--" + boundary + "\r\n"
                 + "Content-Disposition: form-data; name=\"deployment-name\"\r\n\r\n" + deploymentName + "\r\n"
                 + "--" + boundary + "\r\n"
@@ -195,22 +195,22 @@ public class GoFlowRestClient {
                     .build();
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() >= 400) {
-                throw new GoFlowException(res.statusCode(), "deploy → " + res.statusCode() + ": " + res.body());
+                throw new BpmnGoException(res.statusCode(), "deploy → " + res.statusCode() + ": " + res.body());
             }
             return json.readTree(res.body());
         } catch (IOException e) {
-            throw new GoFlowException(0, "deploy failed: " + e.getMessage());
+            throw new BpmnGoException(0, "deploy failed: " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new GoFlowException(0, "deploy interrupted");
+            throw new BpmnGoException(0, "deploy interrupted");
         }
     }
 
-    /** An HTTP error from GoFlow (status 0: no response at all). */
-    public static class GoFlowException extends RuntimeException {
+    /** An HTTP error from BpmnGo (status 0: no response at all). */
+    public static class BpmnGoException extends RuntimeException {
         private final int status;
 
-        public GoFlowException(int status, String message) {
+        public BpmnGoException(int status, String message) {
             super(message);
             this.status = status;
         }

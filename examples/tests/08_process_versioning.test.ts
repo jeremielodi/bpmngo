@@ -15,12 +15,12 @@
  *   E) Instance from v1 retains its original process_definition_id (not v2)
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
 // We reuse the simple support ticket BPMN (SupportTicketProcess) for versioning tests —
 // we just deploy it twice to produce v1 and v2 of the same process key.
 const BPMN = path.join(__dirname, 'bpmn', '07_support_ticket.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   await client.loginAsSuperUser();

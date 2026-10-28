@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/cmdbus"
-	"github.com/jeremielodi/goflow/internal/common"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -89,7 +89,7 @@ const variablesChannel = "goflow_variables"
 // Conditions are evaluated as soon as a variable of their instance changes
 // (listenerConnStr: a dedicated LISTEN connection on variablesChannel), as
 // in Camunda 7, and also every conditionalPollInterval — conditions on
-// time (now()) and anything a dropped listener missed. Several GoFlow
+// time (now()) and anything a dropped listener missed. Several BpmnGo
 // instances can run it: subscriptions are claimed with FOR UPDATE SKIP
 // LOCKED.
 func StartConditionalWatcher(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEventDispatcher, listenerConnStr string) {

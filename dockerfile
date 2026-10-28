@@ -15,7 +15,7 @@ COPY . .
 # fighting that per-attempt. Regenerate with `go mod vendor` after
 # changing go.mod.
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -a -installsuffix cgo -o goflow .
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -a -installsuffix cgo -o bpmngo .
 
 # Final stage
 FROM alpine:latest
@@ -25,11 +25,11 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 # Copy the binary
-COPY --from=builder /app/goflow .
+COPY --from=builder /app/bpmngo .
 
 
 # Expose port
 EXPOSE 8080
 
 # Run the application
-CMD ["./goflow"]
+CMD ["./bpmngo"]

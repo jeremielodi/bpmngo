@@ -1,4 +1,4 @@
-# GoFlow — Cloud-Native BPMN Workflow Engine
+# BpmnGo — Cloud-Native BPMN Workflow Engine
 
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
@@ -7,7 +7,7 @@
 ![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)
 ![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
 
-GoFlow is a BPMN 2.0 workflow engine written in Go that runs models with Camunda 8 semantics, exposing REST APIs shaped after both **Camunda 7** (`/engine-rest/...`) and **Camunda 8** (`/v2/...`), plus a native **Zeebe gRPC gateway**. It's a lightweight, self-hosted alternative to the Java-based engines: PostgreSQL is its only database (a single server, a high-availability cluster with automatic failover, or a Citus cluster sharding the per-instance tables), the application runs as one instance or several behind a load balancer, and it comes with real-time event streaming and a React operations/tasklist frontend. Like Camunda 8, it can run every command of an instance on the one GoFlow instance owning its Kafka partition, with failover between instances. See [Comparison to Camunda 7 / Camunda 8](docs/comparison.md#comparison-to-camunda-7--camunda-8) for an honest look at what's covered and what isn't, and [Switching from Camunda 7 / Camunda 8](docs/switching-from-camunda.md#switching-from-camunda-7--camunda-8) for what an existing Camunda application has to change.
+BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda 8 semantics, exposing REST APIs shaped after both **Camunda 7** (`/engine-rest/...`) and **Camunda 8** (`/v2/...`), plus a native **Zeebe gRPC gateway**. It's a lightweight, self-hosted alternative to the Java-based engines: PostgreSQL is its only database (a single server, a high-availability cluster with automatic failover, or a Citus cluster sharding the per-instance tables), the application runs as one instance or several behind a load balancer, and it comes with real-time event streaming and a React operations/tasklist frontend. Like Camunda 8, it can run every command of an instance on the one BpmnGo instance owning its Kafka partition, with failover between instances. See [Comparison to Camunda 7 / Camunda 8](docs/comparison.md#comparison-to-camunda-7--camunda-8) for an honest look at what's covered and what isn't, and [Switching from Camunda 7 / Camunda 8](docs/switching-from-camunda.md#switching-from-camunda-7--camunda-8) for what an existing Camunda application has to change.
 
 ## Contents
 
@@ -21,15 +21,15 @@ GoFlow is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 ## Current State (v1.0)
 
-**GoFlow 1.0 is production ready.** What backs this:
+**BpmnGo 1.0 is production ready.** What backs this:
 
-- **Tested end to end:** 48 integration suites run against a real Postgres + GoFlow stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
-- **No single point of failure:** several GoFlow instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
+- **Tested end to end:** 48 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
+- **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
 - **Backups:** `pg_dump` backups, with a script that checks each backup restores. See [Operations](docs/operations.md#backups).
 - **Secure defaults:** with `GOFLOW_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
 - **Operable:** Prometheus metrics, history retention, manual SQL migrations from a baseline, load-testing script. See [Operations](docs/operations.md).
 
-What GoFlow does not cover yet compared with Camunda is listed in [Comparison to Camunda 7 / Camunda 8](docs/comparison.md).
+What BpmnGo does not cover yet compared with Camunda is listed in [Comparison to Camunda 7 / Camunda 8](docs/comparison.md).
 
 ### BPMN 2.0 Support
 
@@ -48,7 +48,7 @@ Versioning, FEEL, job workers, incidents, DMN, multi-tenancy, authentication, au
 git clone <repo>
 cd camunda-like
 
-# Start everything (PostgreSQL + GoFlow)
+# Start everything (PostgreSQL + BpmnGo)
 docker compose up -d --build --wait
 
 # Default superuser: admin@goflow.com / admin123 (seeded from docker-compose.yaml)
@@ -77,9 +77,9 @@ A `/modeler` page also lets you author and deploy BPMN diagrams directly in-brow
 
 ## Architecture
 
-Every request goes through the same parser/engine/runtime and lands in the same PostgreSQL database. What the deployment chooses (`WRITE_PATH`) is *where* each command runs: right where it arrives (`direct`, the default), or — like Camunda 8 — on the one GoFlow instance owning the Kafka partition of its process instance (`partitioned`).
+Every request goes through the same parser/engine/runtime and lands in the same PostgreSQL database. What the deployment chooses (`WRITE_PATH`) is *where* each command runs: right where it arrives (`direct`, the default), or — like Camunda 8 — on the one BpmnGo instance owning the Kafka partition of its process instance (`partitioned`).
 
-![GoFlow process command flow: commands go straight to the command handlers (WRITE_PATH=direct) or through the Kafka partition owner (WRITE_PATH=partitioned), then to PostgreSQL](docs/GoFlow_process_command_flow.png)
+![BpmnGo process command flow: commands go straight to the command handlers (WRITE_PATH=direct) or through the Kafka partition owner (WRITE_PATH=partitioned), then to PostgreSQL](docs/BpmnGo_process_command_flow.png)
 
 Design decisions and the partitioned write path: [docs/architecture.md](docs/architecture.md).
 

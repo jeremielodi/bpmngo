@@ -14,14 +14,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/dmn"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/internal/partition"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/runtime"
-	"github.com/jeremielodi/goflow/internal/service"
-	"github.com/jeremielodi/goflow/internal/zeebegrpc/pb"
+	"github.com/jeremielodi/bpmngo/internal/dmn"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/internal/partition"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/runtime"
+	"github.com/jeremielodi/bpmngo/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/zeebegrpc/pb"
 	"github.com/jmoiron/sqlx"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -64,10 +64,10 @@ func (s *Server) Topology(ctx context.Context, req *pb.TopologyRequest) (*pb.Top
 		ClusterSize:       int32(len(topo.Brokers)),
 		PartitionsCount:   int32(topo.PartitionsCount),
 		ReplicationFactor: int32(topo.ReplicationFactor),
-		GatewayVersion:    "goflow-dev",
+		GatewayVersion:    "bpmngo-dev",
 	}
 	for i, b := range topo.Brokers {
-		info := &pb.BrokerInfo{NodeId: int32(i), Host: b.Host, Port: 26500, Version: "goflow-dev"}
+		info := &pb.BrokerInfo{NodeId: int32(i), Host: b.Host, Port: 26500, Version: "bpmngo-dev"}
 		for _, p := range b.Partitions {
 			info.Partitions = append(info.Partitions, &pb.Partition{
 				PartitionId: int32(p),
@@ -467,7 +467,7 @@ func (s *Server) CancelProcessInstance(ctx context.Context, req *pb.CancelProces
 
 func (s *Server) EvaluateDecision(ctx context.Context, req *pb.EvaluateDecisionRequest) (*pb.EvaluateDecisionResponse, error) {
 	if req.DecisionId == "" {
-		return nil, status.Error(codes.InvalidArgument, "decisionId is required (decisionKey lookup is not supported: GoFlow has not assigned int64 keys to decisions)")
+		return nil, status.Error(codes.InvalidArgument, "decisionId is required (decisionKey lookup is not supported: BpmnGo has not assigned int64 keys to decisions)")
 	}
 
 	dmnRepo := repository.NewDMNRepository(s.db)
@@ -537,7 +537,7 @@ func (s *Server) ResolveIncident(ctx context.Context, req *pb.ResolveIncidentReq
 // automatically as the instance's single active execution rather than
 // from terminateInstructions — see the file-level comment in gateway.proto
 // for why (the real SDK's TerminateInstruction carries only an opaque
-// elementInstanceKey GoFlow has no mapping for). Multi-token instances
+// elementInstanceKey BpmnGo has no mapping for). Multi-token instances
 // (parallel gateways, multi-instance) aren't resolvable this way and stay
 // out of scope for gRPC modification; POST /v2/process-instances/:id/modification
 // (explicit sourceElementId/targetElementId pairs) remains the way to
@@ -621,7 +621,7 @@ func (s *Server) BroadcastSignal(ctx context.Context, req *pb.BroadcastSignalReq
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Zeebe assigns every broadcast signal a key; GoFlow has no signal
+	// Zeebe assigns every broadcast signal a key; BpmnGo has no signal
 	// entity to key off, so mint a fresh one via the same zeebe_keys table
 	// PublishMessage already uses for the same reason — nothing ever needs
 	// to resolve it back.

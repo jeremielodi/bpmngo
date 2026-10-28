@@ -13,14 +13,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/cmdbus"
-	"github.com/jeremielodi/goflow/internal/common"
-	"github.com/jeremielodi/goflow/internal/engine"
-	"github.com/jeremielodi/goflow/internal/eventlog"
-	"github.com/jeremielodi/goflow/internal/events"
-	"github.com/jeremielodi/goflow/internal/feel"
-	"github.com/jeremielodi/goflow/internal/repository"
-	"github.com/jeremielodi/goflow/internal/service"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/common"
+	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -188,7 +188,7 @@ type openMessageSubscription struct {
 //
 // A subscription without a correlation key expression also matches a
 // non-empty key equal to its instance's "correlationKey" variable: what
-// GoFlow's gRPC and /v2 publish did before correlation keys existed, kept
+// BpmnGo's gRPC and /v2 publish did before correlation keys existed, kept
 // so processes deployed for it keep working.
 func correlateToSubscriptions(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEventDispatcher, name, key string, vars map[string]interface{}, storedID *uuid.UUID, onlyProcess string, done map[string]bool) ([]uuid.UUID, error) {
 	subs, err := openMessageSubscriptions(db, name, key, onlyProcess, storedID)

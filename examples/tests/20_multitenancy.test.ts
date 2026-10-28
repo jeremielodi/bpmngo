@@ -23,19 +23,19 @@
  *   D) A superuser (no tenant) sees instances/definitions from BOTH tenants.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '20_tenant_process.bpmn');
-const superuser = new GoFlowClient();
+const superuser = new BpmnGoClient();
 
-async function createTenantUser(email: string, tenantId: string): Promise<GoFlowClient> {
+async function createTenantUser(email: string, tenantId: string): Promise<BpmnGoClient> {
   await superuser.api.post('/users', {
     email,
     full_name: email,
     password: 'password123',
     tenant_id: tenantId,
   });
-  const client = new GoFlowClient();
+  const client = new BpmnGoClient();
   await client.login(email, 'password123');
   return client;
 }

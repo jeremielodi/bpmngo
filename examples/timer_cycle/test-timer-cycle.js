@@ -12,7 +12,7 @@ const api = axios.create({
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-class GoFlowClient {
+class BpmnGoClient {
     static async deployBpmn(filePath, deploymentName = null) {
         if (!fs.existsSync(filePath)) {
             throw new Error(`File not found: ${filePath}`);
@@ -138,10 +138,10 @@ async function testTimerCycle() {
     console.log('='.repeat(60) + '\n');
 
     // Deploy BPMN
-    await GoFlowClient.deployBpmn('./TimerCycleTest.bpmn', 'Timer Cycle Test');
+    await BpmnGoClient.deployBpmn('./TimerCycleTest.bpmn', 'Timer Cycle Test');
 
     // Start process
-    const processData = await GoFlowClient.startProcess('TimerCycleProcess', {
+    const processData = await BpmnGoClient.startProcess('TimerCycleProcess', {
         orderId: 'CYCLE-TEST-001',
         amount: 1000,
         startTime: new Date().toISOString()
@@ -155,7 +155,7 @@ async function testTimerCycle() {
     let userTask = null;
     for (let i = 0; i < 10; i++) {
         await sleep(2000);
-        const tasks = await GoFlowClient.getTasks(instanceId);
+        const tasks = await BpmnGoClient.getTasks(instanceId);
         userTask = tasks.find(t => t.taskDefinitionKey === 'Task_WaitForTimer');
         if (userTask) {
             console.log(`✅ User task created: ${userTask.id}\n`);
@@ -184,7 +184,7 @@ async function testTimerCycle() {
         const elapsed = i * 5;
         
         // Get completed jobs count
-        const jobs = await GoFlowClient.getJobs(instanceId, 'escalate_issue');
+        const jobs = await BpmnGoClient.getJobs(instanceId, 'escalate_issue');
         const completedCount = jobs.filter(j => j.status === 'completed').length;
         
         if (completedCount > lastCompletedCount) {
@@ -192,9 +192,9 @@ async function testTimerCycle() {
             lastCompletedCount = completedCount;
         }
         
-        const timers = await GoFlowClient.getTimers(instanceId);
+        const timers = await BpmnGoClient.getTimers(instanceId);
         const activeTimers = timers.filter(t => !t.isTriggered);
-        const processInstance = await GoFlowClient.getProcessInstance(instanceId);
+        const processInstance = await BpmnGoClient.getProcessInstance(instanceId);
         
         console.log(`📊 ${elapsed}s: Completed cycles: ${completedCount}/3, Active timers: ${activeTimers.length}, Process active: ${!!processInstance}`);
         
@@ -209,7 +209,7 @@ async function testTimerCycle() {
     worker.stop();
     
     // Final verification
-    const finalJobs = await GoFlowClient.getJobs(instanceId, 'escalate_issue');
+    const finalJobs = await BpmnGoClient.getJobs(instanceId, 'escalate_issue');
     const finalCompleted = finalJobs.filter(j => j.status === 'completed').length;
     
     console.log('\n' + '='.repeat(60));
@@ -244,4 +244,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { GoFlowClient, ExternalTaskWorker };
+module.exports = { BpmnGoClient, ExternalTaskWorker };

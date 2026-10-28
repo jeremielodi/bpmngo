@@ -9,10 +9,10 @@
  *      are worked by job workers.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '44_script_task.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   await client.loginAsSuperUser();

@@ -1,4 +1,4 @@
-# GoFlow — Citus-Backed Distributed Storage (Design Scope)
+# BpmnGo — Citus-Backed Distributed Storage (Design Scope)
 
 Status: **complete (2026-10-20)** — reference tables, the per-instance
 colocation group (jobs and timers included, section 5), local tables in

@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/segmentio/kafka-go"
 
-	"github.com/jeremielodi/goflow/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 )
 
 // A command lands on the partition cmdbus.PartitionOf gives its key: the

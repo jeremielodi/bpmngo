@@ -10,8 +10,8 @@ import (
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/jeremielodi/goflow/internal/eventlog/pb"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/eventlog/pb"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 

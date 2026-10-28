@@ -74,6 +74,6 @@ npx ts-node run_all.ts
 | 53 | Previous step (step a token back): paths, refusals across a fork, stale job rejected, permissions |
 | 54 | Java clients: runs [examples/java-client](../examples/java-client) and [examples/java-client-spring](../examples/java-client-spring) — plain REST, the Camunda 7 External Task Client (Basic and JWT), the Camunda 8 Java client over gRPC, the Camunda 7 OpenAPI REST client, a Camunda 7 Java-API application through the REST client Spring Boot starter (see [Java client](java-client.md)) |
 
-To run against a GoFlow that isn't on `127.0.0.1:8080`, set `GOFLOW_URL` (and `GOFLOW_GRPC` for suite 54). `SKIP_SETUP=1` runs against the stack already up instead of rebuilding it with fresh volumes.
+To run against a BpmnGo that isn't on `127.0.0.1:8080`, set `GOFLOW_URL` (and `GOFLOW_GRPC` for suite 54). `SKIP_SETUP=1` runs against the stack already up instead of rebuilding it with fresh volumes.
 
 The same suites run against several instances behind the load balancer, and against the high-availability cluster (`COMPOSE_FILE` with the files of [Operations](operations.md#operations), plus `GOFLOW_REPLICAS=3` for several instances). With `WRITE_PATH=partitioned` they run on the partitioned write path, and with `COMPOSE_FILE="docker-compose.yaml;docker-compose.citus.yml"` on Citus.

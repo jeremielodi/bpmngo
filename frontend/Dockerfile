@@ -14,7 +14,7 @@ FROM nginx:1.27-alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Nginx config: serve SPA + reverse-proxy /engine-rest + /auth to GoFlow
+# Nginx config: serve SPA + reverse-proxy /engine-rest + /auth to BpmnGo
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

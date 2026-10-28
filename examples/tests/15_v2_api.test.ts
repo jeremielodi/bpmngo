@@ -17,12 +17,12 @@
  *   F) POST /v2/resources/deployments deploys a BPMN file.
  */
 import * as path from 'path';
-import { GoFlowClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const TASK_LISTENER_BPMN = path.join(__dirname, 'bpmn', '14_task_listener.bpmn');
 const ORDER_BPMN = path.join(__dirname, 'bpmn', '10_order_notification.bpmn');
 const INVENTORY_BPMN = path.join(__dirname, 'bpmn', '11_inventory_broadcast.bpmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function completeV2UserTask(processInstanceKey: string, elementId: string, assignee: string): Promise<void> {
   const search = await client.api.post('/v2/user-tasks/search', {

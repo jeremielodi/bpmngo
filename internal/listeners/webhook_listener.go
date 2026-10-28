@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jeremielodi/goflow/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/events"
 )
 
 type WebhookConfig struct {

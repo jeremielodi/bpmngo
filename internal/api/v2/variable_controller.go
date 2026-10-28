@@ -3,7 +3,7 @@ package v2
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -24,7 +24,7 @@ type SearchVariablesRequest struct {
 	} `json:"filter"`
 }
 
-// SearchVariables handles POST /v2/variables/search. GoFlow stores all of a
+// SearchVariables handles POST /v2/variables/search. BpmnGo stores all of a
 // process instance's variables as one JSONB blob rather than one row per
 // variable, so this flattens that blob into individual name/value entries
 // to match the Camunda 8 response shape.

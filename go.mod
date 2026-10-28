@@ -1,4 +1,4 @@
-module github.com/jeremielodi/goflow
+module github.com/jeremielodi/bpmngo
 
 go 1.26
 

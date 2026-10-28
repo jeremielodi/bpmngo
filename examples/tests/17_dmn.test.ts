@@ -1,7 +1,7 @@
 /**
  * Suite 17 — DMN Decision Engine  (BPMN: 17_dmn_process.bpmn, DMN: 17_approval_decision.dmn)
  *
- * Verifies GoFlow's new DMN decision table support: parsing, hit-policy
+ * Verifies BpmnGo's new DMN decision table support: parsing, hit-policy
  * evaluation (UNIQUE, with numeric comparisons, ranges, string lists, and
  * wildcards), Business Rule Task execution (zeebe:calledDecision), deploying
  * a .bpmn and a .dmn file together in one request, and standalone decision
@@ -19,11 +19,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import FormData from 'form-data';
-import { GoFlowClient, runSuite, assert } from './client';
+import { BpmnGoClient, runSuite, assert } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '17_dmn_process.bpmn');
 const DMN = path.join(__dirname, 'bpmn', '17_approval_decision.dmn');
-const client = new GoFlowClient();
+const client = new BpmnGoClient();
 
 async function run() {
   await client.loginAsSuperUser();

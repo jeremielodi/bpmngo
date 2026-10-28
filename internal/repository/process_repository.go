@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jeremielodi/goflow/internal/models"
-	"github.com/jeremielodi/goflow/pkg/database"
+	"github.com/jeremielodi/bpmngo/internal/models"
+	"github.com/jeremielodi/bpmngo/pkg/database"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -413,7 +413,7 @@ func (r *ProcessRepository) SetProcessDefinitionActive(
 	)
 }
 
-// SetProcessDefinitionWritePath flips a definition between GoFlow's two
+// SetProcessDefinitionWritePath flips a definition between BpmnGo's two
 // write paths — see architecture/event-sourced-kafka-design.md Phase 1.
 // Callers (internal/api's ProcessDefinitionController.SetWritePath) are
 // responsible for validating the graph shape before calling this with
