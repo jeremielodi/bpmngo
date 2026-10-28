@@ -116,6 +116,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
 
       # Super User (valeurs lues depuis .env)
+      CREATE_SUPER_USER: ${CREATE_SUPER_USER:-true}
       SUPER_USER_NAME: ${SUPER_USER_NAME:-admin}
       SUPER_USER_EMAIL: ${SUPER_USER_EMAIL:-admin@goflow.com}
       SUPER_USER_PASSWORD: ${SUPER_USER_PASSWORD:-admin123}

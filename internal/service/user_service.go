@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/goflow/internal/models"
@@ -20,6 +21,9 @@ type DefaultDataConfig struct {
 	SuperUserName     string
 	SuperUserEmail    string
 	SuperUserPassword string
+	// CreateSuperUser is false when CREATE_SUPER_USER=false: the super user
+	// (and its super_admin role assignment) is left alone at startup.
+	CreateSuperUser bool
 }
 
 // LoadDefaultDataConfig loads configuration from environment variables
@@ -31,6 +35,8 @@ func LoadDefaultDataConfig(util common.Util) DefaultDataConfig {
 		SuperUserName:     common.Util.DotEnvVariable(util, "SUPER_USER_NAME"),
 		SuperUserEmail:    common.Util.DotEnvVariable(util, "SUPER_USER_EMAIL"),
 		SuperUserPassword: common.Util.DotEnvVariable(util, "SUPER_USER_PASSWORD"),
+		// Unset means true, so existing deployments keep seeding as before.
+		CreateSuperUser: !strings.EqualFold(strings.TrimSpace(common.Util.DotEnvVariable(util, "CREATE_SUPER_USER")), "false"),
 	}
 }
 
@@ -106,17 +112,20 @@ func CreateDefaultData(db *sqlx.DB, util common.Util) error {
 	// 2. CREATE SUPER USER (if doesn't exist)
 	// =========================================================
 
-	// Check if super user already exists
-	var userExists bool
-	checkUserQuery := `SELECT EXISTS(SELECT 1 FROM public.users WHERE email = $1)`
-	err = tx.QueryRow(checkUserQuery, config.SuperUserEmail).Scan(&userExists)
-	if err != nil {
-		return err
-	}
-
 	var superUserID uuid.UUID
 
-	if userExists {
+	// Check if super user already exists
+	var userExists bool
+	if config.CreateSuperUser {
+		checkUserQuery := `SELECT EXISTS(SELECT 1 FROM public.users WHERE email = $1)`
+		if err := tx.QueryRow(checkUserQuery, config.SuperUserEmail).Scan(&userExists); err != nil {
+			return err
+		}
+	}
+
+	if !config.CreateSuperUser {
+		log.Printf("⏭️ CREATE_SUPER_USER=false, skipping super user creation")
+	} else if userExists {
 		log.Printf("⏭️ User '%s' already exists, skipping creation", config.SuperUserEmail)
 
 		// Get existing user ID
@@ -170,7 +179,7 @@ func CreateDefaultData(db *sqlx.DB, util common.Util) error {
 		}
 	}
 
-	if superAdminRoleID != uuid.Nil {
+	if superAdminRoleID != uuid.Nil && superUserID != uuid.Nil {
 		// Check if role is already assigned
 		var roleAssigned bool
 		checkAssignmentQuery := `

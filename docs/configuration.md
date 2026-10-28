@@ -17,6 +17,8 @@ DB_NAME=goflow
 JWT_SECRET_KEY=<random value>
 
 # Superuser (seeded on first boot)
+# CREATE_SUPER_USER=false skips the seeding (unset = true)
+CREATE_SUPER_USER=true
 SUPER_USER_NAME=admin
 SUPER_USER_EMAIL=admin@goflow.com
 SUPER_USER_PASSWORD=admin123
