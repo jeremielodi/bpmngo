@@ -11,7 +11,7 @@
 #
 #   docker compose -f docker-compose.yaml -f docker-compose.scale.yaml \
 #     -f deploy/ha/app.compose.yaml -f deploy/ha/scale-ha.compose.yaml \
-#     up -d --scale goflow=3
+#     up -d --scale bpmngo=3
 #
 # Une base neuve est initialisée par ha-init (rôle goflow, base, schéma).
 # Pour reprendre une base existante, voir le README avant de démarrer.
@@ -23,7 +23,7 @@ services:
 
   haproxy:
     image: haproxy:3.0-alpine
-    container_name: goflow-haproxy
+    container_name: bpmngo-haproxy
     environment:
       PG1_ADDR: ${PG1_ADDR:?PG1_ADDR must be set}
       PG2_ADDR: ${PG2_ADDR:?PG2_ADDR must be set}
@@ -33,7 +33,7 @@ services:
     ports:
       - "127.0.0.1:7000:7000" # HAProxy stats
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
   ha-init:
@@ -47,10 +47,10 @@ services:
       - ./deploy/ha/ha-init.sh:/ha-init.sh:ro
       - ./database:/schema:ro
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: "no"
 
-  goflow:
+  bpmngo:
     depends_on: !override
       ha-init:
         condition: service_completed_successfully

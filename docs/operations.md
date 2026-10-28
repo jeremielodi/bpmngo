@@ -16,7 +16,7 @@ scrape_configs:
     authorization:
       credentials: <METRICS_TOKEN>
     static_configs:
-      - targets: ["goflow:8080"]
+      - targets: ["bpmngo:8080"]
 ```
 
 | Metric | What it tells you |
@@ -72,7 +72,7 @@ It creates real instances: run it against a non-production server, or in product
 Several BpmnGo instances can share one database behind a load balancer:
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.scale.yaml up -d --scale goflow=3
+docker compose -f docker-compose.yaml -f docker-compose.scale.yaml up -d --scale bpmngo=3
 ```
 
 `docker-compose.scale.yaml` leaves `docker-compose.yaml` untouched for a single instance and adds:
@@ -106,7 +106,7 @@ Several BpmnGo instances in front of the cluster combine both setups — nginx i
 
 ```bash
 docker compose -f docker-compose.yaml -f docker-compose.scale.yaml \
-  -f deploy/ha/app.compose.yaml -f deploy/ha/scale-ha.compose.yaml up -d --scale goflow=3
+  -f deploy/ha/app.compose.yaml -f deploy/ha/scale-ha.compose.yaml up -d --scale bpmngo=3
 ```
 
 Open 2379, 2380, 5432 and 8008 between the database servers, and 5432/8008 to the application server — never to the Internet. `deploy/ha/docker-compose.ha.yaml` runs the whole cluster on one machine to try it out; `scripts/ha-failover-test.sh` stops the current primary under load and checks that no instance is lost and that BpmnGo carries on. On this laptop, a replica took over 28 seconds after the primary stopped, and BpmnGo was writing again at the same moment, with no instance lost; the full regression suite passes on the cluster.
@@ -115,7 +115,7 @@ Moving an existing standalone database to the cluster leaves the old one untouch
 
 1. Run the migrations of `database/migrations` on the old database, as usual.
 2. Start the three nodes, check the cluster: `curl http://10.0.0.1:8008/cluster`.
-3. Stop BpmnGo (`docker compose stop goflow`) and dump the old database — a read: `docker exec goflow-postgres pg_dump -U goflow -Fc goflow > goflow.dump`.
+3. Stop BpmnGo (`docker compose stop bpmngo`) and dump the old database — a read: `docker exec bpmngo-postgres pg_dump -U goflow -Fc goflow > goflow.dump`.
 4. Create the role and the empty database on the cluster: `docker compose -f docker-compose.yaml -f deploy/ha/app.compose.yaml run --rm -e GOFLOW_SKIP_SCHEMA=true ha-init`.
 5. Restore into the primary: `pg_restore -h 10.0.0.x -U postgres -d goflow --no-owner --role=goflow goflow.dump` (any node: if it isn't the primary, the restore is refused — use the one `/cluster` lists as leader).
 6. Start BpmnGo on the cluster (`app.compose.yaml`). Keep the old database stopped but intact until you're satisfied: going back is restarting BpmnGo without `app.compose.yaml`.

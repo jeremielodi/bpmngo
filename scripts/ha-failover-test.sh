@@ -7,7 +7,7 @@
 #   scripts/ha-failover-test.sh [BpmnGo URL] [admin email] [admin password]
 #
 # Needs curl, docker and the containers of deploy/ha/docker-compose.ha.yaml
-# (goflow-pg1..3). Creates real instances: not for a production database.
+# (bpmngo-pg1..3). Creates real instances: not for a production database.
 set -euo pipefail
 
 URL="${1:-http://127.0.0.1:8080}"
@@ -16,7 +16,7 @@ PASSWORD="${3:-admin123}"
 COUNT="${COUNT:-10}"
 
 json() { sed -nE "s/.*\"$1\" *: *\"([^\"]+)\".*/\1/p" | head -1; }
-role() { docker exec "goflow-$1" curl -s localhost:8008/patroni 2>/dev/null | sed -nE 's/.*"role": *"([a-z_]+)".*/\1/p'; }
+role() { docker exec "bpmngo-$1" curl -s localhost:8008/patroni 2>/dev/null | sed -nE 's/.*"role": *"([a-z_]+)".*/\1/p'; }
 primary() { for n in pg1 pg2 pg3; do r="$(role $n || true)"; [ "$r" = "master" ] || [ "$r" = "primary" ] && { echo "$n"; return; }; done; }
 
 TOKEN="$(curl -sf -X POST "$URL/auth/login" -H 'Content-Type: application/json' \
@@ -50,7 +50,7 @@ for _ in $(seq "$COUNT"); do ids+=("$(start)"); done
 OLD="$(primary)"
 echo "Primary: $OLD — stopping it"
 t0=$(date +%s)
-docker stop "goflow-$OLD" >/dev/null
+docker stop "bpmngo-$OLD" >/dev/null
 
 NEW=""
 until [ -n "$NEW" ] && [ "$NEW" != "$OLD" ]; do sleep 1; NEW="$(primary || true)"; done
@@ -83,7 +83,7 @@ for pid in "${ids[@]}"; do
 done
 
 echo "Restarting goflow-$OLD (rejoins as a replica)"
-docker start "goflow-$OLD" >/dev/null
+docker start "bpmngo-$OLD" >/dev/null
 
 if [ "$lost" -eq 0 ] && [ "$completed" -eq "${#ids[@]}" ]; then
 	echo "OK: no instance lost, all ${#ids[@]} completed"

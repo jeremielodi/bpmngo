@@ -4,7 +4,7 @@
 # En test sur une machine :
 #   docker compose -f docker-compose.yaml -f docker-compose.scale.yaml \
 #     -f deploy/ha/docker-compose.ha.yaml -f deploy/ha/scale-ha.compose.yaml \
-#     up -d --scale goflow=3
+#     up -d --scale bpmngo=3
 # En production, deploy/ha/app.compose.yaml à la place de docker-compose.ha.yaml.
 #
 # PgBouncer passe par HAProxy (port 5000) et suit donc le primaire : à une
@@ -28,7 +28,7 @@ services:
       DB_HOST: haproxy
       DB_PORT: 5000
 
-  goflow:
+  bpmngo:
     depends_on: !override
       pgbouncer:
         condition: service_started

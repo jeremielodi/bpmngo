@@ -79,7 +79,7 @@ async function main() {
     console.log('📦  Starting Docker services (fresh build)…');
     // GOFLOW_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
     // runs the suites against several BpmnGo instances behind the load balancer.
-    const replicas = process.env.GOFLOW_REPLICAS ? ` --scale goflow=${process.env.GOFLOW_REPLICAS}` : '';
+    const replicas = process.env.GOFLOW_REPLICAS ? ` --scale bpmngo=${process.env.GOFLOW_REPLICAS}` : '';
     try {
       execSync(`docker compose up -d --build --wait${replicas}`, {
         cwd: path.join(__dirname, '..', '..'),

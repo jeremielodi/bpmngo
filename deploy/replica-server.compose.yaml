@@ -13,7 +13,7 @@
 # If the first server is lost, promote it and start BpmnGo here — see
 # docs/adding-servers.md:
 #
-#   docker exec goflow-postgres psql -U goflow -c "SELECT pg_promote()"
+#   docker exec bpmngo-postgres psql -U goflow -c "SELECT pg_promote()"
 #   docker compose -f docker-compose.yaml -f deploy/replica-server.compose.yaml up -d
 
 services:

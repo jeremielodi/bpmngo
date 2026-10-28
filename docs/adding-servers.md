@@ -71,13 +71,13 @@ Dans l'exemple : serveur 1 = `10.0.0.1`, serveur 2 = `10.0.0.2`.
 
 ```bash
 # 1. Le rôle de réplication (choisir un vrai mot de passe)
-docker exec goflow-postgres psql -U goflow -d goflow \
+docker exec bpmngo-postgres psql -U goflow -d goflow \
   -c "CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD 'mot-de-passe-replication'"
 
 # 2. Autoriser le serveur 2 à répliquer, puis recharger la configuration
-docker exec goflow-postgres bash -c \
+docker exec bpmngo-postgres bash -c \
   "echo 'host replication replicator 10.0.0.2/32 scram-sha-256' >> \$PGDATA/pg_hba.conf"
-docker exec goflow-postgres psql -U goflow -c "SELECT pg_reload_conf()"
+docker exec bpmngo-postgres psql -U goflow -c "SELECT pg_reload_conf()"
 ```
 
 3. Rendre Postgres joignable par le serveur 2 : dans le `.env` du
@@ -98,8 +98,8 @@ Au premier démarrage, la réplique copie la base du serveur 1, puis la
 suit. Vérifier :
 
 ```bash
-docker exec goflow-postgres psql -U goflow -d goflow -tAc "SELECT pg_is_in_recovery()"   # t : c'est une réplique
-docker exec goflow-postgres psql -U goflow -d goflow -tAc "SELECT count(*) FROM process_instances"
+docker exec bpmngo-postgres psql -U goflow -d goflow -tAc "SELECT pg_is_in_recovery()"   # t : c'est une réplique
+docker exec bpmngo-postgres psql -U goflow -d goflow -tAc "SELECT count(*) FROM process_instances"
 ```
 
 Les sauvegardes continuent sur le serveur 1, comme avant.
@@ -108,7 +108,7 @@ Les sauvegardes continuent sur le serveur 1, comme avant.
 
 ```bash
 # 1. La réplique devient la base principale (elle accepte les écritures)
-docker exec goflow-postgres psql -U goflow -c "SELECT pg_promote()"
+docker exec bpmngo-postgres psql -U goflow -c "SELECT pg_promote()"
 
 # 2. Démarrer BpmnGo sur le serveur 2
 docker compose -f docker-compose.yaml -f deploy/replica-server.compose.yaml up -d
@@ -167,7 +167,7 @@ BpmnGo derrière un load balancer (nginx), PgBouncer passant par HAProxy :
 
 ```bash
 docker compose -f docker-compose.yaml -f docker-compose.scale.yaml \
-  -f deploy/ha/app.compose.yaml -f deploy/ha/scale-ha.compose.yaml up -d --scale goflow=3
+  -f deploy/ha/app.compose.yaml -f deploy/ha/scale-ha.compose.yaml up -d --scale bpmngo=3
 ```
 
 Rien à faire côté base de données. Toutes les tâches de fond sont sûres

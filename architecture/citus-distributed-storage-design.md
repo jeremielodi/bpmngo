@@ -54,7 +54,7 @@ Phase 2 below for what it actually took).
   `postgres` service. The base file's `postgres` service does still start
   alongside Citus under the override (Compose merges services additively;
   cleanly excluding it would need version-dependent profile/depends_on
-  tricks) — harmless, just unused once `goflow`'s `DB_HOST` points at
+  tricks) — harmless, just unused once `bpmngo`'s `DB_HOST` points at
   `citus-coordinator` instead.
 - **`database/00_citus_extension.sql`** — a new file in the existing
   `database/` folder, guarded by

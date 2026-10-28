@@ -18,7 +18,7 @@
 services:
   etcd:
     image: quay.io/coreos/etcd:v3.5.17
-    container_name: goflow-etcd
+    container_name: bpmngo-etcd
     network_mode: host
     command:
       - etcd
@@ -37,7 +37,7 @@ services:
 
   postgres:
     image: ghcr.io/zalando/spilo-16:3.2-p3
-    container_name: goflow-pg
+    container_name: bpmngo-pg
     network_mode: host
     depends_on: [etcd]
     environment:

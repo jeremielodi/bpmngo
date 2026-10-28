@@ -3,7 +3,7 @@
  *
  * Needs the 3-replica partitioned stack:
  *   COMPOSE_FILE="docker-compose.yaml;docker-compose.scale.yaml" WRITE_PATH=partitioned \
- *     docker compose up -d --build --wait --scale goflow=3
+ *     docker compose up -d --build --wait --scale bpmngo=3
  *   npx ts-node --transpile-only drill_partition_failover.ts
  *
  * Starts instances, kills one BpmnGo replica while their jobs are being

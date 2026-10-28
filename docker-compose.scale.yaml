@@ -1,7 +1,7 @@
 # Plusieurs instances BpmnGo derrière un load balancer nginx, avec PgBouncer
 # devant Postgres.
 #
-#   docker compose -f docker-compose.yaml -f docker-compose.scale.yaml up -d --scale goflow=3
+#   docker compose -f docker-compose.yaml -f docker-compose.scale.yaml up -d --scale bpmngo=3
 #
 # Ce fichier s'ajoute à docker-compose.yaml sans le modifier : sans lui,
 # BpmnGo tourne comme avant, en une seule instance connectée directement à
@@ -34,7 +34,7 @@ services:
 
   pgbouncer:
     image: edoburu/pgbouncer:latest
-    container_name: goflow-pgbouncer
+    container_name: bpmngo-pgbouncer
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,10 +51,10 @@ services:
       MAX_PREPARED_STATEMENTS: 200
       IGNORE_STARTUP_PARAMETERS: extra_float_digits,statement_timeout,idle_in_transaction_session_timeout
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
-  goflow:
+  bpmngo:
     # Plusieurs répliques : pas de nom de conteneur fixe, et c'est le load
     # balancer qui publie les ports.
     container_name: !reset null
@@ -74,9 +74,9 @@ services:
 
   lb:
     image: nginx:1.29.2-alpine
-    container_name: goflow-lb
+    container_name: bpmngo-lb
     depends_on:
-      goflow:
+      bpmngo:
         condition: service_healthy
     ports:
       - "${SERVER_PORT:-8080}:8080"
@@ -84,7 +84,7 @@ services:
     volumes:
       - ./deploy/nginx-lb.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
   # Rôle de réplication sur le primaire (idempotent), puis la réplique en
@@ -104,12 +104,12 @@ services:
     volumes:
       - ./deploy/replication-setup.sh:/replication-setup.sh:ro
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: "no"
 
   postgres-replica:
     image: postgres:16
-    container_name: goflow-postgres-replica
+    container_name: bpmngo-postgres-replica
     depends_on:
       replication-setup:
         condition: service_completed_successfully
@@ -127,7 +127,7 @@ services:
       timeout: 5s
       retries: 30
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
 volumes:

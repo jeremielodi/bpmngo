@@ -9,7 +9,7 @@ services:
   # PostgreSQL
   postgres:
     image: postgres:16
-    container_name: goflow-postgres
+    container_name: bpmngo-postgres
     # max_connections doit couvrir DB_MAX_OPEN_CONNS × le nombre d'instances
     # BpmnGo (+ quelques connexions d'admin).
     command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"]
@@ -30,7 +30,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
   # Redpanda (Kafka-wire-compatible event log — Phase 0 shadow-mode event
@@ -41,7 +41,7 @@ services:
   # REDPANDA_SMP.
   redpanda:
     image: redpandadata/redpanda:v24.2.4
-    container_name: goflow-redpanda
+    container_name: bpmngo-redpanda
     command:
       - redpanda
       - start
@@ -68,13 +68,13 @@ services:
       retries: 10
       start_period: 20s
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
   # BpmnGo Application
-  goflow:
+  bpmngo:
     build: .
-    container_name: goflow-app
+    container_name: bpmngo-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,7 +112,7 @@ services:
       
       # Server
       # Port d'écoute DANS le conteneur : reste 8080 (nginx proxifie vers
-      # goflow:8080). Le port exposé sur l'hôte vient de SERVER_PORT (.env).
+      # bpmngo:8080). Le port exposé sur l'hôte vient de SERVER_PORT (.env).
       SERVER_PORT: 8080
       QUEUE_WORKERS: 10
       
@@ -155,7 +155,7 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
   # BpmnGo Frontend (React + nginx)
@@ -163,18 +163,18 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: goflow-frontend
+    container_name: bpmngo-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:
-      goflow:
+      bpmngo:
         condition: service_healthy
     networks:
-      - goflow-network
+      - bpmngo-network
     restart: unless-stopped
 
 networks:
-  goflow-network:
+  bpmngo-network:
     driver: bridge
 
 volumes:

@@ -10,7 +10,7 @@
 #   PGHOST=haproxy PGPORT=5000 PGPASSWORD=… ./scripts/backup-postgres.sh
 #
 # pg_dump tourne alors dans un conteneur postgres:16 jetable, sur le réseau
-# Docker de BpmnGo (DOCKER_NETWORK, camunda-like_goflow-network par défaut).
+# Docker de BpmnGo (DOCKER_NETWORK, goflow_bpmngo-network par défaut).
 #
 # Cron quotidien (3h du matin) :
 #   0 3 * * * cd /root/apps/goflow && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1
@@ -20,12 +20,12 @@
 # disque. Vérifier régulièrement qu'elle se restaure : scripts/test-restore.sh.
 set -eu
 
-CONTAINER="${POSTGRES_CONTAINER:-goflow-postgres}"
+CONTAINER="${POSTGRES_CONTAINER:-bpmngo-postgres}"
 DB_USER="${POSTGRES_USER:-goflow}"
 DB_NAME="${POSTGRES_DB:-goflow}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
-NETWORK="${DOCKER_NETWORK:-camunda-like_goflow-network}"
+NETWORK="${DOCKER_NETWORK:-goflow_bpmngo-network}"
 
 # pg_dump / pg_restore : dans le conteneur Postgres, ou, avec PGHOST, dans un
 # conteneur jetable qui joint PGHOST:PGPORT par le réseau.
