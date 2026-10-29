@@ -68,6 +68,24 @@ const priorityBPMN = `<?xml version="1.0" encoding="UTF-8"?>
   </process>
 </definitions>`
 
+const subprocessBPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="test"><process id="subprocess" isExecutable="true">
+  <startEvent id="start"/><subProcess id="sub"><startEvent id="sub_start"/><task id="inside" name="Inside"/><endEvent id="sub_end"/><sequenceFlow id="sub_s" sourceRef="sub_start" targetRef="inside"/><sequenceFlow id="sub_e" sourceRef="inside" targetRef="sub_end"/></subProcess><callActivity id="called" name="Called process" calledElement="other"/><endEvent id="end"/>
+  <sequenceFlow id="s" sourceRef="start" targetRef="sub"/><sequenceFlow id="after_sub" sourceRef="sub" targetRef="called"/><sequenceFlow id="e" sourceRef="called" targetRef="end"/>
+</process></definitions>`
+
+const eventGatewayBPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="test"><process id="events" isExecutable="true">
+  <startEvent id="start"/><eventBasedGateway id="race"/><receiveTask id="message"/><receiveTask id="timer"/><task id="a"/><task id="b"/><endEvent id="end"/>
+  <sequenceFlow id="s" sourceRef="start" targetRef="race"/><sequenceFlow id="message_flow" sourceRef="race" targetRef="message"/><sequenceFlow id="timer_flow" sourceRef="race" targetRef="timer"/><sequenceFlow id="ma" sourceRef="message" targetRef="a"/><sequenceFlow id="tb" sourceRef="timer" targetRef="b"/><sequenceFlow id="ae" sourceRef="a" targetRef="end"/><sequenceFlow id="be" sourceRef="b" targetRef="end"/>
+</process></definitions>`
+
+const boundaryBPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="test"><process id="boundary" isExecutable="true">
+  <startEvent id="start"/><task id="work"/><boundaryEvent id="timeout" attachedToRef="work"><timerEventDefinition><timeDuration>PT5M</timeDuration></timerEventDefinition></boundaryEvent><task id="normal"/><task id="fallback"/><endEvent id="end"/>
+  <sequenceFlow id="s" sourceRef="start" targetRef="work"/><sequenceFlow id="normal_flow" sourceRef="work" targetRef="normal"/><sequenceFlow id="timeout_flow" sourceRef="timeout" targetRef="fallback"/><sequenceFlow id="ne" sourceRef="normal" targetRef="end"/><sequenceFlow id="fe" sourceRef="fallback" targetRef="end"/>
+</process></definitions>`
+
 func testScenario() Scenario {
 	return Scenario{
 		Name: "helpdesk", BPMNXML: testBPMN, ArrivalRatePerHour: 1, DurationHours: 100,
@@ -125,6 +143,62 @@ func TestSimulationIsReproducibleAndCompletesCases(t *testing.T) {
 	assertNear(t, first.Metrics.MeanCycleMinutes, second.Metrics.MeanCycleMinutes, 0)
 	if len(first.Metrics.Resources) != 2 {
 		t.Fatalf("resource metrics = %d, want 2", len(first.Metrics.Resources))
+	}
+}
+
+func TestEmbeddedSubprocessAndCallActivityAreSimulated(t *testing.T) {
+	scenario := Scenario{Name: "sub", BPMNXML: subprocessBPMN, ArrivalRatePerHour: 1, MaxArrivals: 1, Replications: 1, Seed: 1,
+		Activities: map[string]ActivityParameters{
+			"inside": {ProcessingTime: Distribution{Type: "fixed", Value: 7}, ValueAdded: true},
+			"called": {ProcessingTime: Distribution{Type: "fixed", Value: 3}, ValueAdded: true},
+		}}
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Metrics.Completed != 1 {
+		t.Fatalf("completed = %d, want 1", result.Metrics.Completed)
+	}
+	assertNear(t, result.Metrics.MeanCycleMinutes, 10, .0001)
+}
+
+func TestEventGatewayUsesConfiguredRaceProbabilities(t *testing.T) {
+	scenario := Scenario{Name: "events", BPMNXML: eventGatewayBPMN, ArrivalRatePerHour: 1, MaxArrivals: 50, Replications: 1, Seed: 7,
+		Activities: map[string]ActivityParameters{
+			"a": {ProcessingTime: Distribution{Type: "fixed", Value: 1}},
+			"b": {ProcessingTime: Distribution{Type: "fixed", Value: 1}},
+		}, Flows: map[string]FlowParameters{"message_flow": {Probability: 1}, "timer_flow": {Probability: 0}}}
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, element := range result.Metrics.Elements {
+		if element.ElementID == "b" && element.Completed != 0 {
+			t.Fatalf("timer branch completed %d times, want 0", element.Completed)
+		}
+	}
+}
+
+func TestInterruptingBoundaryAlternative(t *testing.T) {
+	scenario := Scenario{Name: "boundary", BPMNXML: boundaryBPMN, ArrivalRatePerHour: 1, MaxArrivals: 10, Replications: 1, Seed: 3,
+		Activities: map[string]ActivityParameters{
+			"work":     {ProcessingTime: Distribution{Type: "fixed", Value: 2}},
+			"normal":   {ProcessingTime: Distribution{Type: "fixed", Value: 1}},
+			"fallback": {ProcessingTime: Distribution{Type: "fixed", Value: 4}},
+		}, Flows: map[string]FlowParameters{"timeout_flow": {Probability: 1}}}
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	analytic, err := Analyze(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, analytic.ProcessingMinutes, 6, .0001)
+	for _, element := range result.Metrics.Elements {
+		if element.ElementID == "normal" && element.Completed != 0 {
+			t.Fatalf("normal branch completed %d times, want 0", element.Completed)
+		}
 	}
 }
 
@@ -227,6 +301,20 @@ func TestScheduledAndPiecewiseArrivalPatterns(t *testing.T) {
 	for _, arrival := range scheduleArrivals(piecewise, newTestRNG()) {
 		if !((arrival >= 0 && arrival <= 30) || (arrival >= 60 && arrival <= 90)) {
 			t.Fatalf("arrival %.2f falls outside configured segments", arrival)
+		}
+	}
+}
+
+func TestPiecewiseArrivalPatternRepeats(t *testing.T) {
+	pattern := &ArrivalPattern{Type: "piecewise_poisson", RepeatMinutes: 60, Segments: []ArrivalSegment{{StartMinute: 0, EndMinute: 30, RatePerHour: 20}}}
+	scenario := Scenario{DurationHours: 3, ArrivalPattern: pattern}
+	if err := ValidateRunnable(scenario); err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, arrivalEstimate(scenario), 30, .0001)
+	for _, arrival := range scheduleArrivals(scenario, newTestRNG()) {
+		if math.Mod(arrival, 60) > 30 {
+			t.Fatalf("repeating arrival %.2f falls outside active half-hour", arrival)
 		}
 	}
 }

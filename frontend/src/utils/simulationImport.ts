@@ -2,7 +2,7 @@ import type { ActivityParameters, Scenario } from '../api/simulation';
 
 const activityTypes = new Set([
   'task', 'userTask', 'serviceTask', 'manualTask', 'businessRuleTask',
-  'scriptTask', 'sendTask', 'receiveTask', 'callActivity', 'subProcess',
+  'scriptTask', 'sendTask', 'receiveTask', 'callActivity',
 ]);
 
 const defaultActivity = (): ActivityParameters => ({
@@ -48,19 +48,19 @@ export function configureScenarioFromBpmn(current: Scenario, bpmnXml: string, fa
   }
   const flows = { ...current.flows };
   const configuredFlowIDs = new Set<string>();
-  for (const gateway of elements.filter(element => element.localName === 'exclusiveGateway' || element.localName === 'inclusiveGateway')) {
+  for (const gateway of elements.filter(element => element.localName === 'exclusiveGateway' || element.localName === 'inclusiveGateway' || element.localName === 'eventBasedGateway')) {
     const gatewayID = gateway.getAttribute('id');
     if (!gatewayID) continue;
     const outgoing = Array.from(sequenceFlows.values()).filter(flow => flow.getAttribute('sourceRef') === gatewayID);
     if (outgoing.length <= 1) continue;
-    const defaultProbability = gateway.localName === 'exclusiveGateway' ? 1 / outgoing.length : 0.5;
+    const defaultProbability = gateway.localName === 'inclusiveGateway' ? 0.5 : 1 / outgoing.length;
     for (const flow of outgoing) {
       const id = flow.getAttribute('id');
       if (!id) continue;
       configuredFlowIDs.add(id);
       flows[id] ??= { probability: defaultProbability };
     }
-    if (gateway.localName === 'exclusiveGateway') {
+    if (gateway.localName === 'exclusiveGateway' || gateway.localName === 'eventBasedGateway') {
       const ids = outgoing.map(flow => flow.getAttribute('id')).filter((id): id is string => !!id);
       const total = ids.reduce((sum, id) => sum + Math.max(0, flows[id].probability), 0);
       if (total > 0) {
@@ -68,6 +68,11 @@ export function configureScenarioFromBpmn(current: Scenario, bpmnXml: string, fa
       }
     }
   }
+	for (const boundary of elements.filter(element => element.localName === 'boundaryEvent' && element.getAttribute('cancelActivity') !== 'false')) {
+	  const boundaryID=boundary.getAttribute('id');if(!boundaryID)continue;
+	  const outgoing=Array.from(sequenceFlows.values()).filter(flow=>flow.getAttribute('sourceRef')===boundaryID);
+	  for(const flow of outgoing){const id=flow.getAttribute('id');if(!id)continue;configuredFlowIDs.add(id);flows[id]??={probability:Math.min(0.1,1/outgoing.length)};}
+	}
   for (const id of Object.keys(flows)) {
     if (!configuredFlowIDs.has(id)) delete flows[id];
   }

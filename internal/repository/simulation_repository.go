@@ -2,6 +2,8 @@ package repository
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/models"
@@ -106,6 +108,144 @@ func (r *SimulationRepository) RestoreScenarioVersion(scenarioID uuid.UUID, vers
 func (r *SimulationRepository) DeleteScenario(id uuid.UUID, tenantID string) error {
 	_, err := r.db.Exec(`DELETE FROM simulation_scenarios WHERE id=$1 AND ($2='' OR tenant_id=$2)`, id, tenantID)
 	return err
+}
+
+// CalibrateFromHistory derives arrival and activity distributions from the
+// archived runtime data without mutating a simulation scenario.
+func (r *SimulationRepository) CalibrateFromHistory(request simulation.CalibrationRequest, tenantID string) (simulation.CalibrationResult, error) {
+	result := simulation.CalibrationResult{
+		ProcessDefinitionKey: request.ProcessDefinitionKey,
+		Activities:           map[string]simulation.ActivityCalibration{},
+	}
+	var stats struct {
+		Samples int        `db:"samples"`
+		First   *time.Time `db:"first_started_at"`
+		Last    *time.Time `db:"last_started_at"`
+	}
+	if err := r.db.Get(&stats, `SELECT COUNT(*) AS samples, MIN(started_at) AS first_started_at, MAX(started_at) AS last_started_at
+		FROM historic_process_instances
+		WHERE process_definition_key=$1 AND ($2='' OR COALESCE(tenant_id,'')=$2)
+		AND ($3::timestamptz IS NULL OR started_at >= $3) AND ($4::timestamptz IS NULL OR started_at < $4)`,
+		request.ProcessDefinitionKey, tenantID, request.StartedAfter, request.StartedBefore); err != nil {
+		return result, err
+	}
+	result.InstanceSamples = stats.Samples
+	result.ObservationStart = stats.First
+	result.ObservationEnd = stats.Last
+	if stats.Samples == 0 || stats.First == nil || stats.Last == nil {
+		return result, fmt.Errorf("no historical process instances match process definition key %q", request.ProcessDefinitionKey)
+	}
+	observedHours := stats.Last.Sub(*stats.First).Hours()
+	if request.StartedAfter != nil && request.StartedBefore != nil {
+		observedHours = request.StartedBefore.Sub(*request.StartedAfter).Hours()
+	}
+	if observedHours <= 0 {
+		observedHours = 1
+	}
+	result.ArrivalRatePerHour = float64(stats.Samples) / observedHours
+	result.SuggestedArrivals = &simulation.ArrivalPattern{Type: "poisson", RatePerHour: result.ArrivalRatePerHour}
+
+	if observedHours >= 24 {
+		type hourlyRate struct {
+			Hour int     `db:"hour_of_day"`
+			Rate float64 `db:"rate_per_hour"`
+		}
+		hourly := []hourlyRate{}
+		err := r.db.Select(&hourly, `WITH bounds AS (
+			SELECT date_trunc('hour', MIN(started_at)) AS first_hour, date_trunc('hour', MAX(started_at)) AS last_hour
+			FROM historic_process_instances WHERE process_definition_key=$1 AND ($2='' OR COALESCE(tenant_id,'')=$2)
+			AND ($3::timestamptz IS NULL OR started_at >= $3) AND ($4::timestamptz IS NULL OR started_at < $4)
+		), hours AS (
+			SELECT generate_series(first_hour,last_hour,INTERVAL '1 hour') AS bucket FROM bounds
+		), counts AS (
+			SELECT date_trunc('hour',started_at) AS bucket, COUNT(*)::float8 AS arrivals
+			FROM historic_process_instances WHERE process_definition_key=$1 AND ($2='' OR COALESCE(tenant_id,'')=$2)
+			AND ($3::timestamptz IS NULL OR started_at >= $3) AND ($4::timestamptz IS NULL OR started_at < $4)
+			GROUP BY 1
+		)
+		SELECT EXTRACT(HOUR FROM h.bucket)::int AS hour_of_day, AVG(COALESCE(c.arrivals,0))::float8 AS rate_per_hour
+		FROM hours h LEFT JOIN counts c USING(bucket) GROUP BY 1 ORDER BY 1`,
+			request.ProcessDefinitionKey, tenantID, request.StartedAfter, request.StartedBefore)
+		if err != nil {
+			return result, err
+		}
+		segments := make([]simulation.ArrivalSegment, 0, 24)
+		rates := make(map[int]float64, len(hourly))
+		for _, row := range hourly {
+			rates[row.Hour] = row.Rate
+		}
+		for hour := 0; hour < 24; hour++ {
+			segments = append(segments, simulation.ArrivalSegment{StartMinute: float64(hour * 60), EndMinute: float64((hour + 1) * 60), RatePerHour: rates[hour]})
+		}
+		result.SuggestedArrivals = &simulation.ArrivalPattern{Type: "piecewise_poisson", Segments: segments, RepeatMinutes: 1440}
+	} else {
+		result.Warnings = append(result.Warnings, "Less than 24 hours of history are available; a stationary Poisson arrival rate was estimated.")
+	}
+
+	type activityRow struct {
+		ElementID string  `db:"element_id"`
+		Name      string  `db:"element_name"`
+		Samples   int     `db:"samples"`
+		Mean      float64 `db:"mean_minutes"`
+		StdDev    float64 `db:"stddev_minutes"`
+		Median    float64 `db:"median_minutes"`
+		P95       float64 `db:"p95_minutes"`
+		Waiting   float64 `db:"waiting_minutes"`
+	}
+	activities := []activityRow{}
+	err := r.db.Select(&activities, `WITH timeline AS (
+		SELECT hai.element_id,hai.element_name,hai.occurred_at,
+			LEAD(hai.occurred_at) OVER(PARTITION BY hai.process_instance_id,hai.execution_key ORDER BY hai.occurred_at,hai.id) AS next_at
+		FROM historic_activity_instances hai
+		JOIN historic_process_instances hpi ON hpi.id=hai.process_instance_id
+		WHERE hpi.process_definition_key=$1 AND ($2='' OR COALESCE(hpi.tenant_id,'')=$2)
+		AND ($3::timestamptz IS NULL OR hpi.started_at >= $3) AND ($4::timestamptz IS NULL OR hpi.started_at < $4)
+		AND hai.action IN ('EXECUTION_MOVED','EXECUTION_COMPLETED') AND hai.execution_key IS NOT NULL
+	), durations AS (
+		SELECT element_id,element_name,EXTRACT(EPOCH FROM (next_at-occurred_at))/60.0 AS minutes
+		FROM timeline WHERE element_id IS NOT NULL AND next_at > occurred_at
+	)
+	SELECT element_id,MAX(COALESCE(element_name,'')) AS element_name,COUNT(*)::int AS samples,
+		AVG(minutes)::float8 AS mean_minutes,COALESCE(STDDEV_SAMP(minutes),0)::float8 AS stddev_minutes,
+		PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY minutes)::float8 AS median_minutes,
+		PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY minutes)::float8 AS p95_minutes
+	FROM durations GROUP BY element_id`, request.ProcessDefinitionKey, tenantID, request.StartedAfter, request.StartedBefore)
+	if err != nil {
+		return result, err
+	}
+	for _, row := range activities {
+		result.Activities[row.ElementID] = simulation.ActivityCalibration{ElementID: row.ElementID, ElementName: row.Name, Samples: row.Samples,
+			MeanProcessingMinutes: row.Mean, ProcessingStdDevMinutes: row.StdDev, MedianTotalMinutes: row.Median, P95TotalMinutes: row.P95, Method: "transition_elapsed"}
+	}
+
+	tasks := []activityRow{}
+	err = r.db.Select(&tasks, `WITH durations AS (
+		SELECT ht.task_definition_key AS element_id,ht.task_name AS element_name,
+			EXTRACT(EPOCH FROM (ht.completed_at-COALESCE(ht.claimed_at,ht.created_at)))/60.0 AS processing_minutes,
+			EXTRACT(EPOCH FROM (COALESCE(ht.claimed_at,ht.created_at)-ht.created_at))/60.0 AS waiting_minutes,
+			EXTRACT(EPOCH FROM (ht.completed_at-ht.created_at))/60.0 AS total_minutes
+		FROM historic_tasks ht JOIN historic_process_instances hpi ON hpi.id=ht.process_instance_id
+		WHERE hpi.process_definition_key=$1 AND ($2='' OR COALESCE(hpi.tenant_id,'')=$2)
+		AND ($3::timestamptz IS NULL OR hpi.started_at >= $3) AND ($4::timestamptz IS NULL OR hpi.started_at < $4)
+		AND ht.completed_at IS NOT NULL AND ht.completed_at >= ht.created_at AND ht.task_definition_key IS NOT NULL
+	)
+	SELECT element_id,MAX(COALESCE(element_name,'')) AS element_name,COUNT(*)::int AS samples,
+		AVG(processing_minutes)::float8 AS mean_minutes,COALESCE(STDDEV_SAMP(processing_minutes),0)::float8 AS stddev_minutes,
+		PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total_minutes)::float8 AS median_minutes,
+		PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY total_minutes)::float8 AS p95_minutes,
+		AVG(waiting_minutes)::float8 AS waiting_minutes
+	FROM durations GROUP BY element_id`, request.ProcessDefinitionKey, tenantID, request.StartedAfter, request.StartedBefore)
+	if err != nil {
+		return result, err
+	}
+	for _, row := range tasks {
+		calibration := simulation.ActivityCalibration{ElementID: row.ElementID, ElementName: row.Name, Samples: row.Samples,
+			MeanProcessingMinutes: row.Mean, ProcessingStdDevMinutes: row.StdDev, MeanWaitingMinutes: row.Waiting,
+			MedianTotalMinutes: row.Median, P95TotalMinutes: row.P95, Method: "historic_task"}
+		result.Activities[row.ElementID] = calibration
+	}
+	result.Warnings = append(result.Warnings, "Transition-based durations can include queue or external waiting time; completed historic tasks use separate claim and processing timestamps when available.")
+	return result, nil
 }
 
 func (r *SimulationRepository) CreateRun(scenarioID, userID uuid.UUID, runType string, request json.RawMessage) (*models.SimulationRun, error) {

@@ -70,6 +70,68 @@ func (s *SimulationService) ImportScenario(pkg simulation.ScenarioPackage, userI
 	return s.CreateScenario(pkg.Scenario, userID, tenantID)
 }
 
+func (s *SimulationService) CalibrateScenario(id, userID uuid.UUID, tenantID string, request simulation.CalibrationRequest) (simulation.CalibrationResult, error) {
+	if request.ProcessDefinitionKey == "" {
+		return simulation.CalibrationResult{}, errors.New("processDefinitionKey is required")
+	}
+	if request.StartedAfter != nil && request.StartedBefore != nil && !request.StartedBefore.After(*request.StartedAfter) {
+		return simulation.CalibrationResult{}, errors.New("startedBefore must be after startedAfter")
+	}
+	if request.MinimumSamples <= 0 {
+		request.MinimumSamples = 30
+	}
+	scenario, err := s.LoadScenario(id, tenantID)
+	if err != nil {
+		return simulation.CalibrationResult{}, err
+	}
+	result, err := s.repository.CalibrateFromHistory(request, tenantID)
+	if err != nil {
+		return result, err
+	}
+	if !request.Apply {
+		return result, nil
+	}
+	scenario.ArrivalRatePerHour = result.ArrivalRatePerHour
+	scenario.ArrivalPattern = result.SuggestedArrivals
+	appliedActivities := 0
+	for elementID, calibration := range result.Activities {
+		parameters, exists := scenario.Activities[elementID]
+		if !exists || calibration.Samples < request.MinimumSamples {
+			continue
+		}
+		parameters.ProcessingTime = calibratedDistribution(calibration.MeanProcessingMinutes, calibration.ProcessingStdDevMinutes)
+		parameters.WaitingTime = simulation.Distribution{Type: "fixed", Value: calibration.MeanWaitingMinutes}
+		scenario.Activities[elementID] = parameters
+		appliedActivities++
+	}
+	if appliedActivities == 0 {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("No scenario activity had at least %d matching historical samples; only the arrival pattern was applied.", request.MinimumSamples))
+	}
+	row, err := s.UpdateScenario(id, scenario, userID, tenantID)
+	if err != nil {
+		return result, err
+	}
+	result.Applied = true
+	result.ScenarioVersion = row.CurrentVersion
+	return result, nil
+}
+
+func calibratedDistribution(mean, standardDeviation float64) simulation.Distribution {
+	if mean <= 0 {
+		return simulation.Distribution{Type: "fixed", Value: 0}
+	}
+	// A very wide normal distribution spends too much probability below zero.
+	// Cap sigma while retaining observed variability; the sampler already
+	// truncates negative values.
+	if standardDeviation > 0 {
+		if standardDeviation > mean {
+			standardDeviation = mean
+		}
+		return simulation.Distribution{Type: "normal", Mean: mean, StandardDeviation: standardDeviation}
+	}
+	return simulation.Distribution{Type: "fixed", Value: mean}
+}
+
 func (s *SimulationService) LoadScenario(id uuid.UUID, tenantID string) (simulation.Scenario, error) {
 	row, err := s.repository.GetScenario(id, tenantID)
 	if err != nil {

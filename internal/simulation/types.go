@@ -62,6 +62,7 @@ type ArrivalPattern struct {
 	Type             string           `json:"type"`
 	RatePerHour      float64          `json:"ratePerHour,omitempty"`
 	Segments         []ArrivalSegment `json:"segments,omitempty"`
+	RepeatMinutes    float64          `json:"repeatMinutes,omitempty"`
 	ScheduledMinutes []float64        `json:"scheduledMinutes,omitempty"`
 	BatchSize        int              `json:"batchSize,omitempty"`
 }
@@ -96,6 +97,39 @@ type ScenarioPackage struct {
 	Format     string    `json:"format"`
 	ExportedAt time.Time `json:"exportedAt"`
 	Scenario   Scenario  `json:"scenario"`
+}
+
+type CalibrationRequest struct {
+	ProcessDefinitionKey string     `json:"processDefinitionKey"`
+	StartedAfter         *time.Time `json:"startedAfter,omitempty"`
+	StartedBefore        *time.Time `json:"startedBefore,omitempty"`
+	MinimumSamples       int        `json:"minimumSamples,omitempty"`
+	Apply                bool       `json:"apply,omitempty"`
+}
+
+type ActivityCalibration struct {
+	ElementID               string  `json:"elementId"`
+	ElementName             string  `json:"elementName,omitempty"`
+	Samples                 int     `json:"samples"`
+	MeanProcessingMinutes   float64 `json:"meanProcessingMinutes"`
+	ProcessingStdDevMinutes float64 `json:"processingStdDevMinutes"`
+	MeanWaitingMinutes      float64 `json:"meanWaitingMinutes"`
+	MedianTotalMinutes      float64 `json:"medianTotalMinutes"`
+	P95TotalMinutes         float64 `json:"p95TotalMinutes"`
+	Method                  string  `json:"method"`
+}
+
+type CalibrationResult struct {
+	ProcessDefinitionKey string                         `json:"processDefinitionKey"`
+	InstanceSamples      int                            `json:"instanceSamples"`
+	ObservationStart     *time.Time                     `json:"observationStart,omitempty"`
+	ObservationEnd       *time.Time                     `json:"observationEnd,omitempty"`
+	ArrivalRatePerHour   float64                        `json:"arrivalRatePerHour"`
+	SuggestedArrivals    *ArrivalPattern                `json:"suggestedArrivals,omitempty"`
+	Activities           map[string]ActivityCalibration `json:"activities"`
+	Warnings             []string                       `json:"warnings,omitempty"`
+	Applied              bool                           `json:"applied"`
+	ScenarioVersion      int                            `json:"scenarioVersion,omitempty"`
 }
 
 type AnalyticElement struct {

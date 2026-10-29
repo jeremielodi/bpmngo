@@ -16,6 +16,7 @@ type compiledScenario struct {
 	calendars         map[string]*calendarPlan
 	gatewayPairs      map[string]string
 	joinNormalization map[string]float64
+	boundaries        map[string][]*engine.Node
 }
 
 func compileScenario(s Scenario) (*compiledScenario, error) {
@@ -93,12 +94,19 @@ func compileScenario(s Scenario) (*compiledScenario, error) {
 			return nil, fmt.Errorf("activity %q waiting time: %w", id, err)
 		}
 	}
+	boundaries, err := prepareSimulationGraph(graph, &s)
+	if err != nil {
+		return nil, err
+	}
 	pairs, err := pairStructuredGateways(graph)
 	if err != nil {
 		return nil, err
 	}
 	joinNormalization := make(map[string]float64, len(pairs))
 	for _, node := range graph.Nodes {
+		if node.AttachedToRef != "" {
+			continue
+		}
 		if len(node.Outgoing) <= 1 {
 			continue
 		}
@@ -141,7 +149,81 @@ func compileScenario(s Scenario) (*compiledScenario, error) {
 		}
 	}
 	sort.Strings(starts)
-	return &compiledScenario{scenario: s, graph: graph, startID: starts[0], resources: resources, calendars: calendars, gatewayPairs: pairs, joinNormalization: joinNormalization}, nil
+	return &compiledScenario{scenario: s, graph: graph, startID: starts[0], resources: resources, calendars: calendars, gatewayPairs: pairs, joinNormalization: joinNormalization, boundaries: boundaries}, nil
+}
+
+// prepareSimulationGraph turns embedded subprocess scopes into ordinary graph
+// paths and indexes interrupting boundary alternatives. Call activities remain
+// atomic activities: their measured/estimated duration represents the called
+// process and can be calibrated like any other BPMN activity.
+func prepareSimulationGraph(graph *engine.ProcessGraph, scenario *Scenario) (map[string][]*engine.Node, error) {
+	boundaries := map[string][]*engine.Node{}
+	for _, node := range graph.Nodes {
+		if node.AttachedToRef != "" && len(node.Outgoing) > 0 {
+			if !node.CancelActivity {
+				return nil, fmt.Errorf("non-interrupting boundary event %q is not yet supported by simulation", node.ID)
+			}
+			probability := 0.0
+			for _, flow := range node.Outgoing {
+				parameter, ok := scenario.Flows[flow.ID]
+				if !ok || parameter.Probability < 0 || parameter.Probability > 1 {
+					return nil, fmt.Errorf("boundary flow %q from %q needs a probability between 0 and 1", flow.ID, node.ID)
+				}
+				probability += parameter.Probability
+			}
+			if probability > 1.000001 {
+				return nil, fmt.Errorf("boundary probabilities from %q sum to %.6f, want at most 1", node.ID, probability)
+			}
+			boundaries[node.AttachedToRef] = append(boundaries[node.AttachedToRef], node)
+		}
+	}
+	for attachedTo, events := range boundaries {
+		if attached := graph.Nodes[attachedTo]; attached != nil {
+			ordinary := attached.Outgoing[:0]
+			for _, flow := range attached.Outgoing {
+				if !flow.IsBoundary {
+					ordinary = append(ordinary, flow)
+				}
+			}
+			attached.Outgoing = ordinary
+		}
+		total := 0.0
+		for _, event := range events {
+			for _, flow := range event.Outgoing {
+				total += scenario.Flows[flow.ID].Probability
+			}
+		}
+		if total > 1.000001 {
+			return nil, fmt.Errorf("boundary probabilities attached to %q sum to %.6f, want at most 1", attachedTo, total)
+		}
+		sort.Slice(events, func(i, j int) bool { return events[i].ID < events[j].ID })
+	}
+	for _, node := range graph.Nodes {
+		if node.Type != engine.SubProcessType {
+			continue
+		}
+		if node.StartNodeID == "" {
+			return nil, fmt.Errorf("sub-process %q has no start event", node.ID)
+		}
+		outer := append([]engine.Flow(nil), node.Outgoing...)
+		node.Outgoing = []engine.Flow{{ID: "simulation-enter-" + node.ID, SourceRef: node.ID, TargetRef: node.StartNodeID}}
+		foundEnd := false
+		for _, inner := range graph.Nodes {
+			if inner.ParentScope != node.ID || !inner.IsEndEvent() {
+				continue
+			}
+			foundEnd = true
+			inner.Outgoing = make([]engine.Flow, 0, len(outer))
+			for _, flow := range outer {
+				inner.Outgoing = append(inner.Outgoing, engine.Flow{ID: "simulation-exit-" + node.ID + "-" + flow.ID, SourceRef: inner.ID, TargetRef: flow.TargetRef})
+			}
+		}
+		if !foundEnd {
+			return nil, fmt.Errorf("sub-process %q has no end event", node.ID)
+		}
+		delete(scenario.Activities, node.ID)
+	}
+	return boundaries, nil
 }
 
 func eligibleResourceIDs(resources map[string]Resource, activity ActivityParameters) []string {

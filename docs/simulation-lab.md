@@ -34,6 +34,12 @@ transactional runtime.
   comparison.
 - immutable scenario revisions with non-destructive restore, portable JSON
   export/import, and a dashboard comparing any two completed simulation runs.
+- previewable calibration from archived BpmnGo instances: aggregate arrival
+  rates, repeating 24-hour demand profiles when enough history exists,
+  transition durations, and separate task claim/processing waits;
+- embedded subprocess traversal, probabilistic event-based gateway races,
+  atomic call-activity surrogates, and probabilistic interrupting boundary
+  alternatives in addition to the existing gateway semantics.
 
 The studio starts with a neutral scenario rather than a domain-specific
 workflow. Importing a `.bpmn` file discovers tasks and configurable gateway
@@ -60,9 +66,12 @@ a required workflow or a special execution mode.
    smallest capacity meeting the mean/p95 cycle-time targets.
 7. Run a multi-parameter experiment to compare combinations and optimize mean
    cycle, p95 cycle, cost, or throughput under optional constraints.
-8. Mark the result as the as-is baseline, duplicate it as a to-be scenario,
+8. In **Calibration**, preview estimates from an archived process-definition
+   key. Apply only after reviewing sample counts; application creates a new
+   immutable scenario version.
+9. Mark the result as the as-is baseline, duplicate it as a to-be scenario,
    change capacity or process parameters, and compare the new result.
-9. Track detected and manually observed problems in **Issues**. Use **Modeler**
+10. Track detected and manually observed problems in **Issues**. Use **Modeler**
    to draw the selected to-be process.
 
 ## API
@@ -81,6 +90,7 @@ All endpoints require authentication. Analysis permissions use
 | `POST /engine-rest/simulation/scenarios/:id/versions/:version/restore` | Restore a revision as a new current version |
 | `GET /engine-rest/simulation/scenarios/:id/export` | Export a portable scenario package |
 | `POST /engine-rest/simulation/scenarios/import` | Import a portable scenario package |
+| `POST /engine-rest/simulation/scenarios/:id/calibration` | Preview or apply calibration from historical runtime data |
 | `POST /engine-rest/simulation/scenarios/:id/runs` | Queue a persisted simulation |
 | `POST /engine-rest/simulation/scenarios/:id/capacity-sweeps` | Queue an automatic capacity comparison |
 | `POST /engine-rest/simulation/scenarios/:id/experiments` | Queue a full-factorial multi-parameter experiment |
@@ -109,5 +119,16 @@ existing database. New databases receive the tables from the baseline schema.
   branch must reach a matching gateway of the same type. Business calendars,
   priorities, preemption, and correlated arrivals are not inferred
   automatically. Represent known external delays explicitly.
+- Historical calibration is tenant-scoped. Periods shorter than 24 hours
+  produce a stationary arrival estimate; longer periods produce a repeating
+  hourly profile. Task history separates created-to-claimed waiting from
+  claimed-to-completed processing. Other transition elapsed times can still
+  contain queue or external wait, so the preview and minimum-sample threshold
+  must be reviewed before application.
+- Embedded subprocess bodies are traversed directly. Call activities are
+  atomic surrogates whose configured duration represents the called process.
+  Event-based gateway alternatives use configured probabilities. Interrupting
+  boundary paths are probabilistic alternatives; non-interrupting boundary
+  events are rejected because they require multi-token lifecycle accounting.
 - Recommendations are hypotheses to test in a separate to-be scenario, not
   automatic prescriptions.

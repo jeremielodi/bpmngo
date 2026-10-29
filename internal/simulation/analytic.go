@@ -23,9 +23,7 @@ func Analyze(s Scenario) (AnalyticResult, error) {
 			if normalization := c.joinNormalization[id]; normalization > 0 {
 				count /= normalization
 			}
-			for _, flow := range node.Outgoing {
-				next[flow.TargetRef] += count * c.probability(node, flow)
-			}
+			propagateVisits(c, node, count, next, "")
 		}
 		delta := 0.0
 		for id, value := range next {
@@ -113,11 +111,7 @@ func expectedDurationUntil(c *compiledScenario, startID, stopID string) (float64
 			if normalization := c.joinNormalization[id]; normalization > 0 {
 				count /= normalization
 			}
-			for _, flow := range node.Outgoing {
-				if flow.TargetRef != stopID {
-					next[flow.TargetRef] += count * c.probability(node, flow)
-				}
-			}
+			propagateVisits(c, node, count, next, stopID)
 		}
 		delta := 0.0
 		for id, value := range next {
@@ -139,6 +133,25 @@ func expectedDurationUntil(c *compiledScenario, startID, stopID string) (float64
 		}
 	}
 	return 0, fmt.Errorf("duration did not converge")
+}
+
+func propagateVisits(c *compiledScenario, node *engine.Node, count float64, next map[string]float64, stopID string) {
+	normalProbability := 1.0
+	for _, boundary := range c.boundaries[node.ID] {
+		for _, flow := range boundary.Outgoing {
+			probability := c.scenario.Flows[flow.ID].Probability
+			normalProbability -= probability
+			if flow.TargetRef != stopID {
+				next[flow.TargetRef] += count * probability
+			}
+		}
+	}
+	normalProbability = math.Max(0, normalProbability)
+	for _, flow := range node.Outgoing {
+		if flow.TargetRef != stopID {
+			next[flow.TargetRef] += count * normalProbability * c.probability(node, flow)
+		}
+	}
 }
 
 func parallelSavings(c *compiledScenario, split *engine.Node, durations []float64) float64 {

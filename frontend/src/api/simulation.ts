@@ -5,7 +5,7 @@ export type CalendarShift = { weekdays?:number[];startMinute:number;endMinute:nu
 export type CalendarException = { date:string;shifts?:CalendarShift[] };
 export type BusinessCalendar = { id:string;name:string;timezone:string;shifts:CalendarShift[];exceptions?:CalendarException[] };
 export type ArrivalSegment = { startMinute:number;endMinute:number;ratePerHour:number };
-export type ArrivalPattern = { type:'poisson'|'piecewise_poisson'|'scheduled'|'batch_poisson';ratePerHour?:number;segments?:ArrivalSegment[];scheduledMinutes?:number[];batchSize?:number };
+export type ArrivalPattern = { type:'poisson'|'piecewise_poisson'|'scheduled'|'batch_poisson';ratePerHour?:number;segments?:ArrivalSegment[];repeatMinutes?:number;scheduledMinutes?:number[];batchSize?:number };
 export type SimulationResource = { id: string; name: string; capacity: number; costPerHour: number; calendarId?:string;skills?:string[] };
 export type ActivityParameters = { processingTime: Distribution; waitingTime?: Distribution; resourceId?: string;resourceIds?:string[];requiredSkills?:string[];routingRule?:'fixed'|'least_queue'|'round_robin';priority?:number;valueAdded: boolean };
 export type Scenario = {
@@ -25,6 +25,9 @@ export type SimulationResult = {
 export type StoredScenario = { id:string;name:string;bpmnXml:string;configuration:Omit<Scenario,'name'|'bpmnXml'>;currentVersion:number;createdAt:string;updatedAt:string };
 export type ScenarioVersion = { id:string;scenarioId:string;version:number;name:string;createdAt:string };
 export type ScenarioPackage = { format:'bpmngo-simulation-scenario/v1';exportedAt:string;scenario:Scenario };
+export type CalibrationRequest = { processDefinitionKey:string;startedAfter?:string;startedBefore?:string;minimumSamples?:number;apply?:boolean };
+export type ActivityCalibration = { elementId:string;elementName?:string;samples:number;meanProcessingMinutes:number;processingStdDevMinutes:number;meanWaitingMinutes:number;medianTotalMinutes:number;p95TotalMinutes:number;method:string };
+export type CalibrationResult = { processDefinitionKey:string;instanceSamples:number;observationStart?:string;observationEnd?:string;arrivalRatePerHour:number;suggestedArrivals?:ArrivalPattern;activities:Record<string,ActivityCalibration>;warnings?:string[];applied:boolean;scenarioVersion?:number };
 export type CapacitySweepRequest = { resourceId:string;minimumCapacity:number;maximumCapacity:number;step:number;targetMeanCycleMinutes?:number;targetP95CycleMinutes?:number };
 export type CapacitySweepResult = { scenarioName:string;resourceId:string;recommendedCapacity?:number;points:Array<{capacity:number;meanCycleMinutes:number;p95CycleMinutes:number;throughputPerHour:number;meanCost:number;utilization:number;meanQueueLength:number;maximumQueueSize:number;meetsTarget:boolean}> };
 export type ExperimentDimension = { path:string;values:number[] };
@@ -37,12 +40,14 @@ export async function analyzeScenario(scenario: Scenario) { return (await apiCli
 export async function simulateScenario(scenario: Scenario) { return (await apiClient.post<SimulationResult>('/engine-rest/simulation/simulate', scenario)).data; }
 export async function calculateStaffing(input:{arrivalRatePerHour:number;serviceTimeHours:number;targetWaitingHours:number;maxServers:number}) { return (await apiClient.post<StaffingResult>('/engine-rest/simulation/staffing',input)).data; }
 export async function listScenarios() { return (await apiClient.get<StoredScenario[]>('/engine-rest/simulation/scenarios')).data; }
+export async function getStoredScenario(id:string) { return (await apiClient.get<StoredScenario>(`/engine-rest/simulation/scenarios/${id}`)).data; }
 export async function createScenario(scenario:Scenario) { return (await apiClient.post<StoredScenario>('/engine-rest/simulation/scenarios',scenario)).data; }
 export async function updateScenario(id:string,scenario:Scenario) { return (await apiClient.put<StoredScenario>(`/engine-rest/simulation/scenarios/${id}`,scenario)).data; }
 export async function listScenarioVersions(id:string) { return (await apiClient.get<ScenarioVersion[]>(`/engine-rest/simulation/scenarios/${id}/versions`)).data; }
 export async function restoreScenarioVersion(id:string,version:number) { return (await apiClient.post<StoredScenario>(`/engine-rest/simulation/scenarios/${id}/versions/${version}/restore`)).data; }
 export async function exportScenario(id:string) { return (await apiClient.get<ScenarioPackage>(`/engine-rest/simulation/scenarios/${id}/export`)).data; }
 export async function importScenario(input:ScenarioPackage) { return (await apiClient.post<StoredScenario>('/engine-rest/simulation/scenarios/import',input)).data; }
+export async function calibrateScenario(id:string,input:CalibrationRequest) { return (await apiClient.post<CalibrationResult>(`/engine-rest/simulation/scenarios/${id}/calibration`,input)).data; }
 export async function runStoredScenario(id:string) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/runs`)).data; }
 export async function runCapacitySweep(id:string,input:CapacitySweepRequest) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/capacity-sweeps`,input)).data; }
 export async function runExperiment(id:string,input:ExperimentRequest) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/experiments`,input)).data; }

@@ -34,6 +34,7 @@ func validateArrivalPattern(s Scenario) error {
 		segments := append([]ArrivalSegment(nil), pattern.Segments...)
 		sort.Slice(segments, func(i, j int) bool { return segments[i].StartMinute < segments[j].StartMinute })
 		lastEnd := -1.0
+		totalRate := 0.0
 		for _, segment := range segments {
 			if segment.StartMinute < 0 || segment.EndMinute <= segment.StartMinute || segment.RatePerHour < 0 {
 				return fmt.Errorf("invalid arrival segment %.2f..%.2f at rate %.2f", segment.StartMinute, segment.EndMinute, segment.RatePerHour)
@@ -42,6 +43,16 @@ func validateArrivalPattern(s Scenario) error {
 				return fmt.Errorf("arrival segments must not overlap")
 			}
 			lastEnd = segment.EndMinute
+			totalRate += segment.RatePerHour
+			if pattern.RepeatMinutes > 0 && segment.EndMinute > pattern.RepeatMinutes {
+				return fmt.Errorf("arrival segment ending at %.2f exceeds repeatMinutes %.2f", segment.EndMinute, pattern.RepeatMinutes)
+			}
+		}
+		if pattern.RepeatMinutes < 0 {
+			return fmt.Errorf("repeatMinutes must be non-negative")
+		}
+		if totalRate <= 0 {
+			return fmt.Errorf("piecewise_poisson requires at least one positive segment rate")
 		}
 	case "scheduled":
 		if len(pattern.ScheduledMinutes) == 0 {
@@ -63,7 +74,7 @@ func hasFiniteArrivalPattern(s Scenario) bool {
 		return false
 	}
 	typeName := strings.ToLower(s.ArrivalPattern.Type)
-	return typeName == "scheduled" || typeName == "piecewise_poisson"
+	return typeName == "scheduled" || (typeName == "piecewise_poisson" && s.ArrivalPattern.RepeatMinutes <= 0)
 }
 
 func arrivalEstimate(s Scenario) float64 {
@@ -85,17 +96,7 @@ func arrivalEstimate(s Scenario) float64 {
 		}
 		return s.DurationHours * rate * float64(pattern.BatchSize)
 	case "piecewise_poisson":
-		total := 0.0
-		for _, segment := range pattern.Segments {
-			end := segment.EndMinute
-			if s.DurationHours > 0 && end > s.DurationHours*60 {
-				end = s.DurationHours * 60
-			}
-			if end > segment.StartMinute {
-				total += (end - segment.StartMinute) / 60 * segment.RatePerHour
-			}
-		}
-		return total
+		return expectedPiecewiseArrivals(pattern, s.DurationHours*60)
 	case "scheduled":
 		return float64(len(pattern.ScheduledMinutes))
 	default:
@@ -150,13 +151,19 @@ func scheduleArrivals(s Scenario, rng *rand.Rand) []float64 {
 	case "piecewise_poisson":
 		segments := append([]ArrivalSegment(nil), s.ArrivalPattern.Segments...)
 		sort.Slice(segments, func(i, j int) bool { return segments[i].StartMinute < segments[j].StartMinute })
-		for _, segment := range segments {
-			end := segment.EndMinute
-			if horizon > 0 && end > horizon {
-				end = horizon
+		repeat := s.ArrivalPattern.RepeatMinutes
+		for offset := 0.0; ; offset += repeat {
+			for _, segment := range segments {
+				start, end := offset+segment.StartMinute, offset+segment.EndMinute
+				if horizon > 0 && end > horizon {
+					end = horizon
+				}
+				if end > start {
+					poisson(start, end, segment.RatePerHour, 1)
+				}
 			}
-			if end > segment.StartMinute {
-				poisson(segment.StartMinute, end, segment.RatePerHour, 1)
+			if repeat <= 0 || (horizon > 0 && offset+repeat >= horizon) || (horizon <= 0 && limit <= 0) || (limit > 0 && len(arrivals) >= limit) {
+				break
 			}
 		}
 	case "batch_poisson":
@@ -173,4 +180,27 @@ func scheduleArrivals(s Scenario, rng *rand.Rand) []float64 {
 		poisson(0, horizon, rate, 1)
 	}
 	return arrivals
+}
+
+func expectedPiecewiseArrivals(pattern *ArrivalPattern, horizon float64) float64 {
+	if pattern == nil {
+		return 0
+	}
+	total := 0.0
+	repeat := pattern.RepeatMinutes
+	for offset := 0.0; ; offset += repeat {
+		for _, segment := range pattern.Segments {
+			start, end := offset+segment.StartMinute, offset+segment.EndMinute
+			if horizon > 0 && end > horizon {
+				end = horizon
+			}
+			if end > start {
+				total += (end - start) / 60 * segment.RatePerHour
+			}
+		}
+		if repeat <= 0 || horizon <= 0 || offset+repeat >= horizon {
+			break
+		}
+	}
+	return total
 }

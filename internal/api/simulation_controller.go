@@ -130,6 +130,22 @@ func (ctrl *SimulationController) ImportScenario(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(row)
 }
 
+func (ctrl *SimulationController) CalibrateScenario(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return badRequest(c, err)
+	}
+	var request simulation.CalibrationRequest
+	if err = c.BodyParser(&request); err != nil {
+		return badRequest(c, err)
+	}
+	result, err := ctrl.service.CalibrateScenario(id, currentUserID(c), common.GetTenantId(c), request)
+	if err != nil {
+		return mutationError(c, err)
+	}
+	return c.JSON(result)
+}
+
 func (ctrl *SimulationController) DeleteScenario(c *fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {

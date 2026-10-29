@@ -360,7 +360,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 			delete(cases[caseID].joins, frame.groupID)
 			frames = frames[:len(frames)-1]
 		}
-		if node.IsEndEvent() || len(node.Outgoing) == 0 {
+		if (node.IsEndEvent() && node.ParentScope == "") || len(node.Outgoing) == 0 {
 			if len(frames) > 0 {
 				return fmt.Errorf("token reached end before structured join %q", frames[len(frames)-1].joinID)
 			}
@@ -418,7 +418,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 				err = release(e.resourceID, e.at)
 			}
 			if err == nil {
-				err = route(c, c.graph.Nodes[e.nodeID], e.caseID, e.at, rng, e.frames, push, &nextGroupID, cases)
+				err = routeAfterActivity(c, c.graph.Nodes[e.nodeID], e.caseID, e.at, rng, e.frames, push, &nextGroupID, cases)
 			}
 		case eventResourceWake:
 			resources[e.resourceID].wakeAt = 0
@@ -488,6 +488,23 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 		}
 	}
 	return m, nil
+}
+
+func routeAfterActivity(c *compiledScenario, node *engine.Node, caseID int, at float64, rng *rand.Rand, frames []syncFrame, push func(simEvent), nextGroupID *int64, cases map[int]*caseState) error {
+	events := c.boundaries[node.ID]
+	if len(events) > 0 {
+		draw, cumulative := rng.Float64(), 0.0
+		for _, event := range events {
+			for _, flow := range event.Outgoing {
+				cumulative += c.scenario.Flows[flow.ID].Probability
+				if draw <= cumulative {
+					push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: flow.TargetRef, frames: frames})
+					return nil
+				}
+			}
+		}
+	}
+	return route(c, node, caseID, at, rng, frames, push, nextGroupID, cases)
 }
 
 func route(c *compiledScenario, node *engine.Node, caseID int, at float64, rng *rand.Rand, frames []syncFrame, push func(simEvent), nextGroupID *int64, cases map[int]*caseState) error {

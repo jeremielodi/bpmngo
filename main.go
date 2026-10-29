@@ -774,6 +774,7 @@ func main() {
 	app.Get("/engine-rest/simulation/scenarios/:id/export", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ExportScenario)
 	app.Get("/engine-rest/simulation/scenarios/:id/versions", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListScenarioVersions)
 	app.Post("/engine-rest/simulation/scenarios/:id/versions/:version/restore", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.RestoreScenarioVersion)
+	app.Post("/engine-rest/simulation/scenarios/:id/calibration", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.CalibrateScenario)
 	app.Post("/engine-rest/simulation/scenarios/:id/runs", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunScenario)
 	app.Post("/engine-rest/simulation/scenarios/:id/capacity-sweeps", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunCapacitySweep)
 	app.Post("/engine-rest/simulation/scenarios/:id/experiments", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunExperiment)

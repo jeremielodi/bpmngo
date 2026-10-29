@@ -33,4 +33,19 @@ describe('configureScenarioFromBpmn', () => {
     expect(second.activities.review.processingTime.value).toBe(42);
     expect(second.flows.yes.probability).toBe(0.8);
   });
+
+  it('discovers nested activities, event races, boundaries and atomic calls', () => {
+    const advanced = `<?xml version="1.0"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"><process id="advanced">
+      <startEvent id="start"/><subProcess id="embedded"><startEvent id="inner_start"/><userTask id="inner_work"/><endEvent id="inner_end"/></subProcess>
+      <eventBasedGateway id="race"/><receiveTask id="reply"/><receiveTask id="timeout"/><callActivity id="external" calledElement="external-process"/><boundaryEvent id="failure" attachedToRef="external"/><endEvent id="end"/>
+      <sequenceFlow id="r1" sourceRef="race" targetRef="reply"/><sequenceFlow id="r2" sourceRef="race" targetRef="timeout"/><sequenceFlow id="failure_flow" sourceRef="failure" targetRef="end"/>
+    </process></definitions>`;
+    const { scenario } = configureScenarioFromBpmn(emptyScenario(), advanced);
+    expect(scenario.activities.embedded).toBeUndefined();
+    expect(scenario.activities.inner_work).toBeDefined();
+    expect(scenario.activities.external).toBeDefined();
+    expect(scenario.flows.r1.probability).toBe(0.5);
+    expect(scenario.flows.r2.probability).toBe(0.5);
+    expect(scenario.flows.failure_flow.probability).toBe(0.1);
+  });
 });
