@@ -147,7 +147,7 @@ services:
       FEEL_MODE: ${FEEL_MODE:-shadow}
     ports:
       - "${SERVER_PORT:-8080}:8080"
-      - "26500:26500" # gRPC gateway (Zeebe protocol subset — see internal/zeebegrpc)
+      - "${GRPC_PORT:-26500}:26500" # gRPC gateway (Zeebe protocol subset — see internal/zeebegrpc)
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
       interval: 30s

@@ -2,7 +2,6 @@ package v2
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
@@ -47,7 +46,7 @@ func (ic *IncidentController) SearchIncidents(c *fiber.Ctx) error {
 
 	f := repository.IncidentFilter{}
 	if req.Filter.ProcessInstanceKey != "" {
-		id, err := uuid.Parse(req.Filter.ProcessInstanceKey)
+		id, err := resolveInstanceKey(ic.db, req.Filter.ProcessInstanceKey)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"title": "INVALID_ARGUMENT", "detail": "invalid processInstanceKey",

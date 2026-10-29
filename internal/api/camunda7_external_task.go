@@ -60,10 +60,15 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 			break
 		}
 		// Woken as soon as a job of the first topic is created on any
-		// BpmnGo instance; the other topics at the next poll.
+		// BpmnGo instance; the other topics at the next poll, which never
+		// falls past the deadline.
+		poll := 500 * time.Millisecond
+		if remaining := time.Until(deadline); remaining < poll {
+			poll = remaining
+		}
 		select {
 		case <-wake:
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(poll):
 		}
 	}
 	for _, topicJob := range topicJobs {

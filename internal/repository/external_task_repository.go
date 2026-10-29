@@ -98,6 +98,13 @@ func (r *ExternalTaskRepository) FetchAndLockJobsTx(tx *sqlx.Tx, topics []TopicC
 			}
 			for i := range jobs {
 				jobs[i].CurrentElementID = elemByID[jobs[i].ExecutionID]
+				// The variables the activity sees now, not when the job was
+				// created: a retry sees what FailJob or SetVariables set.
+				if vars, err := VariablesForExecution(tx, jobs[i].ProcessInstanceID, jobs[i].ExecutionID); err == nil {
+					if payload, err := json.Marshal(vars); err == nil {
+						jobs[i].Payload = payload
+					}
+				}
 			}
 			if distributedClaims.Load() {
 				// Already locked, one by one, by claimJobsTx.

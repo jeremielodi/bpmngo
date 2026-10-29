@@ -236,6 +236,10 @@ func toString(v value) value {
 }
 
 func formatRat(r *big.Rat) string {
+	// A scale wider than the value needs: 12.50 stays "12.50".
+	if s := scaleOf(r); s > naturalScale(r) {
+		return r.FloatString(s)
+	}
 	if r.IsInt() {
 		return r.Num().String()
 	}

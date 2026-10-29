@@ -23,6 +23,9 @@ import (
 var (
 	ErrJobNotFound     = fmt.Errorf("job not found")
 	ErrJobInvalidState = fmt.Errorf("job is not in a lockable state")
+	// ErrJobFinished is the ErrJobInvalidState of a job already completed
+	// or cancelled: one that no longer exists, for Camunda 8.
+	ErrJobFinished = fmt.Errorf("%w (job no longer exists)", ErrJobInvalidState)
 )
 
 type CompleteJobResult struct {
@@ -61,6 +64,9 @@ func CompleteJob(db *sqlx.DB, jobID uuid.UUID, variables map[string]interface{})
 		return nil, ErrJobNotFound
 	}
 	if jobWithExec.Status != "locked" {
+		if jobWithExec.Status == "completed" || jobWithExec.Status == "cancelled" {
+			return nil, fmt.Errorf("%w: current status %s", ErrJobFinished, jobWithExec.Status)
+		}
 		return nil, fmt.Errorf("%w: current status %s", ErrJobInvalidState, jobWithExec.Status)
 	}
 
@@ -299,10 +305,14 @@ func FailJobWithBackoff(db *sqlx.DB, jobID uuid.UUID, retriesRemaining int, erro
 			result.PropagateError = true
 			result.ProcessInstanceID = jobCtx.ProcessInstanceID
 		} else if jobErr == nil && jobCtx != nil {
+			incidentType := models.IncidentJobNoRetries
+			if errorCode != "" {
+				incidentType = models.IncidentUnhandledErrorEvent // a BPMN error nothing caught
+			}
 			inc := &models.IncidentCreate{
 				ProcessInstanceID: jobCtx.ProcessInstanceID,
 				JobID:             &jobID,
-				IncidentType:      "failedExternalTask",
+				IncidentType:      incidentType,
 				ActivityID:        jobCtx.CurrentElementID,
 				ErrorMessage:      errorMessage,
 				ErrorCode:         errorCode,

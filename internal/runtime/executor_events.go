@@ -167,7 +167,7 @@ func (r *Runtime) executeErrorEnd(ctx context.Context, engineRepo *repository.En
 	}
 	if _, err := repository.NewIncidentRepository(r.DB).CreateIncidentTx(tx, &models.IncidentCreate{
 		ProcessInstanceID: exec.ProcessInstanceID,
-		IncidentType:      "unhandledErrorEvent",
+		IncidentType:      models.IncidentUnhandledErrorEvent,
 		ActivityID:        node.ID,
 		ErrorMessage:      fmt.Sprintf("BPMN error %q thrown by end event %s was not caught by any error boundary event", node.ErrorCode, node.ID),
 		ErrorCode:         node.ErrorCode,

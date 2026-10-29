@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/jeremielodi/bpmngo/internal/engine"
+	"github.com/jeremielodi/bpmngo/internal/models"
 )
 
 var (
@@ -325,7 +326,7 @@ func ResolveInclusiveBranches(node *engine.Node, variables map[string]interface{
 		}
 		ok, err := EvaluateCondition(condition, variables)
 		if err != nil {
-			return nil, fmt.Errorf("condition evaluation failed for flow %s: %w", flow.ID, err)
+			return nil, models.WithIncidentType(models.IncidentExtractValueError, fmt.Errorf("condition evaluation failed for flow %s: %w", flow.ID, err))
 		}
 		if ok {
 			active = append(active, flow)
@@ -335,7 +336,7 @@ func ResolveInclusiveBranches(node *engine.Node, variables map[string]interface{
 		active = append(active, *defaultFlow)
 	}
 	if len(active) == 0 {
-		return nil, fmt.Errorf("inclusive gateway %s: no condition matched", node.ID)
+		return nil, models.WithIncidentType(models.IncidentConditionError, fmt.Errorf("inclusive gateway %s: no condition matched", node.ID))
 	}
 	return active, nil
 }
@@ -383,7 +384,7 @@ func ResolveNext(node *engine.Node, variables map[string]interface{}) (string, e
 			}
 			ok, err := EvaluateCondition(condition, variables)
 			if err != nil {
-				return "", fmt.Errorf("condition evaluation failed for flow %s: %w", flow.ID, err)
+				return "", models.WithIncidentType(models.IncidentExtractValueError, fmt.Errorf("condition evaluation failed for flow %s: %w", flow.ID, err))
 			}
 			if ok {
 				return flow.TargetRef, nil
@@ -393,7 +394,7 @@ func ResolveNext(node *engine.Node, variables map[string]interface{}) (string, e
 		if defaultFlow != nil {
 			return defaultFlow.TargetRef, nil
 		}
-		return "", fmt.Errorf("no matching condition on exclusive gateway %s", node.ID)
+		return "", models.WithIncidentType(models.IncidentConditionError, fmt.Errorf("no matching condition on exclusive gateway %s", node.ID))
 	}
 
 	// For ParallelGateway, return first outgoing

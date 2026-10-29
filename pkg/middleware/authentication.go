@@ -2,9 +2,12 @@
 package middleware
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jeremielodi/bpmngo/internal/models"
@@ -267,10 +270,56 @@ func UserFromBasicAuth(db *sqlx.DB, header string) *models.User {
 		return nil
 	}
 	hash, err := userRepo.GetPasswordHash(user.ID)
-	if err != nil || bcrypt.CompareHashAndPassword([]byte(hash.PasswordHash), []byte(password)) != nil {
+	if err != nil || !basicPasswordMatches(hash.PasswordHash, password) {
 		return nil
 	}
 	return &user
+}
+
+// basicVerified remembers, for basicVerifiedTTL, the (stored hash, password)
+// pairs bcrypt already accepted: a Basic client sends its password on every
+// call, and bcrypt at the default cost takes ~60 ms each time. Keyed on the
+// stored hash too, so a password change misses the cache at once; the user
+// lookup itself is never cached, so deactivation applies at once as well.
+var (
+	basicVerifiedMu sync.Mutex
+	basicVerified   = map[[32]byte]time.Time{}
+)
+
+const (
+	basicVerifiedTTL = 5 * time.Minute
+	basicVerifiedMax = 10000
+)
+
+func basicPasswordMatches(storedHash, password string) bool {
+	key := sha256.Sum256([]byte(storedHash + "\x00" + password))
+	now := time.Now()
+
+	basicVerifiedMu.Lock()
+	expires, ok := basicVerified[key]
+	basicVerifiedMu.Unlock()
+	if ok && now.Before(expires) {
+		return true
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password)) != nil {
+		return false
+	}
+
+	basicVerifiedMu.Lock()
+	if len(basicVerified) >= basicVerifiedMax {
+		for k, exp := range basicVerified {
+			if !now.Before(exp) {
+				delete(basicVerified, k)
+			}
+		}
+		if len(basicVerified) >= basicVerifiedMax {
+			basicVerified = map[[32]byte]time.Time{}
+		}
+	}
+	basicVerified[key] = now.Add(basicVerifiedTTL)
+	basicVerifiedMu.Unlock()
+	return true
 }
 
 // CombinedAuthMiddleware handles both JWT and Basic Auth, plus OIDC bearer

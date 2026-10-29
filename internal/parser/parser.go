@@ -191,6 +191,7 @@ type BoundaryErrorEvent struct {
 	AttachedToRef  string
 	CancelActivity bool
 	ErrorCode      string
+	IoMapping      *ZeebeIoMapping
 }
 
 type MessageDefinition struct {
@@ -470,6 +471,15 @@ type BoundaryEvent struct {
 
 	ConditionalEventDefinition *ConditionalEventDefinition `xml:"conditionalEventDefinition"`
 	CompensateEventDefinition  *CompensateEventDefinition  `xml:"compensateEventDefinition"`
+
+	Ext *ExtensionElements `xml:"extensionElements"` // zeebe:ioMapping (an error boundary's output mappings)
+}
+
+func (b BoundaryEvent) ioMapping() *ZeebeIoMapping {
+	if b.Ext == nil {
+		return nil
+	}
+	return b.Ext.ZeebeIoMapping
 }
 
 type BoundaryMessageEvent struct {
@@ -792,6 +802,7 @@ func PopulateErrorBoundaryEvents(defs *Definitions) {
 				AttachedToRef:  event.AttachedToRef,
 				CancelActivity: event.Interrupting(),
 				ErrorCode:      errorCode,
+				IoMapping:      event.ioMapping(),
 			})
 		}
 	}

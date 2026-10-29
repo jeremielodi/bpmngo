@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -80,9 +81,14 @@ func StartJobWakeListener(connStr string) (*pq.Listener, error) {
 			log.Printf("job wake listener: %v", err)
 		}
 	})
-	if err := listener.Listen(JobAvailableChannel); err != nil {
-		listener.Close()
-		return nil, err
+	// The same connection carries InstanceFinishedChannel (see
+	// instance_notifier.go) and TimerArmedChannel (timer_notifier.go), with
+	// the same fallback-poll safety net.
+	for _, channel := range []string{JobAvailableChannel, InstanceFinishedChannel, TimerArmedChannel} {
+		if err := listener.Listen(channel); err != nil {
+			listener.Close()
+			return nil, err
+		}
 	}
 
 	go func() {
@@ -92,7 +98,16 @@ func StartJobWakeListener(connStr string) (*pq.Listener, error) {
 				// poll interval covers anything missed during the gap.
 				continue
 			}
-			wakeLocal(n.Extra)
+			switch n.Channel {
+			case InstanceFinishedChannel:
+				if id, err := uuid.Parse(n.Extra); err == nil {
+					wakeInstance(id)
+				}
+			case TimerArmedChannel:
+				wakeTimers()
+			default:
+				wakeLocal(n.Extra)
+			}
 		}
 	}()
 

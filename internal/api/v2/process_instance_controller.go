@@ -7,9 +7,12 @@
 package v2
 
 import (
+	"sort"
 	"strings"
+	"time"
 
 	"errors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/events"
@@ -129,7 +132,7 @@ func (pc *ProcessInstanceController) CreateProcessInstance(c *fiber.Ctx) error {
 
 // GetProcessInstance handles GET /v2/process-instances/:id.
 func (pc *ProcessInstanceController) GetProcessInstance(c *fiber.Ctx) error {
-	instanceID, err := uuid.Parse(c.Params("id"))
+	instanceID, err := resolveInstanceKey(pc.db, c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"title":  "INVALID_ARGUMENT",
@@ -181,6 +184,9 @@ type SearchProcessInstancesRequest struct {
 		ProcessDefinitionId string `json:"processDefinitionId"`
 		State               string `json:"state"`
 	} `json:"filter"`
+	Page struct {
+		Limit int `json:"limit"`
+	} `json:"page"`
 }
 
 // SearchProcessInstances handles POST /v2/process-instances/search.
@@ -201,18 +207,33 @@ func (pc *ProcessInstanceController) SearchProcessInstances(c *fiber.Ctx) error 
 		status = "suspended"
 	}
 
-	instances, err := pc.processInstanceRepo.FindAll(status, req.Filter.ProcessDefinitionId, common.GetTenantId(c))
+	// One page, newest first, as Camunda (100 by default).
+	limit := req.Page.Limit
+	if limit <= 0 {
+		limit = 100
+	} else if limit > 10000 {
+		limit = 10000
+	}
+	tenant := common.GetTenantId(c)
+
+	instances, err := pc.processInstanceRepo.FindAllLimit(status, req.Filter.ProcessDefinitionId, tenant, "", limit)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "INTERNAL_ERROR", "detail": err.Error()})
 	}
 
+	// One permission check per process, not per instance.
 	userID, userErr := uuid.Parse(common.GetUserUuid(c))
+	viewable := map[string]bool{}
 	canView := func(processKey string) bool {
 		if userErr != nil {
 			return true
 		}
+		if ok, seen := viewable[processKey]; seen {
+			return ok
+		}
 		allowed, permErr := service.CanAccessProcess(pc.db, userID, processKey, "VIEW")
-		return permErr != nil || allowed
+		viewable[processKey] = permErr != nil || allowed
+		return viewable[processKey]
 	}
 
 	items := make([]fiber.Map, 0, len(instances))
@@ -232,6 +253,8 @@ func (pc *ProcessInstanceController) SearchProcessInstances(c *fiber.Ctx) error 
 		historicRows, histErr := archiveRepo.FindAllProcessInstances(repository.HistoricProcessInstanceFilter{
 			ProcessKey: req.Filter.ProcessDefinitionId,
 			State:      status,
+			TenantID:   tenant,
+			Limit:      limit,
 		})
 		if histErr == nil {
 			for _, h := range historicRows {
@@ -252,6 +275,15 @@ func (pc *ProcessInstanceController) SearchProcessInstances(c *fiber.Ctx) error 
 				items = append(items, toV2ProcessInstance(&hi))
 			}
 		}
+		// Live and historic, newest first, one page.
+		sort.SliceStable(items, func(i, j int) bool {
+			a, _ := items[i]["startDate"].(time.Time)
+			b, _ := items[j]["startDate"].(time.Time)
+			return a.After(b)
+		})
+		if len(items) > limit {
+			items = items[:limit]
+		}
 	}
 
 	return c.JSON(fiber.Map{"items": items})
@@ -271,7 +303,7 @@ type ModifyProcessInstanceRequest struct {
 // to it) and creating a fresh one at the target, preserving process
 // variables (see internal/runtime/modification.go).
 func (pc *ProcessInstanceController) ModifyProcessInstance(c *fiber.Ctx) error {
-	instanceID, err := uuid.Parse(c.Params("id"))
+	instanceID, err := resolveInstanceKey(pc.db, c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"title": "INVALID_ARGUMENT", "detail": "invalid process instance key",
@@ -331,7 +363,7 @@ type StepBackRequest struct {
 // before (see internal/runtime/step_back.go). Variables are kept as they
 // are; the element is run again, with a new task or job.
 func (pc *ProcessInstanceController) StepBack(c *fiber.Ctx) error {
-	instanceID, err := uuid.Parse(c.Params("id"))
+	instanceID, err := resolveInstanceKey(pc.db, c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"title": "INVALID_ARGUMENT", "detail": "invalid process instance key",

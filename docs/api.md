@@ -423,7 +423,8 @@ POST   /v2/incidents/:id/resolution
 |---|---|---|
 | `processInstanceId` | UUID | One instance (`400` if not a UUID). |
 | `state` | `open` \| `resolved` \| `deleted` | Incident state. |
-| `incidentType` | `failedExternalTask` \| `executionError` \| `unhandledErrorEvent` | What raised it: a job out of retries, an element that failed to run (condition, script, input…), or a BPMN error nobody caught. |
+| `incidentType` | `failedExternalTask` \| `executionError` \| `unhandledErrorEvent` | What raised it, in the Camunda 7 era names: a job (out of retries, or whose BPMN error nothing caught), an element that failed to run (condition, script, input…), or a BPMN error thrown by an event that nothing caught. |
+| `errorType` | Camunda 8 type | The precise type, as in the `/v2` incident search. Each incident in the answer carries both `incidentType` and `errorType`. |
 | `activityId` | string | BPMN element ID where it happened. |
 
 ```http
@@ -540,7 +541,7 @@ POST /v2/signals/broadcast
 POST /v2/decisions/:key/evaluation            (DMN, no process instance needed)
 GET  /v2/forms/:formKey
 
-POST /v2/flownode-instances/search
+POST /v2/element-instances/search      (also under its pre-8.8 name /v2/flownode-instances/search)
 POST /v2/incidents/search
 POST /v2/variables/search
 
@@ -549,7 +550,9 @@ GET  /v2/topology
 
 ### Search filters
 
-Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. BpmnGo supports the filter fields below; Camunda 8's other filter fields, `sort` and `page` are not supported yet and are ignored, so a search returns every match. An empty body means no filter.
+Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. BpmnGo supports the filter fields below; Camunda 8's other filter fields and `sort` are not supported yet and are ignored. `page.limit` is read by the process-instance search (default 100, newest first, at most 10000) and the element-instance search without a filter (default 100); the other searches return every match. An empty body means no filter.
+
+A `processInstanceKey` (in a filter or in a path such as `/v2/process-instances/:key`) is either the UUID this API returns or the int64 key the gRPC gateway returns, so an instance started over gRPC can be followed over REST. An int64 key nothing was issued for finds nothing (`404` on a lookup).
 
 **`POST /v2/process-instances/search`** — live and archived instances.
 
@@ -562,7 +565,7 @@ Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. Bpm
 
 | Field | Type | Effect |
 |---|---|---|
-| `processInstanceKey` | UUID | One instance. Tasks of an instance that is already archived are found too (except together with `candidateGroup`). |
+| `processInstanceKey` | key | One instance. Tasks of an instance that is already archived are found too (except together with `candidateGroup`). |
 | `elementId` | string | BPMN element ID of the user task. |
 | `assignee` | string | Exact assignee. |
 | `candidateGroup` | string | Offered to this group. |
@@ -573,22 +576,22 @@ Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. Bpm
 
 | Field | Type | Effect |
 |---|---|---|
-| `processInstanceKey` | UUID | One instance (`400` if not a UUID). |
+| `processInstanceKey` | key | One instance (`400` if neither a UUID nor an int64). |
 | `state` | `ACTIVE` \| `RESOLVED` \| `DELETED` | Incident state. |
-| `errorType` | `failedExternalTask` \| `executionError` \| `unhandledErrorEvent` | BpmnGo's incident type (not Camunda 8's `JOB_NO_RETRIES` names). |
+| `errorType` | `JOB_NO_RETRIES` \| `UNHANDLED_ERROR_EVENT` \| `CONDITION_ERROR` \| `EXTRACT_VALUE_ERROR` \| `IO_MAPPING_ERROR` \| `CALLED_ELEMENT_ERROR` \| `CALLED_DECISION_ERROR` \| `DECISION_EVALUATION_ERROR` \| `UNKNOWN` | Camunda 8's incident type: a job out of retries; a BPMN error nothing caught; no outgoing flow's condition true and no default flow; an expression that couldn't be evaluated (a condition on a missing variable, a multi-instance input that isn't a list, a script); an input mapping; a call activity's process; a business rule task's decision, or its evaluation. Incidents raised before migration 007 that it couldn't classify are `UNKNOWN`. |
 | `elementId` | string | BPMN element ID. |
 
-**`POST /v2/flownode-instances/search`**
+**`POST /v2/element-instances/search`** (or `/v2/flownode-instances/search`)
 
 | Field | Type | Effect |
 |---|---|---|
-| `processInstanceKey` | UUID | **Required.** Every token of the instance, `ACTIVE` or not. |
+| `processInstanceKey` | key | Every element instance of the instance, `ACTIVE` or not; for an archived instance, rebuilt from its history. Without it, the most recent element instances of running instances (`page.limit`, default 100). |
 
 **`POST /v2/variables/search`**
 
 | Field | Type | Effect |
 |---|---|---|
-| `processInstanceKey` | UUID | **Required.** Instance-level variables of the instance. |
+| `processInstanceKey` | key | **Required.** Instance-level variables of the instance, archived or not. |
 | `name` | string | One variable. |
 
 **`POST /v2/jobs/activation`** is not a search, but takes these fields: `type` (required), `worker`, `timeout` (lock, ms), `maxJobsToActivate` (default 10).
@@ -596,7 +599,7 @@ Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. Bpm
 ```http
 POST /v2/process-instances/search   { "filter": { "processDefinitionId": "invoice", "state": "ACTIVE" } }
 POST /v2/user-tasks/search          { "filter": { "candidateGroup": "managers", "state": "CREATED" } }
-POST /v2/incidents/search           { "filter": { "state": "ACTIVE", "errorType": "failedExternalTask" } }
+POST /v2/incidents/search           { "filter": { "state": "ACTIVE", "errorType": "JOB_NO_RETRIES" } }
 ```
 
 ### Previous step

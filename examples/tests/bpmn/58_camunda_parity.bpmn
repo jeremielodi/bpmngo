@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="defs_58" targetNamespace="http://bpmngo.io/tests">
+
+  <bpmn:error id="Err_plain" errorCode="PLAIN"/>
+  <bpmn:error id="Err_mapped" errorCode="MAPPED"/>
+
+  <!-- One service task: FailJob variables, cancelled job, keys across APIs. -->
+  <bpmn:process id="p58_work" isExecutable="true">
+    <bpmn:startEvent id="w_start"/>
+    <bpmn:sequenceFlow id="w_f1" sourceRef="w_start" targetRef="w_task"/>
+    <bpmn:serviceTask id="w_task"><bpmn:extensionElements><zeebe:taskDefinition type="p58-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="w_f2" sourceRef="w_task" targetRef="w_end"/>
+    <bpmn:endEvent id="w_end"/>
+  </bpmn:process>
+
+  <!-- ThrowError variables: dropped by a boundary without output mappings,
+       carried on by one with. -->
+  <bpmn:process id="p58_error" isExecutable="true">
+    <bpmn:startEvent id="e_start"/>
+    <bpmn:sequenceFlow id="e_f1" sourceRef="e_start" targetRef="e_pay"/>
+    <bpmn:serviceTask id="e_pay"><bpmn:extensionElements><zeebe:taskDefinition type="p58-pay"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="e_f2" sourceRef="e_pay" targetRef="e_end"/>
+    <bpmn:endEvent id="e_end"/>
+    <bpmn:boundaryEvent id="e_plain" attachedToRef="e_pay"><bpmn:errorEventDefinition errorRef="Err_plain"/></bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="e_mapped" attachedToRef="e_pay">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping><zeebe:output source="=declinedBy" target="reason"/></zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:errorEventDefinition errorRef="Err_mapped"/>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="e_f3" sourceRef="e_plain" targetRef="e_after"/>
+    <bpmn:sequenceFlow id="e_f4" sourceRef="e_mapped" targetRef="e_after"/>
+    <bpmn:serviceTask id="e_after"><bpmn:extensionElements><zeebe:taskDefinition type="p58-after-error"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="e_f5" sourceRef="e_after" targetRef="e_end2"/>
+    <bpmn:endEvent id="e_end2"/>
+  </bpmn:process>
+
+  <!-- Incident types: a gateway with no true condition and no default flow. -->
+  <bpmn:process id="p58_gw" isExecutable="true">
+    <bpmn:startEvent id="g_start"/>
+    <bpmn:sequenceFlow id="g_f1" sourceRef="g_start" targetRef="g_gw"/>
+    <bpmn:exclusiveGateway id="g_gw"/>
+    <bpmn:sequenceFlow id="g_big" sourceRef="g_gw" targetRef="g_end">
+      <bpmn:conditionExpression>=x &gt; 5</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:endEvent id="g_end"/>
+  </bpmn:process>
+
+  <!-- Multi-instance outputElement: each iteration's `result` stays local. -->
+  <bpmn:process id="p58_mi" isExecutable="true">
+    <bpmn:startEvent id="m_start"/>
+    <bpmn:sequenceFlow id="m_f1" sourceRef="m_start" targetRef="m_each"/>
+    <bpmn:serviceTask id="m_each">
+      <bpmn:extensionElements><zeebe:taskDefinition type="p58-each"/></bpmn:extensionElements>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=items" inputElement="item" outputCollection="results" outputElement="=result"/>
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="m_f2" sourceRef="m_each" targetRef="m_after"/>
+    <bpmn:serviceTask id="m_after"><bpmn:extensionElements><zeebe:taskDefinition type="p58-after-mi"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="m_f3" sourceRef="m_after" targetRef="m_end"/>
+    <bpmn:endEvent id="m_end"/>
+  </bpmn:process>
+</bpmn:definitions>

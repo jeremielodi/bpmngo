@@ -103,9 +103,24 @@ func TestEvaluate(t *testing.T) {
 		{`modulo(-5, 3)`, 1.0},
 		{`abs(-3)`, 3.0},
 		{`number("12.5") + 1`, 13.5},
-		{`string(12.50)`, "12.5"},
+		// A number keeps its scale, as a Java BigDecimal.
+		{`string(12.50)`, "12.50"},
+		{`string(12.5)`, "12.5"},
+		{`string(12)`, "12"},
+		{`string(1.10 + 1)`, "2.10"},
+		{`string(1.5 * 2)`, "3.0"},
+		{`string(0.10 - 0.1)`, "0.00"},
+		{`string(10 / 4)`, "2.5"},
+		{`string(decimal(1.5, 2))`, "1.50"},
+		{`string(decimal(1/3, 2))`, "0.33"},
+		{`string(1.5)`, "1.5"},
+		{`12.50 = 12.5`, true},
+		{`string(12.50) + " EUR"`, "12.50 EUR"},
 		{`is defined(missing)`, false},
 		{`get value({a: 1}, "a")`, 1.0},
+		{`context put({a: 1}, "b", 2)`, map[string]interface{}{"a": 1.0, "b": 2.0}},
+		{`context put({a: {x: 1}}, ["a", "y"], 2)`, map[string]interface{}{"a": map[string]interface{}{"x": 1.0, "y": 2.0}}},
+		{`context merge([{a: 1, b: 1}, {b: 2}])`, map[string]interface{}{"a": 1.0, "b": 2.0}},
 		// temporal
 		{`date("2024-01-31") + duration("P1D")`, "2024-02-01"},
 		{`date("2024-03-01") > date("2024-02-28")`, true},
@@ -113,6 +128,11 @@ func TestEvaluate(t *testing.T) {
 		{`string(duration("PT90M"))`, "PT1H30M"},
 		{`date("2024-03-01") - date("2024-02-01") = duration("P29D")`, true},
 		{`@"2024-05-01" + duration("P1M")`, "2024-06-01"},
+		// A day the target month lacks becomes its last day.
+		{`date("2024-01-31") + duration("P1M")`, "2024-02-29"},
+		{`date("2023-01-31") + duration("P1M")`, "2023-02-28"},
+		{`date("2024-03-31") - duration("P1M")`, "2024-02-29"},
+		{`date("2024-02-29") + duration("P1Y")`, "2025-02-28"},
 	}
 	for _, c := range cases {
 		got, err := Evaluate(c.expr, testVars)

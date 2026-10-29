@@ -8,6 +8,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
@@ -37,7 +38,7 @@ func (r *Runtime) executeSubProcess(ctx context.Context, engineRepo *repository.
 	// Input mappings are the sub-process scope's local variables.
 	if inputs := common.EvaluateIOMappings(node.InputMappings, variables); len(inputs) > 0 {
 		if err := repository.SetLocalVariablesTx(tx, exec.ProcessInstanceID, exec.ID, inputs); err != nil {
-			return fmt.Errorf("sub-process %s: input mappings: %w", node.ID, err)
+			return models.WithIncidentType(models.IncidentIOMappingError, fmt.Errorf("sub-process %s: input mappings: %w", node.ID, err))
 		}
 	}
 

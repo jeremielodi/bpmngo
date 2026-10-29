@@ -35,7 +35,8 @@ vérification.
 
 Dans l'ordre, après la baseline, chacune une seule fois (elles sont
 idempotentes : une exécution en double ne casse rien). Toutes ajoutent
-sans rien modifier aux données existantes.
+sans rien modifier aux données existantes, sauf 007 qui renomme les types
+des incidents déjà enregistrés.
 
 | Version | Fichier | Ce qu'elle ajoute | Pour |
 |---|---|---|---|
@@ -45,6 +46,7 @@ sans rien modifier aux données existantes.
 | 004 | `004_variables_notify.sql` | fonction et triggers `goflow_notify_variables` | événements conditionnels réévalués à chaque écriture de variable |
 | 005 | `005_hot_path_indexes.sql` | index sur `jobs`, `timer_jobs`, `event_subscriptions`… | performance avec beaucoup d'instances vivantes |
 | 006 | `006_business_key.sql` | colonne `business_key` sur `process_instances` et `historic_process_instances` | business key des applications Camunda 7 |
+| 007 | `007_incident_types.sql` | renomme `incident_type` des incidents existants (live et archivés) en types Camunda 8 | types d'incident de Camunda 8 (`/v2`, gRPC) |
 
 Pour voir où en est une base :
 

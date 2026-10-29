@@ -62,23 +62,44 @@ func NewTimerScheduler(db *sqlx.DB, resumer func(ctx context.Context, execID uui
 	return s
 }
 
-// Start begins the timer scheduler poller
-func (s *TimerScheduler) Start(ctx context.Context) {
-	// Twice a second: a timer fires at most ~0.5 s late, and a cycle
-	// (each occurrence armed when the previous one fires) keeps up.
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
+// timerPollInterval is the longest the scheduler sleeps: a safety net for
+// a notify missed during a listener reconnect, and the pace at which a
+// timer that could not be handed over is retried.
+const timerPollInterval = 500 * time.Millisecond
 
+// Start runs the timer scheduler. It sleeps until the next timer is due —
+// woken early when a timer is armed on any BpmnGo instance (see
+// repository.NotifyTimerArmedTx) — so a timer fires within milliseconds of
+// its due time instead of up to a poll interval late.
+func (s *TimerScheduler) Start(ctx context.Context) {
 	log.Println("Timer scheduler started")
 
 	for {
+		wait := timerPollInterval
+		claimed, rearmed := s.processDueTimers(ctx)
+		if !rearmed {
+			if next, ok, err := s.engineRepo.NextTimerDueIn(ctx); err != nil {
+				log.Printf("Error reading the next timer: %v", err)
+			} else if ok && next > 0 && next < wait {
+				wait = next
+			} else if ok && next <= 0 && claimed > 0 {
+				// Due during the pass: go again at once. Due but not
+				// claimed (another instance holds it): the full interval.
+				wait = 0
+			}
+		}
+
+		sleep := time.NewTimer(wait)
 		select {
-		case <-ticker.C:
-			s.processDueTimers(ctx)
+		case <-sleep.C:
+		case <-repository.TimerWake():
+			sleep.Stop()
 		case <-s.stopChan:
+			sleep.Stop()
 			log.Println("Timer scheduler stopped")
 			return
 		case <-ctx.Done():
+			sleep.Stop()
 			log.Println("Timer scheduler context cancelled")
 			return
 		}
@@ -95,41 +116,47 @@ func (s *TimerScheduler) Stop() {
 // every instance, partitioned or not — it only flips timer_jobs.is_triggered,
 // never touches executions, so there's nothing here for Kafka partition
 // ownership to race against (see the design doc for the full reasoning).
-func (s *TimerScheduler) processDueTimers(ctx context.Context) {
+// It returns how many timers it claimed, and whether one of them could not
+// be handed over and is due again.
+func (s *TimerScheduler) processDueTimers(ctx context.Context) (claimed int, rearmed bool) {
 	const batch = 20
 	for {
 		timers, err := s.engineRepo.ClaimDueTimers(ctx, batch)
 		if err != nil {
 			log.Printf("Error claiming due timers: %v", err)
-			return
+			return claimed, false
 		}
+		claimed += len(timers)
 
 		for _, timer := range timers {
 			log.Printf("🔥 Processing timer %s (due_at: %s)", timer.ID, timer.DueAt)
-			s.triggerTimer(ctx, timer)
+			if s.triggerTimer(ctx, timer) {
+				rearmed = true
+			}
 		}
 		// A full batch: more may be due, don't wait for the next tick.
-		if len(timers) < batch || ctx.Err() != nil {
-			return
+		if len(timers) < batch || ctx.Err() != nil || rearmed {
+			return claimed, rearmed
 		}
 	}
 }
 
 // triggerTimer hands a claimed timer to whoever fires it: the owner of
 // its instance's partition (directly in direct mode), or, for a timer
-// start event, the start handler.
-func (s *TimerScheduler) triggerTimer(ctx context.Context, timer models.TimerJob) {
+// start event, the start handler. rearmed is true when the timer could not
+// be handed over and is due again.
+func (s *TimerScheduler) triggerTimer(ctx context.Context, timer models.TimerJob) (rearmed bool) {
 	log.Printf("Triggering timer %s for process instance %s", timer.ID, timer.ProcessInstanceID)
 
 	if timer.EventType == TimerStartEventType {
 		if s.startTimer == nil {
 			log.Printf("timer %s: no timer start handler set", timer.ID)
-			return
+			return false
 		}
 		if err := s.startTimer(ctx, timer); err != nil {
 			log.Printf("timer start %s: %v", timer.ID, err)
 		}
-		return
+		return false
 	}
 
 	if err := cmdbus.Post(ctx, cmdbus.Key(timer.ProcessInstanceID), CmdFireTimer, timer); err != nil {
@@ -138,9 +165,12 @@ func (s *TimerScheduler) triggerTimer(ctx context.Context, timer models.TimerJob
 			// Never reached its partition: claim it again on the next poll.
 			if _, uerr := s.db.Exec(`UPDATE public.timer_jobs SET is_triggered = false, triggered_at = NULL WHERE id = $1`, timer.ID); uerr != nil {
 				log.Printf("timer %s: re-arming after a failed send: %v", timer.ID, uerr)
+				return false
 			}
+			return true
 		}
 	}
+	return false
 }
 
 // fireTimer moves the timer's execution on, arms a cycle's next

@@ -11,6 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/jeremielodi/bpmngo/internal/cmdbus"
+	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
@@ -56,6 +57,9 @@ var cmds *commands
 func RegisterCommands(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, tasks *service.TaskService) {
 	cmds = &commands{db: db, dispatcher: dispatcher, tasks: tasks}
 
+	// Before job_invalid_state, which it also matches: the first code
+	// whose error matches is the one sent.
+	cmdbus.RegisterError("job_finished", service.ErrJobFinished)
 	for code, err := range map[string]error{
 		"job_not_found":             service.ErrJobNotFound,
 		"job_invalid_state":         service.ErrJobInvalidState,
@@ -245,11 +249,21 @@ type FailJobArgs struct {
 	ErrorCode        string    `json:"errorCode,omitempty"`
 	// Delay before a retried job can be fetched again, in milliseconds.
 	RetryBackoffMs int64 `json:"retryBackoffMs,omitempty"`
-	// Variables set on the instance before the failure (Camunda 8's
-	// ThrowError carries some).
+	// Variables set with the failure, where VariableScope says.
 	Variables map[string]interface{} `json:"variables,omitempty"`
-	Source    string                 `json:"source,omitempty"`
+	// VariableScope is "" (from the job's activity outwards, Camunda 7's
+	// handleBpmnError), VariablesOnTask (local to the job's activity,
+	// Camunda 8's FailJob: the retry sees them, the activity's end drops
+	// them) or VariablesOnCatchEvent (local to the event that catches the
+	// error, Camunda 8's ThrowError: only its output mappings carry them on).
+	VariableScope string `json:"variableScope,omitempty"`
+	Source        string `json:"source,omitempty"`
 }
+
+const (
+	VariablesOnTask       = "task"
+	VariablesOnCatchEvent = "catchEvent"
+)
 
 type FailJobOutcome struct {
 	PermanentlyFailed  bool `json:"permanentlyFailed"`
@@ -276,12 +290,19 @@ func (c *commands) failJob(ctx context.Context, a FailJobArgs) (FailJobOutcome, 
 			return out, c.resumeJobInstance(ctx, a.JobID)
 		}
 	}
-	if len(a.Variables) > 0 {
-		var instanceID uuid.UUID
-		if err := c.db.Get(&instanceID, `SELECT process_instance_id FROM public.jobs WHERE id = $1`, a.JobID); err != nil {
+	if len(a.Variables) > 0 && a.VariableScope != VariablesOnCatchEvent {
+		var job struct {
+			InstanceID  uuid.UUID `db:"process_instance_id"`
+			ExecutionID uuid.UUID `db:"execution_id"`
+		}
+		if err := c.db.Get(&job, `SELECT process_instance_id, execution_id FROM public.jobs WHERE id = $1`, a.JobID); err != nil {
 			return out, fmt.Errorf("%w: %s", service.ErrJobNotFound, a.JobID)
 		}
-		if err := c.mergeVariables(instanceID, uuid.Nil, false, a.Variables, a.Source); err != nil {
+		scope, local := uuid.Nil, false
+		if a.VariableScope == VariablesOnTask {
+			scope, local = job.ExecutionID, true
+		}
+		if err := c.mergeVariables(job.InstanceID, scope, local, a.Variables, a.Source); err != nil {
 			return out, err
 		}
 	}
@@ -293,6 +314,12 @@ func (c *commands) failJob(ctx context.Context, a FailJobArgs) (FailJobOutcome, 
 	switch {
 	case result.BoundaryTriggered:
 		out.BoundaryTriggered = true
+		if a.VariableScope == VariablesOnCatchEvent && len(a.Variables) > 0 {
+			if err := c.applyCatchEventVariables(result.Graph, result.ExecutionID, a.Variables, a.Source); err != nil {
+				out.ContinueError = err.Error()
+				return out, nil
+			}
+		}
 		if err := NewRuntime(result.Graph, c.db, c.dispatcher).ExecuteExecution(ctx, result.ExecutionID); err != nil {
 			out.ContinueError = err.Error()
 		}
@@ -426,6 +453,44 @@ func SetVariables(ctx context.Context, args SetVariablesArgs) error {
 
 func (c *commands) setVariables(ctx context.Context, a SetVariablesArgs) (struct{}, error) {
 	return struct{}{}, c.mergeVariables(a.InstanceID, a.ScopeID, a.Local, a.Variables, a.Source)
+}
+
+// applyCatchEventVariables sets a thrown error's variables, as Camunda 8
+// does, on the event that caught it (execID now stands on it): an error
+// boundary hands on only what its output mappings take from them, and drops
+// the rest; an error event sub-process passes them on from its scope
+// outwards, the enclosing scope included.
+func (c *commands) applyCatchEventVariables(graph *engine.ProcessGraph, execID uuid.UUID, vars map[string]interface{}, source string) error {
+	var exec struct {
+		InstanceID uuid.UUID `db:"process_instance_id"`
+		ElementID  string    `db:"current_element_id"`
+	}
+	if err := c.db.Get(&exec, `SELECT process_instance_id, current_element_id FROM public.executions WHERE id = $1`, execID); err != nil {
+		return err
+	}
+	node := graph.Nodes[exec.ElementID]
+	if node == nil {
+		return nil
+	}
+	if node.Type != engine.ErrorBoundaryEventType {
+		return c.mergeVariables(exec.InstanceID, execID, false, vars, source)
+	}
+	if len(node.OutputMappings) == 0 {
+		return nil
+	}
+	tx, err := c.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := service.ApplyActivityOutputTx(tx, exec.InstanceID, execID, node, vars); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	service.LogAuditErr("variables merged", service.NewAuditService(c.db).LogVariablesMerged(exec.InstanceID, vars, source))
+	return nil
 }
 
 func (c *commands) mergeVariables(instanceID, scopeID uuid.UUID, local bool, vars map[string]interface{}, source string) error {

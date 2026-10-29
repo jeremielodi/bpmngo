@@ -458,7 +458,7 @@ func (p *parser) primary() (node, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid number %q", t.text)
 		}
-		return &litNode{r}, nil
+		return &litNode{withScale(r, literalScale(t.text))}, nil
 	case tokString:
 		p.next()
 		return &litNode{t.text}, nil

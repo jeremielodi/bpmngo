@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
@@ -77,12 +79,12 @@ func multiInstanceItems(cfg *engine.MultiInstanceConfig, vars map[string]interfa
 		} else {
 			var err error
 			if v, err = feel.Evaluate(trimFEEL(coll), vars); err != nil {
-				return nil, 0, fmt.Errorf("input collection %q: %w", coll, err)
+				return nil, 0, models.WithIncidentType(models.IncidentExtractValueError, fmt.Errorf("input collection %q: %w", coll, err))
 			}
 		}
 		items, ok := v.([]interface{})
 		if !ok {
-			return nil, 0, fmt.Errorf("input collection %q is %v, not a list", coll, v)
+			return nil, 0, models.WithIncidentType(models.IncidentExtractValueError, fmt.Errorf("input collection %q is %v, not a list", coll, v))
 		}
 		return items, len(items), nil
 	}
@@ -187,6 +189,12 @@ func (r *Runtime) createInnerInstanceTx(tx *sqlx.Tx, engineRepo *repository.Engi
 		return uuid.Nil, fmt.Errorf("multi-instance %s: creating instance %d: %w", node.ID, i+1, err)
 	}
 	locals := map[string]interface{}{"loopCounter": i + 1}
+	// An outputElement that names a variable gets it, null, on each inner
+	// instance (as in Camunda 8): the value an iteration sets stays in that
+	// iteration instead of reaching the enclosing scope.
+	if name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(node.MultiInstance.OutputElement), "=")); variableName.MatchString(name) {
+		locals[name] = nil
+	}
 	var element interface{}
 	if items != nil {
 		element = items[i]
@@ -203,6 +211,9 @@ func (r *Runtime) createInnerInstanceTx(tx *sqlx.Tx, engineRepo *repository.Engi
 	}
 	return id, repository.SetLocalVariablesTx(tx, body.ProcessInstanceID, id, locals)
 }
+
+// variableName matches an expression that is just a variable reference.
+var variableName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // completeInnerInstance runs when an inner instance has left its activity.
 func (r *Runtime) completeInnerInstance(ctx context.Context, engineRepo *repository.EngineRepository, exec *repository.Execution, inner *innerInstance, graph *engine.ProcessGraph) error {

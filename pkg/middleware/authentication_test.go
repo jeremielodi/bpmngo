@@ -18,6 +18,7 @@ import (
 	"github.com/jeremielodi/bpmngo/pkg/authentication"
 	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const testSecret = "test-secret-test-secret-test-secret"
@@ -187,5 +188,30 @@ func TestCombinedAuth_Basic(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBasicPasswordMatches_Cache(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !basicPasswordMatches(string(hash), "secret") {
+		t.Fatal("right password refused")
+	}
+	// Second call is served by the cache.
+	if !basicPasswordMatches(string(hash), "secret") {
+		t.Fatal("cached password refused")
+	}
+	if basicPasswordMatches(string(hash), "wrong") {
+		t.Fatal("wrong password accepted")
+	}
+	// A changed password (a new stored hash) never hits the old entry.
+	newHash, err := bcrypt.GenerateFromPassword([]byte("other"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if basicPasswordMatches(string(newHash), "secret") {
+		t.Fatal("old password accepted after a password change")
 	}
 }

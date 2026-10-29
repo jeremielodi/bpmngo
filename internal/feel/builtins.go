@@ -460,7 +460,11 @@ func init() {
 			if !ok || !okS {
 				return nil, nil
 			}
-			return roundHalfEven(r, scale), nil
+			rounded := new(big.Rat).Set(roundHalfEven(r, scale))
+			if scale < 0 {
+				return rounded, nil
+			}
+			return withScale(rounded, scale), nil // decimal(1.5, 2) is 1.50
 		}},
 		"floor": {[]string{"n"}, numFn(func(r *big.Rat) value { return floorRat(r) })},
 		"ceiling": {[]string{"n"}, numFn(func(r *big.Rat) value {
@@ -504,6 +508,50 @@ func init() {
 			}
 			return ctx[k], nil
 		}},
+		// context put(context, key, value), or with a list of keys, a
+		// nested path: a copy of context with the entry added or replaced.
+		"context put": {[]string{"context", "key", "value"}, func(a []value) (value, error) {
+			ctx, ok := a[0].(map[string]value)
+			if !ok {
+				return nil, nil
+			}
+			var path []string
+			switch k := a[1].(type) {
+			case string:
+				path = []string{k}
+			case []value:
+				for _, e := range k {
+					s, ok := e.(string)
+					if !ok {
+						return nil, nil
+					}
+					path = append(path, s)
+				}
+			}
+			if len(path) == 0 {
+				return nil, nil
+			}
+			return contextPut(ctx, path, a[2]), nil
+		}},
+		// context merge(contexts): one context with every entry, later
+		// contexts winning.
+		"context merge": {[]string{"contexts"}, func(a []value) (value, error) {
+			list, ok := a[0].([]value)
+			if !ok {
+				return nil, nil
+			}
+			out := map[string]value{}
+			for _, e := range list {
+				ctx, ok := e.(map[string]value)
+				if !ok {
+					return nil, nil
+				}
+				for k, v := range ctx {
+					out[k] = v
+				}
+			}
+			return out, nil
+		}},
 		"get entries": {[]string{"m"}, func(a []value) (value, error) {
 			ctx, ok := a[0].(map[string]value)
 			if !ok {
@@ -527,6 +575,22 @@ func init() {
 			multiWordFunctions[name] = true
 		}
 	}
+}
+
+// contextPut returns a copy of ctx with path set to v, creating the nested
+// contexts the path goes through.
+func contextPut(ctx map[string]value, path []string, v value) map[string]value {
+	out := make(map[string]value, len(ctx)+1)
+	for k, e := range ctx {
+		out[k] = e
+	}
+	if len(path) == 1 {
+		out[path[0]] = v
+		return out
+	}
+	inner, _ := ctx[path[0]].(map[string]value)
+	out[path[0]] = contextPut(inner, path[1:], v)
+	return out
 }
 
 func regexFlags(a []value) string {

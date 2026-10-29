@@ -69,7 +69,10 @@ type IncidentFilter struct {
 	ProcessInstanceID *uuid.UUID
 	State             *string
 	IncidentType      *string
-	ActivityID        *string
+	// LegacyIncidentType filters by the Camunda 7 name the /engine-rest API
+	// shows (models.LegacyIncidentType).
+	LegacyIncidentType *string
+	ActivityID         *string
 }
 
 func (r *IncidentRepository) List(f IncidentFilter) ([]models.Incident, error) {
@@ -94,6 +97,20 @@ func (r *IncidentRepository) List(f IncidentFilter) ([]models.Incident, error) {
 		query += ` AND incident_type = $` + itoa(n)
 		args = append(args, *f.IncidentType)
 		n++
+	}
+	if f.LegacyIncidentType != nil {
+		switch *f.LegacyIncidentType {
+		case "failedExternalTask":
+			query += ` AND (incident_type = 'JOB_NO_RETRIES' OR (incident_type = 'UNHANDLED_ERROR_EVENT' AND job_id IS NOT NULL))`
+		case "unhandledErrorEvent":
+			query += ` AND incident_type = 'UNHANDLED_ERROR_EVENT' AND job_id IS NULL`
+		case "executionError":
+			query += ` AND incident_type NOT IN ('JOB_NO_RETRIES', 'UNHANDLED_ERROR_EVENT')`
+		default:
+			query += ` AND incident_type = $` + itoa(n)
+			args = append(args, *f.LegacyIncidentType)
+			n++
+		}
 	}
 	if f.ActivityID != nil {
 		query += ` AND activity_id = $` + itoa(n)

@@ -517,7 +517,7 @@ CREATE TABLE incidents (
     -- No FK on job_id (Citus phase 2): incidents becomes distributed while
     -- jobs stays local — see architecture/citus-distributed-storage-design.md.
     -- process_instance_id's cascade FK above still fully cleans up incidents.
-    incident_type TEXT NOT NULL,  -- failedExternalTask, failedJob
+    incident_type TEXT NOT NULL,  -- Camunda 8 type: JOB_NO_RETRIES, CONDITION_ERROR… (models/incident_type.go)
     activity_id TEXT NOT NULL,    -- BPMN element ID where failure occurred
     error_message TEXT NULL,
     error_code TEXT NULL,
@@ -1032,4 +1032,8 @@ ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
 VALUES ('006', 'business key des instances (Camunda 7)')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('007', 'types d''incident de Camunda 8')
 ON CONFLICT (version) DO NOTHING;

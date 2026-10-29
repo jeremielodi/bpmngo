@@ -82,8 +82,15 @@ func (uc *UserTaskController) SearchUserTasks(c *fiber.Ctx) error {
 	_ = c.BodyParser(&req)
 
 	params := map[string]interface{}{}
+	var instanceID uuid.UUID
 	if req.Filter.ProcessInstanceKey != "" {
-		params["process_instance_id"] = req.Filter.ProcessInstanceKey
+		var err error
+		if instanceID, err = resolveInstanceKey(uc.db, req.Filter.ProcessInstanceKey); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"title": "INVALID_ARGUMENT", "detail": "invalid processInstanceKey",
+			})
+		}
+		params["process_instance_id"] = instanceID.String()
 	}
 	if req.Filter.Assignee != "" {
 		params["assignee"] = req.Filter.Assignee
@@ -133,7 +140,7 @@ func (uc *UserTaskController) SearchUserTasks(c *fiber.Ctx) error {
 	// isn't stored on historic_tasks, so skip the merge for that filter —
 	// a known, narrow limitation rather than returning wrong results).
 	if req.Filter.ProcessInstanceKey != "" && req.Filter.CandidateGroup == "" {
-		if instanceID, parseErr := uuid.Parse(req.Filter.ProcessInstanceKey); parseErr == nil && access.allowed(instanceID) {
+		if access.allowed(instanceID) {
 			archiveRepo := repository.NewHistoricArchiveRepository(uc.db)
 			historicTasks, histErr := archiveRepo.FindTasksByProcessInstance(instanceID)
 			if histErr == nil {

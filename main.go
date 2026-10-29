@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"runtime/debug"
 	"net"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -670,7 +670,8 @@ func main() {
 
 	app.Post("/v2/incidents/search", v2IncidentCtrl.SearchIncidents)
 	app.Post("/v2/incidents/:id/resolution", incidentCtrl.ResolveIncident)
-	app.Post("/v2/flownode-instances/search", v2FlownodeInstanceCtrl.SearchFlownodeInstances)
+	app.Post("/v2/element-instances/search", v2FlownodeInstanceCtrl.SearchFlownodeInstances)
+	app.Post("/v2/flownode-instances/search", v2FlownodeInstanceCtrl.SearchFlownodeInstances) // pre-8.8 name
 	app.Post("/v2/variables/search", v2VariableCtrl.SearchVariables)
 	app.Post("/v2/process-instances/:id/modification", v2ProcessInstanceCtrl.ModifyProcessInstance)
 	app.Post("/v2/process-instances/:id/step-back", v2ProcessInstanceCtrl.StepBack)

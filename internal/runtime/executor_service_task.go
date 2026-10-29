@@ -10,6 +10,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 )
 
@@ -39,7 +40,7 @@ func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository
 		}
 		// Input mappings are the activity's local variables.
 		if err := repository.SetLocalVariablesTx(tx, exec.ProcessInstanceID, exec.ID, mapped); err != nil {
-			return fmt.Errorf("service task %s: input mappings: %w", node.ID, err)
+			return models.WithIncidentType(models.IncidentIOMappingError, fmt.Errorf("service task %s: input mappings: %w", node.ID, err))
 		}
 	}
 

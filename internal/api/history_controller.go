@@ -195,6 +195,13 @@ func (hc *HistoryController) ListHistoricProcessInstances(c *fiber.Ctx) error {
 		args = append(args, *finishedAfterT)
 		idx++
 	}
+	// A tenant's user sees that tenant's instances only, live or archived.
+	tenant := common.GetTenantId(c)
+	if tenant != "" {
+		query += ` AND pi.tenant_id = $` + itoa(idx)
+		args = append(args, tenant)
+		idx++
+	}
 
 	type row struct {
 		ID                  uuid.UUID  `db:"id"`
@@ -246,6 +253,7 @@ func (hc *HistoryController) ListHistoricProcessInstances(c *fiber.Ctx) error {
 			FinishedAfter:      finishedAfterT,
 			BusinessKey:        businessKey,
 			ProcessInstanceIDs: instanceIDs,
+			TenantID:           tenant,
 		})
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"message": err.Error()})

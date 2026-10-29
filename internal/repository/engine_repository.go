@@ -85,7 +85,10 @@ func (r *EngineRepository) CreateTimerJob(timer *models.TimerJob) error {
 		(id, process_instance_id, execution_id, event_type, due_at, payload, is_triggered, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
 	`, timer.ID, timer.ProcessInstanceID, timer.ExecutionID, timer.EventType, timer.DueAt, timer.Payload)
-	return err
+	if err != nil {
+		return err
+	}
+	return NotifyTimerArmedTx(r.db)
 }
 
 // GetExecutionByID retrieves an execution by ID regardless of active status
@@ -175,7 +178,10 @@ func (r *EngineRepository) CreateTimerJobTx(tx *sqlx.Tx, timer *models.TimerJob)
 		(id, process_instance_id, execution_id, event_type, due_at, payload, is_triggered, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`, timer.ID, timer.ProcessInstanceID, timer.ExecutionID, timer.EventType, timer.DueAt, timer.Payload, false, time.Now())
-	return err
+	if err != nil {
+		return err
+	}
+	return NotifyTimerArmedTx(tx)
 }
 func (r *EngineRepository) CreateTimerTx(tx *sqlx.Tx, timer *models.TimerJob) error {
 	_, err := tx.Exec(`
@@ -186,7 +192,10 @@ func (r *EngineRepository) CreateTimerTx(tx *sqlx.Tx, timer *models.TimerJob) er
     `, timer.ID, timer.ProcessInstanceID, timer.ExecutionID,
 		timer.EventType, timer.DueAt, timer.Payload, timer.IsTriggered,
 		timer.CreatedAt, timer.CycleCount, timer.TotalCycles, timer.RepeatInterval)
-	return err
+	if err != nil {
+		return err
+	}
+	return NotifyTimerArmedTx(tx)
 }
 
 // GetDueTimers retrieves all timers that are due to be triggered (legacy, no locking).
@@ -251,7 +260,10 @@ func (r *EngineRepository) CreateTimerWithDurationSeconds(tx *sqlx.Tx, timerID, 
          is_triggered, created_at, cycle_count, total_cycles, repeat_interval)
         VALUES ($1, $2, $3, $4, NOW() + ($5 || ' seconds')::interval, $6, false, NOW(), $7, $8, $9)
     `, timerID, processInstanceID, executionID, eventType, durationSeconds, payload, cycleCount, totalCycles, repeatInterval)
-	return err
+	if err != nil {
+		return err
+	}
+	return NotifyTimerArmedTx(tx)
 }
 
 // GetMultiInstanceChildrenCount returns the count of completed child executions
@@ -361,15 +373,17 @@ func (r *EngineRepository) DeleteTimersByProcessInstanceTx(tx *sqlx.Tx, instance
 	return err
 }
 
-// CancelPendingJobsByProcessInstanceTx cancels every still-pending job of a
-// process instance — used when the whole instance is terminated, so no
-// worker can fetch-and-lock a job belonging to a process that no longer
-// runs. Returns the cancelled job IDs so the caller can audit-log each one.
+// CancelPendingJobsByProcessInstanceTx cancels every open job of a process
+// instance — used when the whole instance is terminated, so no worker can
+// fetch-and-lock a job belonging to a process that no longer runs, nor
+// complete one it already holds (that answer is then NOT_FOUND, as in
+// Camunda 8). Returns the cancelled job IDs so the caller can audit-log
+// each one.
 func (r *EngineRepository) CancelPendingJobsByProcessInstanceTx(tx *sqlx.Tx, instanceID uuid.UUID) ([]uuid.UUID, error) {
 	var cancelledJobIDs []uuid.UUID
 	err := tx.Select(&cancelledJobIDs, `
 		UPDATE public.jobs SET status = 'cancelled', updated_at = NOW()
-		WHERE process_instance_id = $1 AND status = 'pending'
+		WHERE process_instance_id = $1 AND status IN ('pending', 'locked')
 		RETURNING id
 	`, instanceID)
 	return cancelledJobIDs, err
@@ -394,7 +408,10 @@ func (r *EngineRepository) CreateTimerWithCycleTx(tx *sqlx.Tx, timerID, processI
         (id, process_instance_id, execution_id, event_type, due_at, payload, is_triggered, created_at, cycle_count, total_cycles, repeat_interval)
         VALUES ($1, $2, $3, $4, $5, $6, false, NOW(), $7, $8, $9)
     `, timerID, processInstanceID, executionID, eventType, dueAt, payload, cycleCount, totalCycles, repeatInterval)
-	return err
+	if err != nil {
+		return err
+	}
+	return NotifyTimerArmedTx(tx)
 }
 
 // CompleteUserTaskByExecution completes any active user task for an execution

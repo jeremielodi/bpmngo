@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/timer"
 	"github.com/jmoiron/sqlx"
 )
@@ -96,7 +97,10 @@ func InsertStartTimerTx(tx *sqlx.Tx, due time.Time, p TimerStartPayload) error {
 		INSERT INTO timer_jobs (id, process_instance_id, execution_id, event_type, due_at, payload, is_triggered, created_at)
 		VALUES ($1, $2, NULL, $3, $4, $5, false, NOW())
 	`, uuid.New(), uuid.Nil, TimerStartEventType, due.In(time.Local), payload)
-	return err
+	if err != nil {
+		return err
+	}
+	return repository.NotifyTimerArmedTx(tx)
 }
 
 // RearmStartEvents arms the timer start events of processKey's latest

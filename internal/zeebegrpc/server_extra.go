@@ -41,11 +41,12 @@ func (s *Server) ThrowError(ctx context.Context, req *pb.ThrowErrorRequest) (*pb
 	}
 
 	result, err := runtime.FailJob(ctx, s.db, runtime.FailJobArgs{
-		JobID:        jobID,
-		ErrorMessage: req.ErrorMessage,
-		ErrorCode:    req.ErrorCode,
-		Variables:    vars,
-		Source:       "throwError",
+		JobID:         jobID,
+		ErrorMessage:  req.ErrorMessage,
+		ErrorCode:     req.ErrorCode,
+		Variables:     vars,
+		VariableScope: runtime.VariablesOnCatchEvent,
+		Source:        "throwError",
 	})
 	if err != nil {
 		return nil, mapJobError(err)
@@ -132,41 +133,63 @@ func (s *Server) CreateProcessInstanceWithResult(ctx context.Context, req *pb.Cr
 	if req.RequestTimeout > 0 {
 		timeout = time.Duration(req.RequestTimeout) * time.Millisecond
 	}
-	deadline := time.Now().Add(timeout)
-	for {
-		state, err := s.instanceState(instanceID)
+	state, err := s.waitFinished(ctx, instanceID, time.Now().Add(timeout))
+	if err != nil {
+		return nil, err
+	}
+	switch state {
+	case "completed":
+		vars, err := s.finishedInstanceVariables(instanceID)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-		switch state {
-		case "completed":
-			vars, err := s.finishedInstanceVariables(instanceID)
-			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			body, err := json.Marshal(pick(vars, req.FetchVariables))
-			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			return &pb.CreateProcessInstanceWithResultResponse{
-				ProcessDefinitionKey: created.ProcessDefinitionKey,
-				BpmnProcessId:        created.BpmnProcessId,
-				Version:              created.Version,
-				ProcessInstanceKey:   created.ProcessInstanceKey,
-				Variables:            string(body),
-				TenantId:             created.TenantId,
-			}, nil
-		case "terminated":
-			return nil, status.Errorf(codes.Aborted, "process instance %d was terminated before completing", created.ProcessInstanceKey)
+		body, err := json.Marshal(pick(vars, req.FetchVariables))
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
 		}
-		if time.Now().After(deadline) {
-			return nil, status.Errorf(codes.DeadlineExceeded, "process instance %d did not complete within %s", created.ProcessInstanceKey, timeout)
+		return &pb.CreateProcessInstanceWithResultResponse{
+			ProcessDefinitionKey: created.ProcessDefinitionKey,
+			BpmnProcessId:        created.BpmnProcessId,
+			Version:              created.Version,
+			ProcessInstanceKey:   created.ProcessInstanceKey,
+			Variables:            string(body),
+			TenantId:             created.TenantId,
+		}, nil
+	case "terminated":
+		return nil, status.Errorf(codes.Aborted, "process instance %d was terminated before completing", created.ProcessInstanceKey)
+	}
+	return nil, status.Errorf(codes.DeadlineExceeded, "process instance %d did not complete within %s", created.ProcessInstanceKey, timeout)
+}
+
+// waitFinished waits until instanceID is completed or terminated, or until
+// deadline, and returns its last state. A finish wakes it at once (see
+// repository.NotifyInstanceFinished); polling once a second is only the
+// safety net for a notify missed during a listener reconnect.
+func (s *Server) waitFinished(ctx context.Context, instanceID uuid.UUID, deadline time.Time) (string, error) {
+	for {
+		// Taken before the status read, so a finish in between still wakes us.
+		finished, release := repository.InstanceFinishedChannelFor(instanceID)
+		state, err := s.instanceState(instanceID)
+		if err != nil {
+			release()
+			return "", status.Error(codes.Internal, err.Error())
+		}
+		wait := time.Until(deadline)
+		if state == "completed" || state == "terminated" || wait <= 0 {
+			release()
+			return state, nil
+		}
+		if wait > time.Second {
+			wait = time.Second
 		}
 		select {
 		case <-ctx.Done():
-			return nil, status.FromContextError(ctx.Err()).Err()
-		case <-time.After(100 * time.Millisecond):
+			release()
+			return "", status.FromContextError(ctx.Err()).Err()
+		case <-finished:
+		case <-time.After(wait):
 		}
+		release()
 	}
 }
 

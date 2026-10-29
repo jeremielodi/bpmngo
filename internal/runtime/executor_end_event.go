@@ -48,6 +48,7 @@ func (r *Runtime) executeEndEvent(ctx context.Context, engineRepo *repository.En
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	repository.NotifyInstanceFinished(r.DB, exec.ProcessInstanceID)
 	service.LogAuditErr("execution completed", r.auditService.LogExecutionCompleted(exec.ID, exec.ProcessInstanceID, exec.CurrentElementID))
 	finalVars, _ := engineRepo.GetProcessVariables(exec.ProcessInstanceID)
 	service.LogAuditErr("process completed", r.auditService.LogProcessCompleted(exec.ProcessInstanceID, finalVars))

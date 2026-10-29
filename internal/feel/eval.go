@@ -461,11 +461,11 @@ func arithmetic(op string, l, r value) value {
 		}
 		switch op {
 		case "+":
-			return new(big.Rat).Add(a, b)
+			return scaleArithmetic(op, a, b, new(big.Rat).Add(a, b))
 		case "-":
-			return new(big.Rat).Sub(a, b)
+			return scaleArithmetic(op, a, b, new(big.Rat).Sub(a, b))
 		case "*":
-			return new(big.Rat).Mul(a, b)
+			return scaleArithmetic(op, a, b, new(big.Rat).Mul(a, b))
 		case "/":
 			if b.Sign() == 0 {
 				return nil
@@ -521,15 +521,27 @@ func arithmetic(op string, l, r value) value {
 			}
 		case Date:
 			if op == "+" {
-				return Date{b.AddDate(0, int(a), 0)}
+				return Date{addMonths(b.Time, int(a))}
 			}
 		case time.Time:
 			if op == "+" {
-				return b.AddDate(0, int(a), 0)
+				return addMonths(b, int(a))
 			}
 		}
 	}
 	return nil
+}
+
+// addMonths adds n months to t, as FEEL (java.time's plusMonths) does: a
+// day the target month lacks becomes its last day — 2024-01-31 + P1M is
+// 2024-02-29, not Go's normalized 2024-03-02.
+func addMonths(t time.Time, n int) time.Time {
+	y, m, d := t.Date()
+	first := time.Date(y, m+time.Month(n), 1, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+	if last := first.AddDate(0, 1, -1).Day(); d > last {
+		d = last
+	}
+	return first.AddDate(0, 0, d-1)
 }
 
 func temporalArithmetic(op string, t time.Time, r value, isDate bool) value {
@@ -550,9 +562,9 @@ func temporalArithmetic(op string, t time.Time, r value, isDate bool) value {
 	case YMDuration:
 		switch op {
 		case "+":
-			return wrap(t.AddDate(0, int(b), 0))
+			return wrap(addMonths(t, int(b)))
 		case "-":
-			return wrap(t.AddDate(0, -int(b), 0))
+			return wrap(addMonths(t, -int(b)))
 		}
 	case Date:
 		if op == "-" {

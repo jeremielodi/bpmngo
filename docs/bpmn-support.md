@@ -11,7 +11,7 @@ Which BPMN 2.0 elements BpmnGo runs, with Camunda 8 semantics. Back to the [READ
 | Script Task (`zeebe:script` FEEL expression, or a job worker) | ✅ |
 | Messages with Camunda 8 semantics: `zeebe:subscription` correlation keys, time to live (buffered messages), `messageId` deduplication, once per process, message start events (one active instance per key) | ✅ |
 | Call Activity: `zeebe:calledElement` (processId as FEEL, `propagateAllChildVariables`, `propagateAllParentVariables`), input/output mappings, Camunda 7 `camunda:in`/`camunda:out`; uncaught errors and escalations rise to the call activity; the called instance is terminated with its call activity | ✅ |
-| Exclusive Gateway (XOR) | ✅ |
+| Exclusive Gateway (XOR): when several conditions are true, the first outgoing flow in the file is taken, as the BPMN 2.0 standard says (Camunda 8.10 was seen taking the last) | ✅ |
 | Inclusive Gateway (OR) | ✅ |
 | Parallel Gateway (AND) | ✅ |
 | Event-based Gateway | ✅ |

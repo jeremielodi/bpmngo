@@ -95,6 +95,8 @@ export interface Incident {
   processInstanceId: string;
   jobId?: string;
   incidentType: string;
+  /** The precise Camunda 8 type (CONDITION_ERROR, JOB_NO_RETRIES…). */
+  errorType?: string;
   activityId: string;
   errorMessage?: string;
   errorCode?: string;

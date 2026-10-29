@@ -396,7 +396,7 @@ func (r *Runtime) raiseExecutionIncident(execID uuid.UUID, cause error) bool {
 	defer tx.Rollback()
 	if _, err := incidents.CreateIncidentTx(tx, &models.IncidentCreate{
 		ProcessInstanceID: exec.ProcessInstanceID,
-		IncidentType:      "executionError",
+		IncidentType:      models.IncidentTypeOf(cause),
 		ActivityID:        element,
 		ErrorMessage:      cause.Error(),
 		ExecutionID:       &exec.ID,

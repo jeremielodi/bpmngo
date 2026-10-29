@@ -233,6 +233,11 @@ type HistoricProcessInstanceFilter struct {
 	BusinessKey   string
 	// ProcessInstanceIDs keeps only these instances (empty: no filter).
 	ProcessInstanceIDs []string
+	// TenantID keeps only that tenant's instances ("": no filter), as
+	// ProcessInstanceRepository.FindAll.
+	TenantID string
+	// Limit caps the rows, newest first (0: no limit).
+	Limit int
 }
 
 func (r *HistoricArchiveRepository) FindAllProcessInstances(f HistoricProcessInstanceFilter) ([]HistoricProcessInstance, error) {
@@ -274,7 +279,16 @@ func (r *HistoricArchiveRepository) FindAllProcessInstances(f HistoricProcessIns
 		args = append(args, pq.Array(f.ProcessInstanceIDs))
 		idx++
 	}
+	if f.TenantID != "" {
+		query += ` AND tenant_id = $` + strconv.Itoa(idx)
+		args = append(args, f.TenantID)
+		idx++
+	}
 	query += ` ORDER BY started_at DESC`
+	if f.Limit > 0 {
+		query += ` LIMIT $` + strconv.Itoa(idx)
+		args = append(args, f.Limit)
+	}
 
 	var rows []HistoricProcessInstance
 	err := r.db.Select(&rows, query, args...)

@@ -13,7 +13,6 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 - [Current State](#current-state-v10)
 - [Quick Start](#quick-start)
-- [Frontend](#frontend)
 - [Architecture](#architecture)
 - [Documentation](#documentation)
 
@@ -69,28 +68,11 @@ curl http://localhost:8080/health
 
 | What | Where |
 |---|---|
-| Frontend | `http://localhost:3000` — log in with `SUPER_USER_EMAIL` / `SUPER_USER_PASSWORD` |
+| Frontend | `http://localhost:3000` — log in with `SUPER_USER_EMAIL` / `SUPER_USER_PASSWORD` — see [Frontend](docs/frontend.md) |
 | REST API | `http://localhost:8080` (Camunda 7 style `/engine-rest/...`, Camunda 8 style `/v2/...`) — see [API Reference](docs/api.md) |
 | gRPC (Zeebe protocol) | `localhost:26500` — every call needs credentials (JWT, OIDC or Basic) |
 
 The ports come from `SERVER_PORT` and `FRONTEND_PORT` in `.env`. To stop: `docker compose down` (add `-v` to also delete the data).
-
----
-
-## Frontend
-
-A React 19 + `bpmn-js` single-page app (`frontend/`, dockerized behind nginx) covering a slice of Camunda's Operate + Tasklist:
-
-- **Dashboard** — at-a-glance counts (running/completed instances, open tasks, incidents)
-- **Process Definitions / Process Instances** — deploy, browse, filter by key/state
-- **Instance Detail** — live BPMN diagram with an active-token overlay, plus a **replay control**: play/pause/step/scrub through the instance's full audit-log-derived token history, with a distinct pulsing marker on the diagram showing where the token was at each step (independent of the live-state overlay). Clicking a row in the Activity History timeline jumps the replay straight to that step. Also supports Move Token (process instance modification) and **Previous step** (send a token back to the wait state before, with a preview of where it goes) from here.
-- **Tasks** — task inbox with claim/unclaim/complete, filtered to open tasks by default
-- **History** — historic process instance list/filter
-- **Incidents** — incident list with retry/resolve
-- **Analytics** — duration distributions, throughput over time, and incident rate by process key (Optimize-lite)
-- **Admin** — Users/Roles management and per-process VIEW/START/MANAGE permission grants
-
-A `/modeler` page also lets you author and deploy BPMN diagrams directly in-browser (bpmn-js's editable `Modeler` build + a properties panel for Zeebe task/gateway properties) — see below.
 
 ---
 
@@ -111,6 +93,7 @@ Design decisions and the partitioned write path: [docs/architecture.md](docs/arc
 - [BPMN 2.0 Support](docs/bpmn-support.md) — every supported BPMN element, timers, conditional events, known limits
 - [Engine Features](docs/engine-features.md) — everything besides BPMN elements: FEEL, jobs, incidents, DMN, auth, scaling, HA, gRPC
 - [API Reference](docs/api.md) — REST (`/engine-rest`, `/v2`), events, audit trail, every filter
+- [Frontend](docs/frontend.md) — the web app: pages, modeler, running it in Docker or with Vite, its tests
 - [Java client](docs/java-client.md) — a remote Java application over REST, the Camunda 7 External Task Client or the Camunda 8 Java client, with tested examples
 - [Architecture](docs/architecture.md) — design decisions, partitioned write path
 - [Environment Variables](docs/configuration.md) — every setting

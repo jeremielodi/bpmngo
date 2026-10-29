@@ -82,7 +82,7 @@ export default function Incidents() {
                   <Td>
                     <span className="inline-flex items-center gap-1 text-xs text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
                       <AlertTriangle className="w-3 h-3" />
-                      {inc.incidentType}
+                      {inc.errorType ?? inc.incidentType}
                     </span>
                   </Td>
                   <Td><span className="text-xs font-mono">{inc.activityId}</span></Td>

@@ -9,6 +9,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 )
@@ -25,7 +26,7 @@ func (r *Runtime) executeScriptTask(ctx context.Context, engineRepo *repository.
 			scriptResult, err = executeScript(*node.Script, variables)
 		}
 		if err != nil {
-			return "", fmt.Errorf("script execution failed: %w", err)
+			return "", models.WithIncidentType(models.IncidentExtractValueError, fmt.Errorf("script execution failed: %w", err))
 		}
 
 		if len(scriptResult) > 0 {

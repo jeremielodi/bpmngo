@@ -10,6 +10,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 )
 
@@ -24,12 +25,12 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 		}
 		s, ok := v.(string)
 		if !ok || s == "" {
-			return fmt.Errorf("callActivity %s: processId %q is %v, not a process id", node.ID, calledID, v)
+			return models.WithIncidentType(models.IncidentCalledElementError, fmt.Errorf("callActivity %s: processId %q is %v, not a process id", node.ID, calledID, v))
 		}
 		calledID = s
 	}
 	if calledID == "" {
-		return fmt.Errorf("callActivity %s has no calledElement", node.ID)
+		return models.WithIncidentType(models.IncidentCalledElementError, fmt.Errorf("callActivity %s has no calledElement", node.ID))
 	}
 
 	// The called process runs in the caller's tenant: resolved there, and
@@ -46,7 +47,7 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 	// Find the called process definition
 	procDef, err := engineRepo.FindLatestProcessDefinitionByKeyForTenant(calledID, tenant)
 	if err != nil {
-		return fmt.Errorf("callActivity: cannot find process '%s': %w", calledID, err)
+		return models.WithIncidentType(models.IncidentCalledElementError, fmt.Errorf("callActivity: cannot find process '%s': %w", calledID, err))
 	}
 
 	// Build the child process graph
@@ -64,7 +65,7 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 		}
 	}
 	if startNodeID == "" {
-		return fmt.Errorf("callActivity: no start event in called process '%s'", node.CalledElement)
+		return models.WithIncidentType(models.IncidentCalledElementError, fmt.Errorf("callActivity: no start event in called process '%s'", node.CalledElement))
 	}
 
 	now := time.Now()
@@ -101,7 +102,7 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 			childVars[k] = v
 		}
 		if err := repository.SetLocalVariablesTx(tx, exec.ProcessInstanceID, exec.ID, inputs); err != nil {
-			return fmt.Errorf("callActivity: input mappings: %w", err)
+			return models.WithIncidentType(models.IncidentIOMappingError, fmt.Errorf("callActivity: input mappings: %w", err))
 		}
 	}
 	if err := engineRepo.CreateVariablesTx(tx, childInstanceID, childVars, now); err != nil {

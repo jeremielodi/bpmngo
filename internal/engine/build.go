@@ -412,13 +412,16 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 
 	// ---- Boundary Error Events ----
 	for _, b := range process.BoundaryErrorEvents {
-		register(&Node{
+		node := &Node{
 			ID:             b.ID,
 			Type:           ErrorBoundaryEventType,
 			AttachedToRef:  b.AttachedToRef,
 			CancelActivity: b.CancelActivity,
 			ErrorCode:      b.ErrorCode,
-		})
+		}
+		// Its output mappings carry a thrown error's variables on.
+		applyIoMapping(node, b.IoMapping)
+		register(node)
 	}
 
 	// ---- Intermediate Message Catch Events (and signal catch events) ----

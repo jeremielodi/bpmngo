@@ -151,6 +151,15 @@ func (r *ProcessInstanceRepository) UpsertVariables(instanceID uuid.UUID, variab
 // FindAll retrieves process instances with optional filters. An empty
 // tenantID means "no tenant filter" (superuser / untenanted deployment).
 func (r *ProcessInstanceRepository) FindAll(status, processKey, tenantID string, businessKey ...string) ([]models.ProcessInstance, error) {
+	bk := ""
+	if len(businessKey) > 0 {
+		bk = businessKey[0]
+	}
+	return r.FindAllLimit(status, processKey, tenantID, bk, 0)
+}
+
+// FindAllLimit is FindAll keeping only the limit newest instances (0: all).
+func (r *ProcessInstanceRepository) FindAllLimit(status, processKey, tenantID, businessKey string, limit int) ([]models.ProcessInstance, error) {
 	var instances []models.ProcessInstance
 	query := `
 		SELECT pi.id, pi.process_definition_id, pi.status, pi.started_by, pi.started_at, pi.ended_at, pi.tenant_id, pi.business_key,
@@ -178,13 +187,17 @@ func (r *ProcessInstanceRepository) FindAll(status, processKey, tenantID string,
 		argIndex++
 	}
 
-	if len(businessKey) > 0 && businessKey[0] != "" {
+	if businessKey != "" {
 		query += fmt.Sprintf(" AND pi.business_key = $%d", argIndex)
-		args = append(args, businessKey[0])
+		args = append(args, businessKey)
 		argIndex++
 	}
 
 	query += " ORDER BY pi.started_at DESC"
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", argIndex)
+		args = append(args, limit)
+	}
 
 	err := r.db.Select(&instances, query, args...)
 	return instances, err
@@ -292,6 +305,20 @@ func (r *ProcessInstanceRepository) FindExecutionsByInstance(instanceID uuid.UUI
 		WHERE process_instance_id = $1
 		ORDER BY created_at ASC
 	`, instanceID)
+	return executions, err
+}
+
+// FindRecentExecutions returns the limit most recently created executions
+// of every live instance, newest first.
+func (r *ProcessInstanceRepository) FindRecentExecutions(limit int) ([]Execution, error) {
+	var executions []Execution
+	err := r.db.Select(&executions, `
+		SELECT id, process_instance_id, current_element_id, status, is_active,
+		       parent_execution_id, path_id, created_at, updated_at
+		FROM public.executions
+		ORDER BY created_at DESC
+		LIMIT $1
+	`, limit)
 	return executions, err
 }
 

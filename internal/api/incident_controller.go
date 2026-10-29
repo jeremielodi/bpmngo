@@ -66,6 +66,10 @@ func (ctrl *IncidentController) withZeebeKey(inc *models.Incident) (map[string]i
 		return nil, err
 	}
 	m["zeebeKey"] = zeebeKey
+	// incidentType keeps the Camunda 7 era name; errorType is the precise
+	// Camunda 8 type stored.
+	m["incidentType"] = models.LegacyIncidentType(inc.IncidentType, inc.JobID != nil)
+	m["errorType"] = inc.IncidentType
 	return m, nil
 }
 
@@ -84,6 +88,9 @@ func (ctrl *IncidentController) ListIncidents(c *fiber.Ctx) error {
 		f.State = &s
 	}
 	if t := c.Query("incidentType"); t != "" {
+		f.LegacyIncidentType = &t
+	}
+	if t := c.Query("errorType"); t != "" {
 		f.IncidentType = &t
 	}
 	if a := c.Query("activityId"); a != "" {

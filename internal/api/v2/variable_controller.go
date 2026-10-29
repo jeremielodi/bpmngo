@@ -2,7 +2,6 @@ package v2
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
@@ -37,7 +36,7 @@ func (vc *VariableController) SearchVariables(c *fiber.Ctx) error {
 			"title": "INVALID_ARGUMENT", "detail": "filter.processInstanceKey is required",
 		})
 	}
-	instanceID, err := uuid.Parse(req.Filter.ProcessInstanceKey)
+	instanceID, err := resolveInstanceKey(vc.db, req.Filter.ProcessInstanceKey)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"title": "INVALID_ARGUMENT", "detail": "invalid processInstanceKey",
@@ -51,6 +50,10 @@ func (vc *VariableController) SearchVariables(c *fiber.Ctx) error {
 	}
 
 	vars, err := vc.instanceRepo.GetVariables(instanceID)
+	if err == nil && len(vars) == 0 {
+		// An archived instance: its variables moved to history.
+		vars, err = repository.NewHistoricArchiveRepository(vc.db).FindVariablesByProcessInstance(instanceID)
+	}
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "INTERNAL_ERROR", "detail": err.Error()})
 	}

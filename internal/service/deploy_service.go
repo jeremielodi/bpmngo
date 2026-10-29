@@ -222,8 +222,13 @@ func DeployResources(db *sqlx.DB, deploymentName string, tenantID string, resour
 				log.Printf("deploy %s: arming timer start events: %v", procKey, err)
 			}
 
+			// The file name the client sent, as decisions and forms.
+			resourceName := res.Filename
+			if resourceName == "" {
+				resourceName = procKey + ".bpmn"
+			}
 			result.ProcessDefinitions = append(result.ProcessDefinitions, DeployedProcessDefinition{
-				ID: defUUID, Key: procKey, Version: version, ResourceName: fmt.Sprintf("%s.bpmn", procKey),
+				ID: defUUID, Key: procKey, Version: version, ResourceName: resourceName,
 			})
 		}
 	}

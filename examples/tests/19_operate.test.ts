@@ -142,9 +142,10 @@ async function run() {
           assert(byState.data.items.length > 0, 'expected state=ACTIVE filter to still find the incident');
 
           const byErrorType = await client.api.post('/v2/incidents/search', {
-            filter: { processInstanceKey: instanceId, errorType: 'failedExternalTask' },
+            filter: { processInstanceKey: instanceId, errorType: 'JOB_NO_RETRIES' },
           });
           assert(byErrorType.data.items.length > 0, 'expected errorType filter to find the incident');
+          assert(byErrorType.data.items[0].errorType === 'JOB_NO_RETRIES', `errorType: ${byErrorType.data.items[0].errorType}`);
 
           const byWrongState = await client.api.post('/v2/incidents/search', {
             filter: { processInstanceKey: instanceId, state: 'RESOLVED' },

@@ -278,11 +278,17 @@ func (s *Server) ActivateJobs(req *pb.ActivateJobsRequest, stream pb.Gateway_Act
 			return stream.Send(&pb.ActivateJobsResponse{Jobs: jobs})
 		}
 
+		// Never past the request's deadline: an empty answer is due then,
+		// not at the next fallback poll.
+		wait := activateJobsFallbackPoll
+		if remaining := time.Until(deadline); remaining < wait {
+			wait = remaining
+		}
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-wake:
-		case <-time.After(activateJobsFallbackPoll):
+		case <-time.After(wait):
 		}
 	}
 
@@ -412,6 +418,11 @@ func (s *Server) FailJob(ctx context.Context, req *pb.FailJobRequest) (*pb.FailJ
 	// failure" (Zeebe's own convention) — no extra decrement, unlike the
 	// REST HandleFailure path which uses Camunda 7's convention.
 
+	vars, err := parseVariables(req.Variables)
+	if err != nil {
+		return nil, err
+	}
+
 	// Continuing from a boundary event may fail without failing the call:
 	// the failure itself is recorded.
 	if _, err := runtime.FailJob(ctx, s.db, runtime.FailJobArgs{
@@ -419,6 +430,9 @@ func (s *Server) FailJob(ctx context.Context, req *pb.FailJobRequest) (*pb.FailJ
 		RetriesRemaining: int(req.Retries),
 		ErrorMessage:     req.ErrorMessage,
 		RetryBackoffMs:   req.RetryBackOff,
+		Variables:        vars,
+		VariableScope:    runtime.VariablesOnTask,
+		Source:           "failJob",
 	}); err != nil {
 		return nil, mapJobError(err)
 	}
@@ -428,7 +442,7 @@ func (s *Server) FailJob(ctx context.Context, req *pb.FailJobRequest) (*pb.FailJ
 
 func mapJobError(err error) error {
 	switch {
-	case errors.Is(err, service.ErrJobNotFound):
+	case errors.Is(err, service.ErrJobNotFound), errors.Is(err, service.ErrJobFinished):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, service.ErrJobInvalidState):
 		return status.Error(codes.FailedPrecondition, err.Error())

@@ -9,6 +9,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/dmn"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 )
@@ -19,13 +20,13 @@ import (
 // script task.
 func (r *Runtime) executeBusinessRuleTask(ctx context.Context, engineRepo *repository.EngineRepository, exec *repository.Execution, node *engine.Node, variables map[string]interface{}) (nextID string, err error) {
 	if node.DecisionKey == "" {
-		return "", fmt.Errorf("business rule task %s has no decision key (zeebe:calledDecision)", node.ID)
+		return "", models.WithIncidentType(models.IncidentCalledDecisionError, fmt.Errorf("business rule task %s has no decision key (zeebe:calledDecision)", node.ID))
 	}
 
 	dmnRepo := repository.NewDMNRepository(r.DB)
 	decision, err := dmnRepo.FindLatestDecisionByKey(node.DecisionKey)
 	if err != nil {
-		return "", fmt.Errorf("decision %q not found: %w", node.DecisionKey, err)
+		return "", models.WithIncidentType(models.IncidentCalledDecisionError, fmt.Errorf("decision %q not found: %w", node.DecisionKey, err))
 	}
 
 	var parsed dmn.Decision
@@ -51,7 +52,7 @@ func (r *Runtime) executeBusinessRuleTask(ctx context.Context, engineRepo *repos
 
 	result, err := dmn.EvaluateDecisionTable(parsed.DecisionTable, evalVars)
 	if err != nil {
-		return "", fmt.Errorf("failed to evaluate decision %q: %w", node.DecisionKey, err)
+		return "", models.WithIncidentType(models.IncidentDecisionEvaluationError, fmt.Errorf("failed to evaluate decision %q: %w", node.DecisionKey, err))
 	}
 
 	resultVar := node.ResultVariable
