@@ -23,7 +23,7 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 **BpmnGo 1.0 is production ready.** What backs this:
 
-- **Tested end to end:** 48 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
+- **Tested end to end:** 51 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
 - **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
 - **Backups:** `pg_dump` backups, with a script that checks each backup restores. See [Operations](docs/operations.md#backups).
 - **Secure defaults:** with `GOFLOW_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
@@ -43,18 +43,37 @@ Versioning, FEEL, job workers, incidents, DMN, multi-tenancy, authentication, au
 
 ## Quick Start
 
+Requires Docker with Compose v2.
+
 ```bash
-# Clone
-git clone <repo>
-cd camunda-like
+# 1. Clone
+git clone https://github.com/jeremielodi/bpmngo.git
+cd bpmngo
 
-# Start everything (PostgreSQL + BpmnGo)
-docker compose up -d --build --wait
-
-# Default superuser: admin@goflow.com / admin123 (seeded from docker-compose.yaml)
+# 2. Configure: copy the sample, then edit .env
+cp .env.example .env
 ```
 
-The API is available at `http://localhost:8080` (REST) and `localhost:26500` (gRPC — Zeebe protocol core loop, see [Roadmap](docs/roadmap.md#roadmap)).
+In `.env`, set at least:
+
+- `JWT_SECRET_KEY` — a real random secret, e.g. the output of `openssl rand -base64 48`. The stack runs with `GOFLOW_ENV=production`, so the server refuses to start with the sample value `change_me` (or with none).
+- `SUPER_USER_PASSWORD` — the password of the admin account created at first start (`SUPER_USER_EMAIL`, `admin@goflow.com` by default).
+
+```bash
+# 3. Start everything: PostgreSQL, Redpanda, BpmnGo and the frontend
+docker compose up -d --build --wait
+
+# 4. Check
+curl http://localhost:8080/health
+```
+
+| What | Where |
+|---|---|
+| Frontend | `http://localhost:3000` — log in with `SUPER_USER_EMAIL` / `SUPER_USER_PASSWORD` |
+| REST API | `http://localhost:8080` (Camunda 7 style `/engine-rest/...`, Camunda 8 style `/v2/...`) — see [API Reference](docs/api.md) |
+| gRPC (Zeebe protocol) | `localhost:26500` — every call needs credentials (JWT, OIDC or Basic) |
+
+The ports come from `SERVER_PORT` and `FRONTEND_PORT` in `.env`. To stop: `docker compose down` (add `-v` to also delete the data).
 
 ---
 
