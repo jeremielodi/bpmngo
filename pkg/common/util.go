@@ -234,7 +234,9 @@ func (u Util) DotEnvVariable(key string) string {
 	dotEnvOnce.Do(func() {
 		if err := godotenv.Load(path.Join(*u.rootDirPath, "..", ".env")); err != nil {
 			if err2 := godotenv.Load(path.Join(*u.rootDirPath, ".env")); err2 != nil {
-				fmt.Println("No .env file found — using process environment only")
+				// Informational: .env is optional (Docker passes the
+				// settings as environment variables).
+				fmt.Println(".env is optional: none found, settings come from the environment")
 			}
 		}
 	})
