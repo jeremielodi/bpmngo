@@ -5,3 +5,5 @@ backups/
 examples/java-client/target/
 examples/java-client-spring/target/
 bpmngo.exe
+# Demo mode: the generated JWT signing key (see DEMO_SECRET_FILE)
+/data/

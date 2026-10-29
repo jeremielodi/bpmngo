@@ -128,9 +128,12 @@ services:
       SERVER_PORT: 8080
       QUEUE_WORKERS: 10
       
-      # JWT signing key — required, read from .env (never hardcode it here).
-      # Generate one with: openssl rand -base64 48
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
+      # JWT signing key, read from .env (never hardcode it here). Generate one
+      # with: openssl rand -base64 48. Set, BpmnGo runs in production mode.
+      # Unset (no .env at all), it runs in demo mode with a generated key
+      # kept in the bpmngo_data volume — fine to try BpmnGo, not for
+      # production.
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
 
       # Super User (valeurs lues depuis .env)
       CREATE_SUPER_USER: ${CREATE_SUPER_USER:-true}
@@ -138,8 +141,10 @@ services:
       SUPER_USER_EMAIL: ${SUPER_USER_EMAIL:-admin@goflow.com}
       SUPER_USER_PASSWORD: ${SUPER_USER_PASSWORD:-admin123}
       
-      # Other
-      GOFLOW_ENV: production
+      # Mode : production (défaut dès que JWT_SECRET_KEY est fixé : refuse les
+      # secrets d'exemple, avertit sur /metrics ouvert et le mot de passe
+      # admin123) ou demo (défaut sans JWT_SECRET_KEY : secret généré).
+      GOFLOW_ENV: ${GOFLOW_ENV:-}
 
       # Observabilité : jeton Bearer exigé sur GET /metrics (vide = ouvert)
       METRICS_TOKEN: ${METRICS_TOKEN:-}
@@ -161,6 +166,9 @@ services:
       # Clés dans les réponses /v2 : uuid (défaut) ou int (la clé int64 du
       # gRPC, en chaîne, comme Camunda 8). /v2 accepte les deux en entrée.
       REST_KEYS: ${REST_KEYS:-uuid}
+    volumes:
+      # Mode démo : la clé JWT générée, partagée par toutes les instances
+      - bpmngo_data:/app/data
     ports:
       - "${SERVER_PORT:-8080}:8080"
       - "${GRPC_PORT:-26500}:26500" # gRPC gateway (Zeebe protocol subset — see internal/zeebegrpc)
@@ -196,3 +204,4 @@ networks:
 volumes:
   postgres_data:
   redpanda_data:
+  bpmngo_data:

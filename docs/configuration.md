@@ -1,6 +1,6 @@
 # Environment Variables
 
-Every variable can come either from the process environment or from a `.env` file (optional — real environment variables always win, and the Docker image no longer contains a `.env`). `docker-compose.yaml` reads secrets from `.env` next to it: `JWT_SECRET_KEY` is required, `POSTGRES_PASSWORD` defaults to `goflow123`.
+Every variable can come either from the process environment or from a `.env` file (optional — real environment variables always win, and the Docker image no longer contains a `.env`). `docker-compose.yaml` reads secrets from `.env` next to it: without `JWT_SECRET_KEY` BpmnGo starts in demo mode (see below), `POSTGRES_PASSWORD` defaults to `goflow123`.
 
 ```bash
 # Database
@@ -11,10 +11,18 @@ DB_PASS=goflow123
 DB_SSLMODE=disable   # or require / verify-ca / verify-full
 DB_NAME=goflow
 
-# JWT — required; the server refuses to start without it, and refuses
-# known sample values when GOFLOW_ENV=production. Generate with:
+# JWT signing key. Generate with:
 #   openssl rand -base64 48
+# Set, the server runs in production mode and refuses known sample values.
+# Unset, it runs in demo mode: the key is generated once and kept in
+# DEMO_SECRET_FILE (default data/jwt_secret, the bpmngo_data volume in
+# Docker) — to try BpmnGo, never for production.
 JWT_SECRET_KEY=<random value>
+# GOFLOW_ENV=production        # or demo; unset: production when JWT_SECRET_KEY
+#                              # is set, demo otherwise. Production refuses a
+#                              # sample JWT key, warns about an open /metrics
+#                              # and the sample admin password
+# DEMO_SECRET_FILE=data/jwt_secret
 
 # Superuser (seeded on first boot)
 # CREATE_SUPER_USER=false skips the seeding (unset = true)

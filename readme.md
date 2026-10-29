@@ -11,18 +11,18 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 ## Contents
 
-- [Current State](#current-state-v10)
+- [Current State](#current-state-v101)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Documentation](#documentation)
 
 ---
 
-## Current State (v1.0)
+## Current State (v1.0.1)
 
-**BpmnGo 1.0 is production ready.** What backs this:
+**BpmnGo 1.0.1 is production ready.** What backs this:
 
-- **Tested end to end:** 51 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
+- **Tested end to end:** 53 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
 - **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
 - **Backups:** `pg_dump` backups, with a script that checks each backup restores. See [Operations](docs/operations.md#backups).
 - **Secure defaults:** with `GOFLOW_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
@@ -44,35 +44,52 @@ Versioning, FEEL, job workers, incidents, DMN, multi-tenancy, authentication, au
 
 Requires Docker with Compose v2.
 
+### Try it — no configuration
+
 ```bash
-# 1. Clone
 git clone https://github.com/jeremielodi/bpmngo.git
 cd bpmngo
+docker compose up -d --build --wait     # PostgreSQL, BpmnGo and the web app
+./scripts/demo.sh                       # your first workflow, end to end
+```
 
-# 2. Configure: copy the sample, then edit .env
+With no `.env`, BpmnGo starts in **demo mode**: it generates its token-signing key (kept in the `bpmngo_data` volume) and the admin account is `admin@goflow.com` / `admin123`. Fine to try BpmnGo, not for production (see below).
+
+Then open the web app at `http://localhost:3000` and log in as `admin@goflow.com` / `admin123`. On Windows, run the script from Git Bash.
+
+### Your first workflow
+
+[`examples/hello-world.bpmn`](examples/hello-world.bpmn): someone reviews a request, then it is approved or rejected. `./scripts/demo.sh` runs it through the Camunda 8 style REST API, four calls:
+
+| Step | Call |
+|---|---|
+| Deploy the process | `POST /v2/resources/deployments` (the `.bpmn` file as `resources`) |
+| Start an instance | `POST /v2/process-instances` `{"processDefinitionId": "hello_world", "variables": {...}}` |
+| Find its waiting task | `POST /v2/user-tasks/search` `{"filter": {"processInstanceKey": "..."}}` |
+| Complete it | `POST /v2/user-tasks/<userTaskKey>/completion` `{"variables": {"approved": true}}` |
+
+`./scripts/demo.sh --ui` stops once the task waits: complete it yourself on the web app's **Tasks** page, and follow the instance on **Process Instances**. To draw your own process, use the web app's **Modeler** page. For everything else — job workers, the Camunda 7 API, the Zeebe gRPC gateway — see [Documentation](#documentation).
+
+### For production
+
+```bash
 cp .env.example .env
 ```
 
 In `.env`, set at least:
 
-- `JWT_SECRET_KEY` — a real random secret, e.g. the output of `openssl rand -base64 48`. The stack runs with `GOFLOW_ENV=production`, so the server refuses to start with the sample value `change_me` (or with none).
+- `JWT_SECRET_KEY` — a real random secret, e.g. the output of `openssl rand -base64 48`. With it set, BpmnGo runs in production mode (`GOFLOW_ENV=production`): it refuses to start with a sample value such as `change_me`, and warns about an unprotected `/metrics` or the sample admin password.
 - `SUPER_USER_PASSWORD` — the password of the admin account created at first start (`SUPER_USER_EMAIL`, `admin@goflow.com` by default).
 
-```bash
-# 3. Start everything: PostgreSQL, BpmnGo and the frontend
-docker compose up -d --build --wait
-
-# 4. Check
-curl http://localhost:8080/health
-```
+Then `docker compose up -d --build --wait`, and check with `curl http://localhost:8080/health`. A database created this way already has the full schema; when upgrading an existing one, apply the new files of [`database/migrations/`](database/migrations/README.md) first.
 
 | What | Where |
 |---|---|
-| Frontend | `http://localhost:3000` — log in with `SUPER_USER_EMAIL` / `SUPER_USER_PASSWORD` — see [Frontend](docs/frontend.md) |
+| Frontend | `http://localhost:3000` — see [Frontend](docs/frontend.md) |
 | REST API | `http://localhost:8080` (Camunda 7 style `/engine-rest/...`, Camunda 8 style `/v2/...`) — see [API Reference](docs/api.md) |
 | gRPC (Zeebe protocol) | `localhost:26500` — every call needs credentials (JWT, OIDC or Basic) |
 
-The ports come from `SERVER_PORT` and `FRONTEND_PORT` in `.env`. To stop: `docker compose down` (add `-v` to also delete the data).
+The ports come from `SERVER_PORT` and `FRONTEND_PORT` in `.env`. Kafka (Redpanda) is not started: only the partitioned write path needs it (see [Environment Variables](docs/configuration.md)). To stop: `docker compose down` (add `-v` to also delete the data).
 
 ---
 

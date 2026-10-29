@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -53,10 +58,8 @@ var knownDevJWTSecrets = map[string]bool{
 	"goflow_dev_secret_change_in_production": true,
 }
 
-// resolveJWTSecret reads JWT_SECRET_KEY (falling back to the legacy
-// goflow_secret_key name) and refuses to start without one: an empty HMAC
-// key is silently accepted by jwt/v4, which makes every token forgeable.
-func resolveJWTSecret(util common.Util) string {
+// configuredJWTSecret is JWT_SECRET_KEY, or the legacy goflow_secret_key.
+func configuredJWTSecret(util common.Util) string {
 	secret := util.DotEnvVariable("JWT_SECRET_KEY")
 	if secret == "" {
 		secret = util.DotEnvVariable("goflow_secret_key")
@@ -64,16 +67,86 @@ func resolveJWTSecret(util common.Util) string {
 			log.Println("⚠️ goflow_secret_key is deprecated — rename it to JWT_SECRET_KEY")
 		}
 	}
+	return secret
+}
+
+// goflowEnv is GOFLOW_ENV when set. Unset, it is "production" when a JWT
+// secret is configured (a deployment that set one keeps every production
+// check), and "demo" otherwise: a first `docker compose up` with no .env
+// at all just works.
+func goflowEnv(util common.Util) string {
+	if env := strings.TrimSpace(util.DotEnvVariable("GOFLOW_ENV")); env != "" {
+		return env
+	}
+	if configuredJWTSecret(util) != "" {
+		return "production"
+	}
+	return "demo"
+}
+
+// resolveJWTSecret returns the token-signing key, and refuses to start
+// without one: an empty HMAC key is silently accepted by jwt/v4, which makes
+// every token forgeable. In demo mode a missing key is generated once and
+// kept in DEMO_SECRET_FILE (a volume shared by every instance), so tokens
+// survive a restart.
+func resolveJWTSecret(util common.Util, env string) string {
+	secret := configuredJWTSecret(util)
+	if secret == "" && env == "demo" {
+		path := util.DotEnvVariable("DEMO_SECRET_FILE")
+		if path == "" {
+			path = "data/jwt_secret"
+		}
+		generated, err := demoJWTSecret(path)
+		if err != nil {
+			log.Fatalln("demo mode: JWT secret: ", err)
+		}
+		log.Printf("⚠️ DEMO MODE: no JWT_SECRET_KEY, using a generated one (%s). Not for production: set JWT_SECRET_KEY and SUPER_USER_PASSWORD (see .env.example).", path)
+		return generated
+	}
 	if secret == "" {
 		log.Fatalln("JWT_SECRET_KEY is not set — refusing to start with an empty token-signing key")
 	}
-	if util.DotEnvVariable("GOFLOW_ENV") == "production" && knownDevJWTSecrets[secret] {
+	if env == "production" && knownDevJWTSecrets[secret] {
 		log.Fatalln("JWT_SECRET_KEY is a sample placeholder value — set a real secret for production (e.g. `openssl rand -base64 48`)")
 	}
 	if len(secret) < 32 {
 		log.Println("⚠️ JWT_SECRET_KEY is shorter than 32 characters — use a longer random value (e.g. `openssl rand -base64 48`)")
 	}
 	return secret
+}
+
+// demoJWTSecret reads the secret kept at path, or creates it. Created with
+// O_EXCL: of instances starting together, one writes it, the others read it.
+func demoJWTSecret(path string) (string, error) {
+	if b, err := os.ReadFile(path); err == nil && len(strings.TrimSpace(string(b))) >= 32 {
+		return strings.TrimSpace(string(b)), nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", err
+	}
+	raw := make([]byte, 48)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	secret := base64.StdEncoding.EncodeToString(raw)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, os.ErrExist) {
+		for i := 0; i < 50; i++ { // another instance is writing it
+			if b, err := os.ReadFile(path); err == nil && len(strings.TrimSpace(string(b))) >= 32 {
+				return strings.TrimSpace(string(b)), nil
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		return "", fmt.Errorf("%s exists but holds no secret", path)
+	}
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if _, err := f.WriteString(secret + "\n"); err != nil {
+		return "", err
+	}
+	return secret, nil
 }
 
 func main() {
@@ -87,6 +160,11 @@ func main() {
 
 	// Initialize utility functions using the root directory
 	var util = *common.NewUtil(&rootDirPath)
+	env := goflowEnv(util)
+	log.Printf("Environment: %s (GOFLOW_ENV)", env)
+	if env == "production" && util.DotEnvVariable("SUPER_USER_PASSWORD") == "admin123" {
+		log.Println("⚠️ SUPER_USER_PASSWORD is the sample admin123 — set a real password for the admin account")
+	}
 
 	// Initialize a new Postgres database connection
 	db, err := database.NewPostgres(util)
@@ -345,7 +423,7 @@ func main() {
 
 	multiInstanceController := api.NewMultiInstanceController(db)
 
-	jwcService := authentication.NewJWTService(db, resolveJWTSecret(util))
+	jwcService := authentication.NewJWTService(db, resolveJWTSecret(util, env))
 	userController := api.NewUserController(db, jwcService)
 
 	// OIDC is entirely optional: NewOIDCService returns nil unless both
@@ -445,7 +523,7 @@ func main() {
 	// Prometheus metrics. Registered before the auth middleware below so a
 	// scraper needs no user account; protect it with METRICS_TOKEN instead.
 	metricsToken := util.DotEnvVariable("METRICS_TOKEN")
-	if metricsToken == "" && util.DotEnvVariable("GOFLOW_ENV") == "production" {
+	if metricsToken == "" && env == "production" {
 		log.Println("⚠️ METRICS_TOKEN not set — /metrics is readable without authentication")
 	}
 	app.Get("/metrics", metrics.Handler(metricsToken))
