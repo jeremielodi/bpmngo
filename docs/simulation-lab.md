@@ -24,20 +24,25 @@ transactional runtime.
 - an evidence-based issue register, redesign heuristics, and as-is/to-be
   comparison.
 
-The built-in **Helpdesk assignment** template contains the Level 1/Level 2
-resources, costs, branch probabilities, repeated escalation loop, client
-response delay, and activity durations used by the exercise. It can be used
-as-is, or replaced by importing a `.bpmn` file.
+The studio starts with a neutral scenario rather than a domain-specific
+workflow. Importing a `.bpmn` file discovers tasks and configurable gateway
+flows automatically, initializes safe placeholder assumptions, and preserves
+matching parameters when the model is replaced by a newer revision. The
+built-in **Support operations** scenario is an optional product example, not
+a required workflow or a special execution mode.
 
 ## Workflow
 
-1. Open **Simulation lab** and import a BPMN file or load the Helpdesk template.
-2. Associate activity IDs with duration distributions, explicit waits, and
-   resources. Exclusive gateway probabilities total `1`; inclusive gateway
-   probabilities are independent; parallel gateways need none.
+1. Open **Simulation studio**, start a scenario, and import any BPMN 2.0 file
+   (or load the optional Support operations example).
+2. Review the automatically discovered activities and branches. Associate
+   activities with duration distributions, explicit waits, and resources.
+   Exclusive gateway probabilities total `1`; inclusive gateway probabilities
+   are independent; parallel gateways need none.
 3. Run **Analyze** for deterministic expected values.
-4. Use **Staffing** to calculate the minimum server count for a queueing target.
-5. Use **Save & run async** for a persisted campaign. Follow progress, leave
+4. Use **Capacity planning** to calculate the minimum server count for a
+   queueing target.
+5. Use **Run experiment** for a persisted campaign. Follow progress, leave
    the page, resume tracking later, or cancel it from **Campaigns**.
 6. Run a capacity sweep to compare a resource over a range and select the
    smallest capacity meeting the mean/p95 cycle-time targets.

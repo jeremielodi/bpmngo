@@ -1,8 +1,8 @@
 import type { Scenario } from '../api/simulation';
 
-const bpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
+const supportOperationsBpmn = `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="https://bpmngo.dev/simulation">
-  <process id="helpdesk_assignment" name="Helpdesk request" isExecutable="true">
+  <process id="support_operations" name="Support operations" isExecutable="true">
     <startEvent id="StartEvent_1wsxujp"/><userTask id="Activity_0rt6ids" name="Check request"/>
     <exclusiveGateway id="Gateway_1i01pjg"/><userTask id="Activity_0ouwyd5" name="Send known resolution"/>
     <userTask id="Activity_1npzcct" name="Evaluate request"/><exclusiveGateway id="Gateway_18x5arg"/>
@@ -26,8 +26,20 @@ const bpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
   </process>
 </definitions>`;
 
-export const helpdeskScenario: Scenario = {
-  name: 'Helpdesk — assignment as-is', bpmnXml, arrivalRatePerHour: 1, durationHours: 720, replications: 10, seed: 20261029,
+export const emptyScenario = (): Scenario => ({
+  name: 'Untitled simulation',
+  bpmnXml: '',
+  arrivalRatePerHour: 1,
+  durationHours: 168,
+  replications: 10,
+  seed: 1,
+  resources: [],
+  activities: {},
+  flows: {},
+});
+
+export const supportOperationsExample: Scenario = {
+  name: 'Support operations — baseline', bpmnXml: supportOperationsBpmn, arrivalRatePerHour: 1, durationHours: 720, replications: 10, seed: 20261029,
   resources: [{ id:'level1',name:'Level 1 agents',capacity:5,costPerHour:40 },{ id:'level2',name:'Level 2 agents',capacity:3,costPerHour:60 }],
   activities: {
     Activity_0rt6ids:{processingTime:{type:'fixed',value:10},waitingTime:{type:'fixed',value:60},resourceId:'level1',valueAdded:true},
