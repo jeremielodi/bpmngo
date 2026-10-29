@@ -264,13 +264,8 @@ func UserFromBasicAuth(db *sqlx.DB, header string) *models.User {
 	if !ok {
 		return nil
 	}
-	userRepo := repository.NewUserRepository(db)
-	user, err := userRepo.FindByEmail(email)
-	if err != nil || !user.IsActive {
-		return nil
-	}
-	hash, err := userRepo.GetPasswordHash(user.ID)
-	if err != nil || !basicPasswordMatches(hash.PasswordHash, password) {
+	user, hash, err := repository.NewUserRepository(db).FindByEmailWithHash(email)
+	if err != nil || !user.IsActive || !basicPasswordMatches(hash, password) {
 		return nil
 	}
 	return &user

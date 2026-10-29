@@ -377,7 +377,8 @@ func (pc *ProcessInstanceController) StepBack(c *fiber.Ctx) error {
 	}
 	args := runtime.StepBackArgs{InstanceID: instanceID, ElementID: req.ElementId, Steps: req.Steps, DryRun: req.DryRun}
 	if req.ExecutionId != "" {
-		if args.ExecutionID, err = uuid.Parse(req.ExecutionId); err != nil {
+		// Its UUID, or its elementInstanceKey (the int64 key).
+		if args.ExecutionID, err = resolveKey(pc.db, "element_instance", req.ExecutionId); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"title": "INVALID_ARGUMENT", "detail": "invalid executionId",
 			})

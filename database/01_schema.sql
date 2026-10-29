@@ -241,6 +241,11 @@ CREATE TABLE executions (
 CREATE INDEX idx_executions_process_instance_id
 ON executions(process_instance_id);
 
+-- The primary key leads with process_instance_id: lookups by id alone
+-- (migration 008).
+CREATE INDEX idx_executions_id
+ON executions(id);
+
 CREATE INDEX idx_executions_current_element_id
 ON executions(current_element_id);
 
@@ -533,6 +538,13 @@ ON incidents(process_instance_id);
 
 CREATE INDEX idx_incidents_state
 ON incidents(state);
+
+-- Lookups by id alone, and a job's incidents (migration 008).
+CREATE INDEX idx_incidents_id
+ON incidents(id);
+
+CREATE INDEX idx_incidents_job_id
+ON incidents(job_id);
 
 
 CREATE TABLE process_outbox (
@@ -1036,4 +1048,8 @@ ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
 VALUES ('007', 'types d''incident de Camunda 8')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('008', 'index sur executions.id, incidents.id et incidents.job_id')
 ON CONFLICT (version) DO NOTHING;

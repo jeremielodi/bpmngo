@@ -46,7 +46,7 @@ npx ts-node run_all.ts
 
 | Suite | Feature |
 |---|---|
-| 26 | Event Log Shadow Mode (observability only) |
+| 26 | Event Log Shadow Mode (observability only; skipped unless `EVENT_LOG=shadow`) |
 | 27 | Write path: topology, concurrent commands on one instance, 30 instances at once, messages across partitions, refusals (runs in both modes) |
 
 **BPMN coverage, Camunda 8 semantics, Camunda 7 task API** (35–52):
@@ -76,4 +76,4 @@ npx ts-node run_all.ts
 
 To run against a BpmnGo that isn't on `127.0.0.1:8080`, set `GOFLOW_URL` (and `GOFLOW_GRPC` for suite 54). `SKIP_SETUP=1` runs against the stack already up instead of rebuilding it with fresh volumes.
 
-The same suites run against several instances behind the load balancer, and against the high-availability cluster (`COMPOSE_FILE` with the files of [Operations](operations.md#operations), plus `GOFLOW_REPLICAS=3` for several instances). With `WRITE_PATH=partitioned` they run on the partitioned write path, and with `COMPOSE_FILE="docker-compose.yaml;docker-compose.citus.yml"` on Citus.
+The same suites run against several instances behind the load balancer, and against the high-availability cluster (`COMPOSE_FILE` with the files of [Operations](operations.md#operations), plus `GOFLOW_REPLICAS=3` for several instances). With `WRITE_PATH=partitioned`, `KAFKA_BROKERS=redpanda:9092` and `COMPOSE_PROFILES=kafka` they run on the partitioned write path, and with `COMPOSE_FILE="docker-compose.yaml;docker-compose.citus.yml"` on Citus.

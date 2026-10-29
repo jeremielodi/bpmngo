@@ -29,9 +29,14 @@ SUPER_USER_PASSWORD=admin123
 # OIDC_AUDIENCE=goflow-api
 # OIDC_JWKS_URL=https://your-idp.example.com/realms/goflow/protocol/openid-connect/certs
 
-# Kafka (Redpanda): event log, and the partitioned write path
-# leave KAFKA_BROKERS unset to disable both
+# Kafka (Redpanda): only for the partitioned write path and the shadow event
+# log. Direct mode (the default) needs no Kafka: leave KAFKA_BROKERS unset and
+# Redpanda is not started. For WRITE_PATH=partitioned or EVENT_LOG=shadow, set
+# KAFKA_BROKERS and start the "kafka" compose profile (COMPOSE_PROFILES=kafka).
 # KAFKA_BROKERS=redpanda:9092
+# EVENT_LOG=off                # or shadow: every engine event also written to
+#                              # Kafka and projected; feeds only the
+#                              # /engine-rest/eventlog/* diagnostic routes
 # KAFKA_REPLICATION_FACTOR=1   # replicas per partition, applied when topics are created
 # WRITE_PATH=direct            # or partitioned (Camunda 8 style, see above)
 # KAFKA_PARTITIONS=12          # fixed once instances exist
@@ -56,6 +61,12 @@ SUPER_USER_PASSWORD=admin123
 # FEEL-to-CEL path decides, native FEEL runs alongside and mismatches are
 # logged), feel (native interpreter decides), cel (legacy only)
 # FEEL_MODE=shadow
+
+# Keys in /v2 (Camunda 8 API) answers: uuid (default, BpmnGo's UUIDs) or int
+# (the gRPC gateway's int64 key, as a string as Camunda 8 does, so a client
+# sees one key in gRPC and REST). /v2 accepts both forms in requests either
+# way; /engine-rest (Camunda 7 API) stays on UUIDs.
+# REST_KEYS=uuid
 
 # Connection pool per BpmnGo instance (keep instances × this under
 # Postgres's max_connections, or put PgBouncer in front)

@@ -27,24 +27,44 @@ func newMockZeebeKeyRepo(t *testing.T) (*ZeebeKeyRepository, sqlmock.Sqlmock) {
 
 // A second call for the same resource must return the SAME key, not fail or
 // assign a new one — this is what lets a client hand a job key from
-// ActivateJobs back to CompleteJob/FailJob later. That guarantee lives in
-// the SQL (an upsert that RETURNs the stored key on conflict; DO NOTHING
-// would return no row), so the statement shape is what is checked here.
-// The conflict itself needs a real database: see the gRPC e2e suites.
-func TestGetOrAssignKey(t *testing.T) {
+// ActivateJobs back to CompleteJob/FailJob later.
+func TestGetOrAssignKey_NewKey(t *testing.T) {
 	repo, mock := newMockZeebeKeyRepo(t)
 	resourceID := uuid.New()
 
-	mock.ExpectQuery(`INSERT INTO public\.zeebe_keys .*ON CONFLICT \(resource_type, resource_id\)\s+DO UPDATE .*RETURNING key`).
+	mock.ExpectQuery(`INSERT INTO public\.zeebe_keys .*ON CONFLICT \(resource_type, resource_id\) DO NOTHING\s+RETURNING key`).
 		WithArgs("job", resourceID).
 		WillReturnRows(sqlmock.NewRows([]string{"key"}).AddRow(int64(42)))
 
-	key, err := repo.GetOrAssignKey("job", resourceID)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	for i := 0; i < 2; i++ { // the second call is served from memory: no query
+		key, err := repo.GetOrAssignKey("job", resourceID)
+		if err != nil || key != 42 {
+			t.Fatalf("call %d: key %d, err %v; want 42", i+1, key, err)
+		}
 	}
-	if key != 42 {
-		t.Errorf("expected key 42, got %d", key)
+	// The reverse lookup too.
+	if id, err := repo.ResolveKey("job", 42); err != nil || id != resourceID {
+		t.Fatalf("ResolveKey: %s, %v", id, err)
+	}
+}
+
+// Issued earlier (by another BpmnGo instance, or before a restart): the
+// insert does nothing and returns no row, the stored key is read instead —
+// never a new key.
+func TestGetOrAssignKey_IssuedEarlier(t *testing.T) {
+	repo, mock := newMockZeebeKeyRepo(t)
+	resourceID := uuid.New()
+
+	mock.ExpectQuery(`INSERT INTO public\.zeebe_keys .*DO NOTHING`).
+		WithArgs("job", resourceID).
+		WillReturnRows(sqlmock.NewRows([]string{"key"}))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT key FROM public.zeebe_keys WHERE resource_type = $1 AND resource_id = $2")).
+		WithArgs("job", resourceID).
+		WillReturnRows(sqlmock.NewRows([]string{"key"}).AddRow(int64(7)))
+
+	key, err := repo.GetOrAssignKey("job", resourceID)
+	if err != nil || key != 7 {
+		t.Fatalf("key %d, err %v; want the stored 7", key, err)
 	}
 }
 

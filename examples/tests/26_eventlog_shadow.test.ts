@@ -16,13 +16,16 @@
  * resolve the resulting incident (IncidentResolved), then terminate a third
  * instance while its job is still pending (ProcessTerminated).
  *
+ * Runs only with the shadow event log on (EVENT_LOG=shadow, off by
+ * default): otherwise it reports itself skipped.
+ *
  * Test [J] (added in a later pass, after auditing the schema): user-task
  * lifecycle events (TaskCreated/TaskClaimed/TaskCompleted) — added because
  * job lifecycle was fully instrumented here but task lifecycle had zero
  * coverage at all, neither the proto schema nor any call site.
  */
 import * as path from 'path';
-import { BpmnGoClient, runSuite, assert, sleep } from './client';
+import { BpmnGoClient, runSuite, assert, sleep, SKIPPED_EXIT_CODE } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '24_grpc_process.bpmn');
 const PARALLEL_BPMN = path.join(__dirname, 'bpmn', '03_meal_preparation.bpmn');
@@ -61,6 +64,10 @@ async function waitForEventTypes(instanceId: string, expectedTypes: string[], ti
 }
 
 async function run() {
+  if ((process.env.EVENT_LOG ?? '').toLowerCase() !== 'shadow') {
+    console.log('\n  ⏭️  26 — Event log shadow mode: skipped (set EVENT_LOG=shadow, KAFKA_BROKERS and the "kafka" compose profile on the server, and EVENT_LOG=shadow for this suite)\n');
+    process.exit(SKIPPED_EXIT_CODE); // reported as skipped by run_all, not as passed
+  }
   await client.loginAsSuperUser();
   await client.deployBpmn(BPMN);
   await client.deployBpmn(PARALLEL_BPMN);

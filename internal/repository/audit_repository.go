@@ -17,13 +17,14 @@ func NewAuditRepository(db *sqlx.DB) *AuditRepository {
 	return &AuditRepository{db: db}
 }
 
-// CreateAuditLog creates a single audit log entry. It doesn't wait for
-// the write to reach the disk (synchronous_commit off for this
-// transaction only): on a crash the last few milliseconds of audit rows
-// may be lost, never engine state, which is written durably by its own
-// transactions. Waiting for the disk on every audit row was the largest
-// cost of running an instance — COMMIT dominated the database time under
-// load.
+// CreateAuditLog creates a single audit log entry: queued for the next
+// batch when the audit writer runs (see audit_writer.go), written now
+// otherwise. Either way it doesn't wait for the write to reach the disk
+// (synchronous_commit off): on a crash the last few milliseconds of audit
+// rows may be lost, never engine state, which is written durably by its
+// own transactions. Waiting for the disk on every audit row was the
+// largest cost of running an instance — COMMIT dominated the database
+// time under load.
 func (r *AuditRepository) CreateAuditLog(log *models.AuditLog) error {
 	if log.ID == uuid.Nil {
 		log.ID = uuid.New()
@@ -31,6 +32,15 @@ func (r *AuditRepository) CreateAuditLog(log *models.AuditLog) error {
 	if log.CreatedAt.IsZero() {
 		log.CreatedAt = time.Now()
 	}
+	if w := currentAuditWriter(); w != nil {
+		w.enqueue(log)
+		return nil
+	}
+	return r.insertNow(log)
+}
+
+// insertNow writes one audit row in its own transaction.
+func (r *AuditRepository) insertNow(log *models.AuditLog) error {
 	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
@@ -68,6 +78,7 @@ func (r *AuditRepository) CreateAuditLogTx(tx *sqlx.Tx, log *models.AuditLog) er
 
 // GetProcessAuditLogs retrieves all audit logs for a process instance
 func (r *AuditRepository) GetProcessAuditLogs(processInstanceID uuid.UUID) ([]models.AuditLog, error) {
+	FlushAuditLogs() // rows still queued for their batch
 	var logs []models.AuditLog
 
 	query := `
@@ -83,6 +94,7 @@ func (r *AuditRepository) GetProcessAuditLogs(processInstanceID uuid.UUID) ([]mo
 
 // GetTaskAuditLogs retrieves all audit logs for a task
 func (r *AuditRepository) GetTaskAuditLogs(taskID uuid.UUID) ([]models.AuditLog, error) {
+	FlushAuditLogs() // rows still queued for their batch
 	var logs []models.AuditLog
 
 	query := `
@@ -98,6 +110,7 @@ func (r *AuditRepository) GetTaskAuditLogs(taskID uuid.UUID) ([]models.AuditLog,
 
 // GetAuditLogsByAction retrieves audit logs by action type
 func (r *AuditRepository) GetAuditLogsByAction(action models.AuditAction, limit int) ([]models.AuditLog, error) {
+	FlushAuditLogs() // rows still queued for their batch
 	var logs []models.AuditLog
 
 	query := `
@@ -114,6 +127,7 @@ func (r *AuditRepository) GetAuditLogsByAction(action models.AuditAction, limit 
 
 // GetAuditLogsByDateRange retrieves audit logs within a date range
 func (r *AuditRepository) GetAuditLogsByDateRange(start, end time.Time) ([]models.AuditLog, error) {
+	FlushAuditLogs() // rows still queued for their batch
 	var logs []models.AuditLog
 
 	query := `

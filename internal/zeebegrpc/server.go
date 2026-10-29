@@ -257,42 +257,52 @@ func (s *Server) ActivateJobs(req *pb.ActivateJobsRequest, stream pb.Gateway_Act
 	deadline := time.Now().Add(requestTimeout)
 	ctx := stream.Context()
 
-	for time.Now().Before(deadline) {
+	for {
 		if ctx.Err() != nil {
 			return nil
 		}
 
-		// Snapshot the wake channel *before* fetching, so a job created
-		// in the gap between this fetch and the select below still wakes
-		// us — NotifyJobAvailable installs a fresh channel every time it
-		// fires, so this snapshot can only be closed by a notify that
-		// happens after this point.
-		wake := repository.JobWakeChannel(req.Type)
+		// Queued *before* fetching, so a job created in the gap between
+		// this fetch and the select below still wakes us.
+		waiter := repository.WaitForJob(req.Type)
 
 		jobs, err := s.fetchAndLockOneBatch(req.Type, req.Worker, lockDuration, maxJobs)
 		if err != nil {
+			waiter.Release()
 			return status.Error(codes.Internal, err.Error())
 		}
 
 		if len(jobs) > 0 {
+			waiter.Release()
+			if len(jobs) == maxJobs {
+				repository.WakeJobWaiter(req.Type) // more may be waiting
+			}
 			return stream.Send(&pb.ActivateJobsResponse{Jobs: jobs})
 		}
 
 		// Never past the request's deadline: an empty answer is due then,
 		// not at the next fallback poll.
-		wait := activateJobsFallbackPoll
-		if remaining := time.Until(deadline); remaining < wait {
-			wait = remaining
+		wait := time.Until(deadline)
+		if wait <= 0 {
+			waiter.Release()
+			return nil
+		}
+		if wait > activateJobsFallbackPoll {
+			wait = activateJobsFallbackPoll
 		}
 		select {
 		case <-ctx.Done():
+			waiter.Release()
 			return nil
-		case <-wake:
+		case <-waiter.C:
+			// Woken for a job: fetch again, even at the deadline.
 		case <-time.After(wait):
+			waiter.Release()
+			if !time.Now().Before(deadline) {
+				return nil
+			}
 		}
 	}
-
-	return nil
 }
 
 func (s *Server) fetchAndLockOneBatch(jobType, worker string, lockDuration, maxJobs int) ([]*pb.ActivatedJob, error) {

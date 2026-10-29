@@ -32,8 +32,9 @@ services:
     depends_on: !override
       pgbouncer:
         condition: service_started
-      redpanda:
+      redpanda: # only with the "kafka" profile (WRITE_PATH=partitioned, EVENT_LOG=shadow)
         condition: service_healthy
+        required: false
     environment:
       DB_HOST: pgbouncer
       DB_PORT: 5432

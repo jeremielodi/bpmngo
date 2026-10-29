@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="defs_59" targetNamespace="http://bpmngo.io/tests">
+  <bpmn:message id="Msg59" name="p59-msg">
+    <bpmn:extensionElements><zeebe:subscription correlationKey="=orderId"/></bpmn:extensionElements>
+  </bpmn:message>
+
+  <!-- Waits for a message published over /v2. -->
+  <bpmn:process id="p59_msg" isExecutable="true">
+    <bpmn:startEvent id="m_start"/>
+    <bpmn:sequenceFlow id="m_f1" sourceRef="m_start" targetRef="m_wait"/>
+    <bpmn:intermediateCatchEvent id="m_wait"><bpmn:messageEventDefinition messageRef="Msg59"/></bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="m_f2" sourceRef="m_wait" targetRef="m_end"/>
+    <bpmn:endEvent id="m_end"/>
+  </bpmn:process>
+
+  <!-- A job, then a user task: both completed over /v2 with int64 keys. -->
+  <bpmn:process id="p59_keys" isExecutable="true">
+    <bpmn:startEvent id="k_start"/>
+    <bpmn:sequenceFlow id="k_f1" sourceRef="k_start" targetRef="k_work"/>
+    <bpmn:serviceTask id="k_work"><bpmn:extensionElements><zeebe:taskDefinition type="p59-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="k_f2" sourceRef="k_work" targetRef="k_review"/>
+    <bpmn:userTask id="k_review"/>
+    <bpmn:sequenceFlow id="k_f3" sourceRef="k_review" targetRef="k_end"/>
+    <bpmn:endEvent id="k_end"/>
+  </bpmn:process>
+</bpmn:definitions>

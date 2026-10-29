@@ -39,14 +39,19 @@ func newInstanceAccess(c *fiber.Ctx, db *sqlx.DB, level string) *instanceAccess 
 // resolves to uuid.Nil, which matches no instance: a search finds nothing
 // and a lookup answers 404, not 400.
 func resolveInstanceKey(db *sqlx.DB, key string) (uuid.UUID, error) {
+	return resolveKey(db, "process_instance", key)
+}
+
+// resolveKey is resolveInstanceKey for any zeebe_keys resource type.
+func resolveKey(db *sqlx.DB, resourceType, key string) (uuid.UUID, error) {
 	if id, err := uuid.Parse(key); err == nil {
 		return id, nil
 	}
 	n, err := strconv.ParseInt(key, 10, 64)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("invalid process instance key %q", key)
+		return uuid.Nil, fmt.Errorf("invalid key %q", key)
 	}
-	id, err := repository.NewZeebeKeyRepository(db).ResolveKey("process_instance", n)
+	id, err := repository.NewZeebeKeyRepository(db).ResolveKey(resourceType, n)
 	if errors.Is(err, sql.ErrNoRows) {
 		return uuid.Nil, nil
 	}

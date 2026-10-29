@@ -59,6 +59,9 @@ func StepBack(ctx context.Context, args StepBackArgs) (StepBackResult, error) {
 
 func (c *commands) stepBack(ctx context.Context, a StepBackArgs) (StepBackResult, error) {
 	if cmdbus.Redelivered(ctx) && !a.DryRun {
+		// The row looked for is written in the step back's own transaction
+		// (never batched); flushed anyway, as every reader of audit_logs.
+		repository.FlushAuditLogs()
 		var applied bool
 		if err := c.db.Get(&applied, `
 			SELECT EXISTS (SELECT 1 FROM public.audit_logs

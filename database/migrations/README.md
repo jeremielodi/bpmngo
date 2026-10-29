@@ -47,6 +47,7 @@ des incidents déjà enregistrés.
 | 005 | `005_hot_path_indexes.sql` | index sur `jobs`, `timer_jobs`, `event_subscriptions`… | performance avec beaucoup d'instances vivantes |
 | 006 | `006_business_key.sql` | colonne `business_key` sur `process_instances` et `historic_process_instances` | business key des applications Camunda 7 |
 | 007 | `007_incident_types.sql` | renomme `incident_type` des incidents existants (live et archivés) en types Camunda 8 | types d'incident de Camunda 8 (`/v2`, gRPC) |
+| 008 | `008_id_indexes.sql` | index sur `executions(id)`, `incidents(id)`, `incidents(job_id)` | performance sous charge (recherches par identifiant seul) |
 
 Pour voir où en est une base :
 

@@ -46,17 +46,24 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 	deadline := time.Now().Add(wait)
 	var topicJobs []repository.TopicJobs
 	for {
-		// Taken before looking, so a job created meanwhile still wakes us.
-		var wake <-chan struct{}
-		if len(topics) > 0 {
-			wake = repository.JobWakeChannel(topics[0].TopicName)
+		// Queued before looking, so a job created meanwhile still wakes us
+		// (long polling only: without asyncResponseTimeout nothing waits).
+		var waiter *repository.JobWaiter
+		if len(topics) > 0 && time.Now().Before(deadline) {
+			waiter = repository.WaitForJob(topics[0].TopicName)
 		}
 		var err error
 		topicJobs, err = ctrl.lockJobs(topics, req.WorkerId, req.MaxTasks)
 		if err != nil {
+			if waiter != nil {
+				waiter.Release()
+			}
 			return c.Status(500).JSON(fiber.Map{"title": "Database Error", "message": "failed to fetch jobs", "error": err.Error()})
 		}
-		if countJobs(topicJobs) > 0 || time.Now().After(deadline) {
+		if countJobs(topicJobs) > 0 || waiter == nil {
+			if waiter != nil {
+				waiter.Release()
+			}
 			break
 		}
 		// Woken as soon as a job of the first topic is created on any
@@ -67,8 +74,10 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 			poll = remaining
 		}
 		select {
-		case <-wake:
+		case <-waiter.C:
+			// Woken for a job: look again, even at the deadline.
 		case <-time.After(poll):
+			waiter.Release()
 		}
 	}
 	for _, topicJob := range topicJobs {

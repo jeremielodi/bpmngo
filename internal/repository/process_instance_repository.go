@@ -521,6 +521,7 @@ func (r *ProcessInstanceRepository) CreateAuditLog(log models.AuditLog) error {
 
 // GetAuditLogs retrieves audit logs for a process instance
 func (r *ProcessInstanceRepository) GetAuditLogs(instanceID uuid.UUID) ([]models.AuditLog, error) {
+	FlushAuditLogs() // rows still queued for their batch
 	var logs []models.AuditLog
 	err := r.db.Select(&logs, `
 		SELECT id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at

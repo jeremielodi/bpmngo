@@ -39,7 +39,13 @@ services:
   # fsyncées dans le volume redpanda_data, mais pas répliquées — la sécurité
   # vient des sauvegardes de ce volume. Mémoire/CPU : REDPANDA_MEMORY,
   # REDPANDA_SMP.
+  #
+  # Lancé seulement avec le profil "kafka" (COMPOSE_PROFILES=kafka) : il ne
+  # sert qu'au chemin d'écriture partitionné (WRITE_PATH=partitioned) et au
+  # journal d'événements en mode shadow (EVENT_LOG=shadow). En mode direct,
+  # BpmnGo n'a pas besoin de Kafka.
   redpanda:
+    profiles: ["kafka"]
     image: redpandadata/redpanda:v24.2.4
     container_name: bpmngo-redpanda
     command:
@@ -78,8 +84,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redpanda:
+      redpanda: # only with the "kafka" profile
         condition: service_healthy
+        required: false
     environment:
       # Database
       DB_HOST: postgres
@@ -90,8 +97,13 @@ services:
       # Taille du pool de connexions par instance BpmnGo
       DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-80}
 
-      # Event log (shadow mode — see internal/eventlog)
-      KAFKA_BROKERS: redpanda:9092
+      # Kafka : vide (défaut) en mode direct. Pour WRITE_PATH=partitioned ou
+      # EVENT_LOG=shadow : KAFKA_BROKERS=redpanda:9092 et COMPOSE_PROFILES=kafka.
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-}
+      # Journal d'événements en mode shadow (internal/eventlog) : off (défaut)
+      # ou shadow. Il n'alimente que /engine-rest/eventlog/* et ses métriques,
+      # pour une écriture Kafka par événement du moteur.
+      EVENT_LOG: ${EVENT_LOG:-off}
       # Copies de chaque partition à la création des topics (1 = mono-nœud)
       KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-1}
       # Chemin d'écriture (voir internal/cmdbus) : direct (défaut) ou
@@ -145,6 +157,10 @@ services:
       # Expressions FEEL (préfixe "=") : shadow (défaut : CEL utilisé, écarts
       # avec le moteur FEEL natif journalisés), feel (moteur natif), cel
       FEEL_MODE: ${FEEL_MODE:-shadow}
+
+      # Clés dans les réponses /v2 : uuid (défaut) ou int (la clé int64 du
+      # gRPC, en chaîne, comme Camunda 8). /v2 accepte les deux en entrée.
+      REST_KEYS: ${REST_KEYS:-uuid}
     ports:
       - "${SERVER_PORT:-8080}:8080"
       - "${GRPC_PORT:-26500}:26500" # gRPC gateway (Zeebe protocol subset — see internal/zeebegrpc)

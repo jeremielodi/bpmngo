@@ -153,6 +153,7 @@ async function main() {
     '56_instance_lifecycle_and_variables.test.ts',
     '57_ops_and_legacy_routes.test.ts',
     '58_camunda_parity.test.ts',
+    '59_rest_int_keys.test.ts',
   ];
 
   const exitCodes: number[] = [];

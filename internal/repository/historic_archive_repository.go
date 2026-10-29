@@ -4,6 +4,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -98,14 +99,25 @@ func (r *HistoricArchiveRepository) InsertProcessInstanceTx(tx *sqlx.Tx, h Histo
 	return err
 }
 
+// InsertActivityInstancesTx writes an instance's token history (about ten
+// rows) in one statement per activityInsertBatch rows, not one per row.
 func (r *HistoricArchiveRepository) InsertActivityInstancesTx(tx *sqlx.Tx, rows []HistoricActivityInstanceRow) error {
-	for _, row := range rows {
-		_, err := tx.Exec(`
-			INSERT INTO public.historic_activity_instances
-				(process_instance_id, execution_id, action, element_id, element_name, task_id, detail, occurred_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		`, row.ProcessInstanceID, row.ExecutionID, row.Action, row.ElementID, row.ElementName, row.TaskID, row.Detail, row.OccurredAt)
-		if err != nil {
+	const activityInsertBatch = 500 // 8 parameters each, far under Postgres's 65535
+	for start := 0; start < len(rows); start += activityInsertBatch {
+		batch := rows[start:min(start+activityInsertBatch, len(rows))]
+		var sb strings.Builder
+		sb.WriteString(`INSERT INTO public.historic_activity_instances
+			(process_instance_id, execution_id, action, element_id, element_name, task_id, detail, occurred_at) VALUES `)
+		args := make([]interface{}, 0, len(batch)*8)
+		for i, row := range batch {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			n := i * 8
+			fmt.Fprintf(&sb, "($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", n+1, n+2, n+3, n+4, n+5, n+6, n+7, n+8)
+			args = append(args, row.ProcessInstanceID, row.ExecutionID, row.Action, row.ElementID, row.ElementName, row.TaskID, row.Detail, row.OccurredAt)
+		}
+		if _, err := tx.Exec(sb.String(), args...); err != nil {
 			return err
 		}
 	}

@@ -54,8 +54,9 @@ services:
     depends_on: !override
       ha-init:
         condition: service_completed_successfully
-      redpanda:
+      redpanda: # only with the "kafka" profile (WRITE_PATH=partitioned, EVENT_LOG=shadow)
         condition: service_healthy
+        required: false
     environment:
       DB_HOST: haproxy
       DB_PORT: 5000

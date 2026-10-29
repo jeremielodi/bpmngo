@@ -18,52 +18,100 @@ import (
 // instance, instead of only the one that happened to run the workflow step.
 const JobAvailableChannel = "goflow_job_available"
 
-// jobWakeChans implements a simple broadcast-per-job-type wake-up: closing a
-// channel wakes every current waiter for that type, and a fresh channel is
-// installed immediately after so the next round of waiters has something to
-// select on. Used to let gRPC's ActivateJobs long-poll react to new jobs
-// near-instantly instead of only on its fallback poll interval.
-var (
-	jobWakeMu    sync.Mutex
-	jobWakeChans = make(map[string]chan struct{})
-)
-
-// NotifyJobAvailable broadcasts, via Postgres NOTIFY, that a job of jobType
-// was created — waking any ActivateJobs callers currently waiting on it, on
-// every BpmnGo instance connected to this database (including this one,
-// which receives its own notification back through the same LISTEN
-// connection started by StartJobWakeListener). Must only be called after the
-// job's creating transaction has committed — waking a waiter before the row
-// is visible would just send it back to an empty query.
+// NotifyJobAvailable announces, via Postgres NOTIFY, that a job of jobType
+// was created — waking a caller waiting for it on every BpmnGo instance
+// connected to this database (including this one, which receives its own
+// notification back through the same LISTEN connection started by
+// StartJobWakeListener). Must only be called after the job's creating
+// transaction has committed — waking a waiter before the row is visible
+// would just send it back to an empty query.
 func NotifyJobAvailable(db *sqlx.DB, jobType string) error {
 	_, err := db.Exec(`SELECT pg_notify($1, $2)`, JobAvailableChannel, jobType)
 	return err
 }
 
-// JobWakeChannel returns the current wake channel for jobType. Callers
-// should grab this *before* checking the DB for available jobs, so a notify
-// that races with that check is never missed — the channel returned here is
-// only closed by a wake (local or via NOTIFY) that happens after this point.
-func JobWakeChannel(jobType string) <-chan struct{} {
-	jobWakeMu.Lock()
-	defer jobWakeMu.Unlock()
-	ch, ok := jobWakeChans[jobType]
-	if !ok {
-		ch = make(chan struct{})
-		jobWakeChans[jobType] = ch
-	}
-	return ch
+// Waiting for jobs. Each caller looking for jobs of a type (gRPC
+// ActivateJobs and StreamActivatedJobs, Camunda 7 fetchAndLock long
+// polling) queues a JobWaiter before it looks. A job created wakes ONE
+// waiter — the longest waiting — not every waiter of the type: waking them
+// all sent each one to fetch, for a single job, the main cost under load.
+// No job is forgotten for it:
+//   - a waiter woken that leaves without fetching (end of its request)
+//     hands the wake to the next waiter (Release);
+//   - a fetch that comes back full wakes another waiter (WakeJobWaiter):
+//     more jobs may be waiting;
+//   - the fallback poll still runs, for a notify missed during a listener
+//     reconnect.
+var (
+	jobWaitMu sync.Mutex
+	jobWaits  = make(map[string][]*JobWaiter)
+)
+
+// JobWaiter is one caller waiting for jobs of a type. C closes when it is
+// woken.
+type JobWaiter struct {
+	jobType string
+	ch      chan struct{}
+	woken   bool // under jobWaitMu
+	C       <-chan struct{}
 }
 
-// wakeLocal closes the current wake channel for jobType (if any waiter has
-// requested one) and installs a fresh one for the next round of waiters.
-func wakeLocal(jobType string) {
-	jobWakeMu.Lock()
-	defer jobWakeMu.Unlock()
-	if ch, ok := jobWakeChans[jobType]; ok {
-		close(ch)
+// WaitForJob queues a waiter for jobType. Call it *before* looking for
+// jobs, so a job created while looking still wakes it.
+func WaitForJob(jobType string) *JobWaiter {
+	ch := make(chan struct{})
+	w := &JobWaiter{jobType: jobType, ch: ch, C: ch}
+	jobWaitMu.Lock()
+	jobWaits[jobType] = append(jobWaits[jobType], w)
+	jobWaitMu.Unlock()
+	return w
+}
+
+// Release takes w out of the queue when its caller stops waiting without
+// having acted on a wake: found jobs, timed out, or left. A wake it had
+// already received goes to the next waiter.
+func (w *JobWaiter) Release() {
+	jobWaitMu.Lock()
+	woken := w.woken
+	if !woken {
+		queue := jobWaits[w.jobType]
+		for i, other := range queue {
+			if other == w {
+				jobWaits[w.jobType] = append(queue[:i:i], queue[i+1:]...)
+				break
+			}
+		}
+		if len(jobWaits[w.jobType]) == 0 {
+			delete(jobWaits, w.jobType)
+		}
 	}
-	jobWakeChans[jobType] = make(chan struct{})
+	jobWaitMu.Unlock()
+	if woken {
+		wakeLocal(w.jobType)
+	}
+}
+
+// WakeJobWaiter wakes one waiter for jobType on this BpmnGo instance (a
+// fetch came back full: more jobs may be waiting).
+func WakeJobWaiter(jobType string) { wakeLocal(jobType) }
+
+// wakeLocal wakes the longest-waiting waiter for jobType, if any. With
+// none, nothing is lost: the next waiter looks for jobs after queuing.
+func wakeLocal(jobType string) {
+	jobWaitMu.Lock()
+	defer jobWaitMu.Unlock()
+	queue := jobWaits[jobType]
+	if len(queue) == 0 {
+		return
+	}
+	w := queue[0]
+	if len(queue) == 1 {
+		delete(jobWaits, jobType)
+	} else {
+		jobWaits[jobType] = queue[1:]
+	}
+	w.woken = true
+	close(w.ch)
 }
 
 // StartJobWakeListener opens a dedicated Postgres LISTEN connection (via

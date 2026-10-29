@@ -59,7 +59,7 @@ In `.env`, set at least:
 - `SUPER_USER_PASSWORD` — the password of the admin account created at first start (`SUPER_USER_EMAIL`, `admin@goflow.com` by default).
 
 ```bash
-# 3. Start everything: PostgreSQL, Redpanda, BpmnGo and the frontend
+# 3. Start everything: PostgreSQL, BpmnGo and the frontend
 docker compose up -d --build --wait
 
 # 4. Check

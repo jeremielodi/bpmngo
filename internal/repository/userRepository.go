@@ -85,6 +85,21 @@ func (r *UserRepository) GetPasswordHash(id uuid.UUID) (models.UserPassword, err
 	return result, err
 }
 
+// FindByEmailWithHash returns a user by email together with their password
+// hash, in one query (Basic authentication checks both on every call).
+func (r *UserRepository) FindByEmailWithHash(email string) (models.User, string, error) {
+	var row struct {
+		models.User
+		PasswordHash string `db:"password_hash"`
+	}
+	err := r.db.Get(&row, `
+        SELECT id, email, full_name, is_active, tenant_id, created_at, updated_at, password_hash
+        FROM public.users
+        WHERE email = $1
+    `, email)
+	return row.User, row.PasswordHash, err
+}
+
 // FindByEmail returns a user (without password_hash) by email.
 func (r *UserRepository) FindByEmail(email string) (models.User, error) {
 	var user models.User

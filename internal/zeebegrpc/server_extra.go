@@ -249,25 +249,29 @@ func (s *Server) StreamActivatedJobs(req *pb.StreamActivatedJobsRequest, stream 
 		if ctx.Err() != nil {
 			return nil
 		}
-		// Snapshot the wake channel before fetching (see ActivateJobs).
-		wake := repository.JobWakeChannel(req.Type)
+		// Queued before fetching (see ActivateJobs).
+		waiter := repository.WaitForJob(req.Type)
 		jobs, err := s.fetchAndLockOneBatch(req.Type, req.Worker, lockDuration, 32)
 		if err != nil {
+			waiter.Release()
 			return status.Error(codes.Internal, err.Error())
 		}
-		for _, job := range jobs {
-			if err := stream.Send(job); err != nil {
-				return err
-			}
-		}
 		if len(jobs) > 0 {
+			waiter.Release()
+			for _, job := range jobs {
+				if err := stream.Send(job); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		select {
 		case <-ctx.Done():
+			waiter.Release()
 			return nil
-		case <-wake:
+		case <-waiter.C:
 		case <-time.After(activateJobsFallbackPoll):
+			waiter.Release()
 		}
 	}
 }

@@ -3,69 +3,80 @@ package repository
 import (
 	"regexp"
 	"testing"
-	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 )
 
-// These tests exercise wakeLocal directly (the pure in-memory broadcast
-// logic) rather than NotifyJobAvailable, which now requires a live Postgres
-// connection to issue NOTIFY — that cross-instance path is covered by
-// TestNotifyJobAvailable_IssuesPgNotify below (via sqlmock) and by the e2e
-// suite against a real database.
+// These tests exercise wakeLocal directly (the in-memory waiter queue)
+// rather than NotifyJobAvailable, which needs a live Postgres to NOTIFY —
+// that path is covered by TestNotifyJobAvailable_IssuesPgNotify below (via
+// sqlmock) and by the e2e suites against a real database.
 
-func TestJobWakeChannel_NotifyWakesExistingWaiter(t *testing.T) {
+func woken(w *JobWaiter) bool {
+	select {
+	case <-w.C:
+		return true
+	default:
+		return false
+	}
+}
+
+func TestJobWaiter_OneJobWakesOneWaiter(t *testing.T) {
 	jobType := "wake-test-" + t.Name()
-	wake := JobWakeChannel(jobType)
+	first, second := WaitForJob(jobType), WaitForJob(jobType)
+	defer second.Release()
 
-	woke := make(chan struct{})
-	go func() {
-		<-wake
-		close(woke)
-	}()
-
-	// Give the goroutine a moment to start waiting before notifying.
-	time.Sleep(10 * time.Millisecond)
 	wakeLocal(jobType)
-
-	select {
-	case <-woke:
-	case <-time.After(time.Second):
-		t.Fatal("waiter was not woken within 1s of wakeLocal")
+	if !woken(first) || woken(second) {
+		t.Fatalf("a job must wake the longest-waiting waiter only: first %v, second %v", woken(first), woken(second))
+	}
+	wakeLocal(jobType)
+	if !woken(second) {
+		t.Fatal("the next job must wake the next waiter")
 	}
 }
 
-func TestJobWakeChannel_UnrelatedTypeIsNotWoken(t *testing.T) {
-	watched := "wake-test-watched-" + t.Name()
-	other := "wake-test-other-" + t.Name()
-	wake := JobWakeChannel(watched)
-
-	wakeLocal(other)
-
-	select {
-	case <-wake:
-		t.Fatal("wake channel for a different job type fired")
-	case <-time.After(50 * time.Millisecond):
+func TestJobWaiter_UnrelatedTypeIsNotWoken(t *testing.T) {
+	w := WaitForJob("wake-test-watched-" + t.Name())
+	defer w.Release()
+	wakeLocal("wake-test-other-" + t.Name())
+	if woken(w) {
+		t.Fatal("a job of another type woke the waiter")
 	}
 }
 
-func TestJobWakeChannel_FreshChannelAfterNotify(t *testing.T) {
-	jobType := "wake-test-fresh-" + t.Name()
-	first := JobWakeChannel(jobType)
+func TestJobWaiter_ReleasedWaiterGetsNoWake(t *testing.T) {
+	jobType := "wake-test-" + t.Name()
+	gone, staying := WaitForJob(jobType), WaitForJob(jobType)
+	defer staying.Release()
+	gone.Release() // its request ended before any job came
+
 	wakeLocal(jobType)
-
-	select {
-	case <-first:
-	default:
-		t.Fatal("expected the pre-notify channel to be closed")
+	if !woken(staying) {
+		t.Fatal("the wake went to a waiter that had left")
 	}
+}
 
-	second := JobWakeChannel(jobType)
-	select {
-	case <-second:
-		t.Fatal("expected a fresh, still-open channel to be installed after notify")
-	default:
+func TestJobWaiter_WokenWaiterLeavingPassesTheWakeOn(t *testing.T) {
+	jobType := "wake-test-" + t.Name()
+	leaving, next := WaitForJob(jobType), WaitForJob(jobType)
+	defer next.Release()
+
+	wakeLocal(jobType) // wakes leaving...
+	leaving.Release()  // ...which stops without fetching
+	if !woken(next) {
+		t.Fatal("a wake received by a waiter that left must go to the next one")
+	}
+}
+
+func TestJobWaiter_NoWaiterNothingQueued(t *testing.T) {
+	jobType := "wake-test-" + t.Name()
+	wakeLocal(jobType) // nobody waiting: the next waiter looks for jobs itself
+	w := WaitForJob(jobType)
+	defer w.Release()
+	if woken(w) {
+		t.Fatal("a waiter queued after a job must not start woken (it fetches first)")
 	}
 }
 

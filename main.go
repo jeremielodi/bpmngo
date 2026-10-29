@@ -5,9 +5,11 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gofiber/contrib/websocket"
@@ -145,25 +147,47 @@ func main() {
 		log.Fatalln("job wake listener: ", err)
 	}
 
-	// Phase 0 shadow-mode event log (see
-	// architecture/event-sourced-kafka-design.md) — optional. If
-	// KAFKA_BROKERS isn't set (e.g. local `go run` outside Docker),
-	// eventlog.Global() stays nil and every publish call site becomes a
-	// silent no-op; nothing about the engine's real write path depends on
-	// this being configured.
-	var eventLogConsumer *eventlog.Consumer
+	// Audit rows are written in batches (see repository/audit_writer.go);
+	// what is still queued is written when the server is asked to stop.
+	repository.StartAuditWriter(context.Background(), db)
+	go func() {
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
+		<-stop
+		repository.FlushAuditLogs()
+		log.Println("Stopping: audit rows written")
+		os.Exit(0)
+	}()
+
+	// Kafka (KAFKA_BROKERS) serves two independent things: the partitioned
+	// write path (WRITE_PATH=partitioned, below) and the Phase 0 shadow-mode
+	// event log (EVENT_LOG=shadow, see
+	// architecture/event-sourced-kafka-design.md). The shadow log feeds only
+	// the /engine-rest/eventlog/* diagnostic routes and their metrics; it
+	// costs a Kafka write per engine event plus its projection in Postgres,
+	// so it is off by default, and in direct mode BpmnGo needs no Kafka at
+	// all. Off, eventlog.Global() stays nil and every publish call site is a
+	// silent no-op.
+	var kafkaBrokers []string
 	if brokersEnv := util.DotEnvVariable("KAFKA_BROKERS"); brokersEnv != "" {
-		brokers := strings.Split(brokersEnv, ",")
-		eventlog.SetGlobalProducer(eventlog.NewProducer(brokers))
+		kafkaBrokers = strings.Split(brokersEnv, ",")
+	}
+	var eventLogConsumer *eventlog.Consumer
+	switch mode := strings.ToLower(strings.TrimSpace(util.DotEnvVariable("EVENT_LOG"))); {
+	case mode == "shadow" && kafkaBrokers == nil:
+		log.Fatalln("EVENT_LOG=shadow needs KAFKA_BROKERS")
+	case mode == "shadow":
+		eventlog.SetGlobalProducer(eventlog.NewProducer(kafkaBrokers))
 		// The projector (one group shared by every replica) and this
-		// replica's watcher (every event: recent-events ring, Command
-		// Gateway waiters).
-		go eventlog.NewConsumer(brokers, "goflow-eventlog-shadow", db).Run(context.Background())
-		eventLogConsumer = eventlog.NewWatcher(brokers)
+		// replica's watcher (every event: recent-events ring).
+		go eventlog.NewConsumer(kafkaBrokers, "goflow-eventlog-shadow", db).Run(context.Background())
+		eventLogConsumer = eventlog.NewWatcher(kafkaBrokers)
 		go eventLogConsumer.Run(context.Background())
-		log.Println("✅ Event log shadow mode started (brokers:", brokersEnv, ")")
-	} else {
-		log.Println("⏭️ KAFKA_BROKERS not set — event log shadow mode disabled")
+		log.Println("✅ Event log shadow mode started (brokers:", strings.Join(kafkaBrokers, ","), ")")
+	case mode == "" || mode == "off":
+		log.Println("⏭️ Event log shadow mode off (EVENT_LOG=shadow to enable it)")
+	default:
+		log.Fatalf("EVENT_LOG must be off or shadow, got %q", mode)
 	}
 
 	// Create task event dispatcher
@@ -179,10 +203,11 @@ func main() {
 		}
 		kafkaPartitions = n
 	}
-	var kafkaBrokers []string
+	if writePathPartitioned() && kafkaBrokers == nil {
+		log.Fatalln("WRITE_PATH=partitioned needs KAFKA_BROKERS")
+	}
 	replicationFactor := 1
-	if eventLogConsumer != nil {
-		kafkaBrokers = strings.Split(util.DotEnvVariable("KAFKA_BROKERS"), ",")
+	if eventLogConsumer != nil || writePathPartitioned() {
 		if v := util.DotEnvVariable("KAFKA_REPLICATION_FACTOR"); v != "" {
 			rf, err := strconv.Atoi(v)
 			if err != nil || rf < 1 {
@@ -190,7 +215,10 @@ func main() {
 			}
 			replicationFactor = rf
 		}
-		topics := []eventlog.TopicSpec{{Name: eventlog.Topic, Partitions: kafkaPartitions}}
+		var topics []eventlog.TopicSpec
+		if eventLogConsumer != nil {
+			topics = append(topics, eventlog.TopicSpec{Name: eventlog.Topic, Partitions: kafkaPartitions})
+		}
 		if writePathPartitioned() {
 			topics = append(topics,
 				eventlog.TopicSpec{Name: partition.CommandsTopic, Partitions: kafkaPartitions, Fixed: true},
@@ -199,8 +227,6 @@ func main() {
 		if err := eventlog.EnsureTopics(kafkaBrokers, replicationFactor, topics...); err != nil {
 			log.Fatalln("Kafka topics: ", err)
 		}
-	} else if writePathPartitioned() {
-		log.Fatalln("WRITE_PATH=partitioned needs KAFKA_BROKERS")
 	}
 
 	// Create SSE listener for real-time events
@@ -645,6 +671,10 @@ func main() {
 	// ============================================================
 	// CAMUNDA 8 REST API ("/v2/...")
 	// ============================================================
+
+	// int64 keys (the gRPC gateway's) work in /v2 paths; REST_KEYS=int
+	// answers with them too.
+	app.Use("/v2", apiv2.KeyTranslation(db))
 
 	app.Post("/v2/resources/deployments", processDefinitionCtrl.DeployBPMN)
 
