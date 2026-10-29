@@ -32,6 +32,8 @@ transactional runtime.
   queues, and 95% confidence intervals across replications;
 - an evidence-based issue register, redesign heuristics, and as-is/to-be
   comparison.
+- immutable scenario revisions with non-destructive restore, portable JSON
+  export/import, and a dashboard comparing any two completed simulation runs.
 
 The studio starts with a neutral scenario rather than a domain-specific
 workflow. Importing a `.bpmn` file discovers tasks and configurable gateway
@@ -75,6 +77,10 @@ All endpoints require authentication. Analysis permissions use
 | `POST /engine-rest/simulation/staffing` | Calculate an Erlang-C staffing curve |
 | `GET/POST /engine-rest/simulation/scenarios` | List or create scenarios |
 | `GET/PUT/DELETE /engine-rest/simulation/scenarios/:id` | Read, update, or delete a scenario |
+| `GET /engine-rest/simulation/scenarios/:id/versions` | List immutable saved revisions |
+| `POST /engine-rest/simulation/scenarios/:id/versions/:version/restore` | Restore a revision as a new current version |
+| `GET /engine-rest/simulation/scenarios/:id/export` | Export a portable scenario package |
+| `POST /engine-rest/simulation/scenarios/import` | Import a portable scenario package |
 | `POST /engine-rest/simulation/scenarios/:id/runs` | Queue a persisted simulation |
 | `POST /engine-rest/simulation/scenarios/:id/capacity-sweeps` | Queue an automatic capacity comparison |
 | `POST /engine-rest/simulation/scenarios/:id/experiments` | Queue a full-factorial multi-parameter experiment |
@@ -84,7 +90,7 @@ All endpoints require authentication. Analysis permissions use
 | `GET/POST /engine-rest/simulation/scenarios/:id/issues` | List or add issues |
 | `PUT/DELETE /engine-rest/simulation/issues/:issueId` | Update or remove an issue |
 
-Install migrations `020`, `021`, and `022` before deploying this version to an
+Install migrations `020` through `023` before deploying this version to an
 existing database. New databases receive the tables from the baseline schema.
 `SIMULATION_WORKERS` controls concurrency (default `2`, maximum `16`).
 

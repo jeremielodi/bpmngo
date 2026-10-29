@@ -92,6 +92,12 @@ type Scenario struct {
 	Flows              map[string]FlowParameters     `json:"flows"`
 }
 
+type ScenarioPackage struct {
+	Format     string    `json:"format"`
+	ExportedAt time.Time `json:"exportedAt"`
+	Scenario   Scenario  `json:"scenario"`
+}
+
 type AnalyticElement struct {
 	ElementID           string  `json:"elementId"`
 	ElementName         string  `json:"elementName"`

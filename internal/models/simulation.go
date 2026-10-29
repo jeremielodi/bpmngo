@@ -8,14 +8,26 @@ import (
 )
 
 type SimulationScenario struct {
+	ID             uuid.UUID       `db:"id" json:"id"`
+	Name           string          `db:"name" json:"name"`
+	BPMNXML        string          `db:"bpmn_xml" json:"bpmnXml"`
+	Configuration  json.RawMessage `db:"configuration" json:"configuration"`
+	CreatedBy      *uuid.UUID      `db:"created_by" json:"createdBy,omitempty"`
+	TenantID       *string         `db:"tenant_id" json:"tenantId,omitempty"`
+	CurrentVersion int             `db:"current_version" json:"currentVersion"`
+	CreatedAt      time.Time       `db:"created_at" json:"createdAt"`
+	UpdatedAt      time.Time       `db:"updated_at" json:"updatedAt"`
+}
+
+type SimulationScenarioVersion struct {
 	ID            uuid.UUID       `db:"id" json:"id"`
+	ScenarioID    uuid.UUID       `db:"scenario_id" json:"scenarioId"`
+	Version       int             `db:"version" json:"version"`
 	Name          string          `db:"name" json:"name"`
-	BPMNXML       string          `db:"bpmn_xml" json:"bpmnXml"`
-	Configuration json.RawMessage `db:"configuration" json:"configuration"`
+	BPMNXML       string          `db:"bpmn_xml" json:"bpmnXml,omitempty"`
+	Configuration json.RawMessage `db:"configuration" json:"configuration,omitempty"`
 	CreatedBy     *uuid.UUID      `db:"created_by" json:"createdBy,omitempty"`
-	TenantID      *string         `db:"tenant_id" json:"tenantId,omitempty"`
 	CreatedAt     time.Time       `db:"created_at" json:"createdAt"`
-	UpdatedAt     time.Time       `db:"updated_at" json:"updatedAt"`
 }
 
 type SimulationRun struct {

@@ -63,6 +63,7 @@ des incidents déjà enregistrés.
 | 020 | `020_simulation_lab.sql` | scénarios BPMN, campagnes de simulation et registre de problèmes | laboratoire d'analyse, dimensionnement et redesign |
 | 021 | `021_simulation_async_sweeps.sql` | file asynchrone des simulations, progression, annulation et campagnes de capacité | nécessite 020 |
 | 022 | `022_simulation_multi_parameter_experiments.sql` | expériences de simulation multi-paramètres | nécessite 021 |
+| 023 | `023_simulation_scenario_versions.sql` | versionnement, restauration et export des scénarios | nécessite 022 |
 
 Pour voir où en est une base :
 

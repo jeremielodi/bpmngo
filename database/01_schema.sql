@@ -1129,12 +1129,26 @@ CREATE TABLE IF NOT EXISTS public.simulation_scenarios (
     configuration JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
     tenant_id TEXT,
+    current_version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ALTER TABLE public.simulation_scenarios ADD COLUMN IF NOT EXISTS tenant_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_simulation_scenarios_created_at ON public.simulation_scenarios(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_simulation_scenarios_tenant ON public.simulation_scenarios(tenant_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.simulation_scenario_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scenario_id UUID NOT NULL REFERENCES public.simulation_scenarios(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    bpmn_xml TEXT NOT NULL,
+    configuration JSONB NOT NULL,
+    created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (scenario_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_simulation_scenario_versions_scenario ON public.simulation_scenario_versions(scenario_id, version DESC);
 
 CREATE TABLE IF NOT EXISTS public.simulation_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1242,6 +1256,10 @@ ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
 VALUES ('022', 'expériences de simulation multi-paramètres')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('023', 'versionnement, restauration et export des scénarios de simulation')
 ON CONFLICT (version) DO NOTHING;
 
 -- Finalise la transition hybride construite ci-dessus. `\ir` est résolu

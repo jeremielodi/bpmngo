@@ -37,7 +37,7 @@ func (s *SimulationService) CreateScenario(scenario simulation.Scenario, userID 
 	return s.repository.CreateScenario(scenario.Name, scenario.BPMNXML, configuration, userID, tenantID)
 }
 
-func (s *SimulationService) UpdateScenario(id uuid.UUID, scenario simulation.Scenario, tenantID string) (*models.SimulationScenario, error) {
+func (s *SimulationService) UpdateScenario(id uuid.UUID, scenario simulation.Scenario, userID uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
 	if err := simulation.ValidateRunnable(scenario); err != nil {
 		return nil, err
 	}
@@ -48,7 +48,26 @@ func (s *SimulationService) UpdateScenario(id uuid.UUID, scenario simulation.Sce
 	if err != nil {
 		return nil, err
 	}
-	return s.repository.UpdateScenario(id, scenario.Name, scenario.BPMNXML, configuration, tenantID)
+	return s.repository.UpdateScenario(id, scenario.Name, scenario.BPMNXML, configuration, userID, tenantID)
+}
+
+func (s *SimulationService) RestoreScenarioVersion(id uuid.UUID, version int, userID uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
+	return s.repository.RestoreScenarioVersion(id, version, userID, tenantID)
+}
+
+func (s *SimulationService) ExportScenario(id uuid.UUID, tenantID string) (simulation.ScenarioPackage, error) {
+	scenario, err := s.LoadScenario(id, tenantID)
+	if err != nil {
+		return simulation.ScenarioPackage{}, err
+	}
+	return simulation.ScenarioPackage{Format: "bpmngo-simulation-scenario/v1", ExportedAt: time.Now().UTC(), Scenario: scenario}, nil
+}
+
+func (s *SimulationService) ImportScenario(pkg simulation.ScenarioPackage, userID uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
+	if pkg.Format != "bpmngo-simulation-scenario/v1" {
+		return nil, fmt.Errorf("unsupported scenario package format %q", pkg.Format)
+	}
+	return s.CreateScenario(pkg.Scenario, userID, tenantID)
 }
 
 func (s *SimulationService) LoadScenario(id uuid.UUID, tenantID string) (simulation.Scenario, error) {

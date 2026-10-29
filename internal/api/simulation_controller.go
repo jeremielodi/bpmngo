@@ -70,11 +70,64 @@ func (ctrl *SimulationController) UpdateScenario(c *fiber.Ctx) error {
 	if err = c.BodyParser(&input); err != nil {
 		return badRequest(c, err)
 	}
-	row, err := ctrl.service.UpdateScenario(id, input, common.GetTenantId(c))
+	row, err := ctrl.service.UpdateScenario(id, input, currentUserID(c), common.GetTenantId(c))
 	if err != nil {
 		return mutationError(c, err)
 	}
 	return c.JSON(row)
+}
+
+func (ctrl *SimulationController) ListScenarioVersions(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return badRequest(c, err)
+	}
+	rows, err := ctrl.repository.ListScenarioVersions(id, common.GetTenantId(c))
+	if err != nil {
+		return repositoryError(c, err)
+	}
+	return c.JSON(rows)
+}
+
+func (ctrl *SimulationController) RestoreScenarioVersion(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return badRequest(c, err)
+	}
+	version, err := c.ParamsInt("version")
+	if err != nil || version < 1 {
+		return badRequest(c, errors.New("version must be a positive integer"))
+	}
+	row, err := ctrl.service.RestoreScenarioVersion(id, version, currentUserID(c), common.GetTenantId(c))
+	if err != nil {
+		return mutationError(c, err)
+	}
+	return c.JSON(row)
+}
+
+func (ctrl *SimulationController) ExportScenario(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return badRequest(c, err)
+	}
+	pkg, err := ctrl.service.ExportScenario(id, common.GetTenantId(c))
+	if err != nil {
+		return repositoryError(c, err)
+	}
+	c.Set(fiber.HeaderContentDisposition, "attachment; filename=simulation-scenario-"+id.String()+".json")
+	return c.JSON(pkg)
+}
+
+func (ctrl *SimulationController) ImportScenario(c *fiber.Ctx) error {
+	var pkg simulation.ScenarioPackage
+	if err := c.BodyParser(&pkg); err != nil {
+		return badRequest(c, err)
+	}
+	row, err := ctrl.service.ImportScenario(pkg, currentUserID(c), common.GetTenantId(c))
+	if err != nil {
+		return mutationError(c, err)
+	}
+	return c.Status(fiber.StatusCreated).JSON(row)
 }
 
 func (ctrl *SimulationController) DeleteScenario(c *fiber.Ctx) error {

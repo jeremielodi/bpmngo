@@ -3,9 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, BarChart3, Calculator, FlaskConical, Play, Save, Upload } from 'lucide-react';
 import {
-  analyzeScenario, calculateStaffing, cancelSimulationRun, createIssue, createScenario, getSimulationRun, listIssues, listScenarios,
-  listSimulationRuns, runCapacitySweep, runExperiment, runStoredScenario, updateIssue, updateScenario, type AnalyticResult, type CapacitySweepRequest,
-  type CapacitySweepResult, type ExperimentRequest, type ExperimentResult, type Scenario, type SimulationResult, type SimulationRun, type StaffingResult,
+  analyzeScenario, calculateStaffing, cancelSimulationRun, createIssue, createScenario, exportScenario, getSimulationRun, importScenario, listIssues, listScenarios,
+  listScenarioVersions, listSimulationRuns, restoreScenarioVersion, runCapacitySweep, runExperiment, runStoredScenario, updateIssue, updateScenario, type AnalyticResult, type CapacitySweepRequest,
+  type CapacitySweepResult, type ExperimentRequest, type ExperimentResult, type Scenario, type ScenarioPackage, type SimulationResult, type SimulationRun, type StaffingResult, type StoredScenario,
 } from '../api/simulation';
 import { emptyScenario, supportOperationsExample } from '../data/simulationExamples';
 import { configureScenarioFromBpmn, type ImportSummary } from '../utils/simulationImport';
@@ -42,7 +42,9 @@ export default function SimulationLab() {
   const [experimentInput,setExperimentInput] = useState<ExperimentRequest>({dimensions:[{path:'arrivalRatePerHour',values:[0.5,1,2]}],objective:'mean_cycle'});
   const [importSummary,setImportSummary] = useState<ImportSummary>();
   const [showXml,setShowXml] = useState(false);
+  const [selectedVersion,setSelectedVersion] = useState(0);
   const {data:stored=[]} = useQuery({queryKey:['simulation-scenarios'],queryFn:listScenarios,retry:false});
+  const {data:versions=[]} = useQuery({queryKey:['simulation-versions',scenarioId],queryFn:()=>listScenarioVersions(scenarioId),enabled:!!scenarioId});
   const {data:runs=[]} = useQuery({queryKey:['simulation-runs',scenarioId],queryFn:()=>listSimulationRuns(scenarioId),enabled:!!scenarioId,refetchInterval:scenarioId?2000:false});
   const {data:activeRun} = useQuery({queryKey:['simulation-run',activeRunId],queryFn:()=>getSimulationRun(activeRunId),enabled:!!activeRunId,refetchInterval:1000});
   const activityRows = useMemo(()=>Object.entries(scenario.activities),[scenario.activities]);
@@ -80,10 +82,10 @@ export default function SimulationLab() {
     patchActivity(id,{[kind]:next});
   };
   const resetWorkspace = () => {
-    setScenario(emptyScenario());setScenarioId('');setAnalytic(undefined);setResult(undefined);setSweepResult(undefined);setExperimentResult(undefined);setBaseline(undefined);setImportSummary(undefined);setTab('setup');
+    setScenario(emptyScenario());setScenarioId('');setSelectedVersion(0);setAnalytic(undefined);setResult(undefined);setSweepResult(undefined);setExperimentResult(undefined);setBaseline(undefined);setImportSummary(undefined);setTab('setup');
   };
   const loadExample = () => {
-    setScenario(structuredClone(supportOperationsExample));setScenarioId('');setAnalytic(undefined);setResult(undefined);setSweepResult(undefined);setExperimentResult(undefined);setImportSummary({processName:'Support operations',activityCount:Object.keys(supportOperationsExample.activities).length,branchFlowCount:Object.keys(supportOperationsExample.flows).length});setTab('setup');
+    setScenario(structuredClone(supportOperationsExample));setScenarioId('');setSelectedVersion(0);setAnalytic(undefined);setResult(undefined);setSweepResult(undefined);setExperimentResult(undefined);setImportSummary({processName:'Support operations',activityCount:Object.keys(supportOperationsExample.activities).length,branchFlowCount:Object.keys(supportOperationsExample.flows).length});setTab('setup');
   };
   const importBpmn = async (file:File) => {
     const xml=await file.text();
@@ -92,11 +94,21 @@ export default function SimulationLab() {
   };
   const save = async () => {
     const row = scenarioId ? await updateScenario(scenarioId,scenario) : await createScenario(scenario);
-    setScenarioId(row.id);await queryClient.invalidateQueries({queryKey:['simulation-scenarios']});return row.id;
+    setScenarioId(row.id);setSelectedVersion(row.currentVersion);await queryClient.invalidateQueries({queryKey:['simulation-scenarios']});await queryClient.invalidateQueries({queryKey:['simulation-versions',row.id]});return row.id;
+  };
+  const applyStoredScenario = (row:StoredScenario) => {
+    setScenarioId(row.id);setScenario({...row.configuration,name:row.name,bpmnXml:row.bpmnXml});setSelectedVersion(row.currentVersion);setAnalytic(undefined);setResult(undefined);setSweepResult(undefined);setExperimentResult(undefined);setImportSummary(undefined);
   };
   const loadStored = (id:string) => {
     const row=stored.find(item=>item.id===id);if(!row)return;
-    setScenarioId(id);setScenario({...row.configuration,name:row.name,bpmnXml:row.bpmnXml});setAnalytic(undefined);setResult(undefined);setSweepResult(undefined);setExperimentResult(undefined);setImportSummary(undefined);
+    applyStoredScenario(row);
+  };
+  const downloadScenario = async () => {
+    if(!scenarioId)return;
+    const pkg=await exportScenario(scenarioId);const blob=new Blob([JSON.stringify(pkg,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=`${scenario.name.replace(/[^a-z0-9-_]+/gi,'-').toLowerCase()||'scenario'}.simulation.json`;anchor.click();URL.revokeObjectURL(url);
+  };
+  const uploadScenario = async (file:File) => {
+    const pkg=JSON.parse(await file.text()) as ScenarioPackage;const row=await importScenario(pkg);applyStoredScenario(row);await queryClient.invalidateQueries({queryKey:['simulation-scenarios']});
   };
 
   return <div className="p-6 space-y-5">
@@ -105,6 +117,8 @@ export default function SimulationLab() {
       <div className="flex flex-wrap gap-2">
         <Link to="/modeler" className="px-3 py-2 text-sm border rounded-lg bg-white">Open modeler</Link>
         <select value={scenarioId} onChange={e=>e.target.value?loadStored(e.target.value):resetWorkspace()} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"><option value="">Unsaved scenario</option>{stored.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+        {scenarioId&&<><select value={selectedVersion||stored.find(item=>item.id===scenarioId)?.currentVersion||0} onChange={e=>setSelectedVersion(Number(e.target.value))} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">{versions.map(version=><option key={version.id} value={version.version}>Version {version.version} · {new Date(version.createdAt).toLocaleString()}</option>)}</select><button disabled={!selectedVersion||selectedVersion===stored.find(item=>item.id===scenarioId)?.currentVersion} onClick={()=>execute('restore',async()=>{const row=await restoreScenarioVersion(scenarioId,selectedVersion);applyStoredScenario(row);await queryClient.invalidateQueries({queryKey:['simulation-scenarios']});await queryClient.invalidateQueries({queryKey:['simulation-versions',scenarioId]})})} className="px-3 py-2 text-sm border rounded-lg bg-white disabled:opacity-50">Restore version</button><button onClick={()=>execute('export',downloadScenario)} className="px-3 py-2 text-sm border rounded-lg bg-white">Export</button></>}
+        <label className="px-3 py-2 text-sm border rounded-lg bg-white cursor-pointer">Import<input type="file" accept=".json" className="hidden" onChange={async e=>{const file=e.target.files?.[0];if(file)await execute('import-package',()=>uploadScenario(file))}}/></label>
         <button onClick={resetWorkspace} className="px-3 py-2 text-sm border rounded-lg bg-white">New scenario</button>
         <button onClick={loadExample} className="px-3 py-2 text-sm border rounded-lg bg-white">Load support example</button>
       </div>
@@ -175,6 +189,11 @@ function Campaigns({scenario,input,setInput,experimentInput,setExperimentInput,r
   result?:CapacitySweepResult;experimentResult?:ExperimentResult;disabled:boolean;onStart:()=>void;onStartExperiment:()=>void;onOpen:(run:SimulationRun)=>void;onTrack:(run:SimulationRun)=>void;onCancel:(run:SimulationRun)=>void;
 }) {
   const suggestedPaths=['arrivalRatePerHour','durationHours','maxArrivals',...(scenario.arrivalPattern?[`arrivalPattern.ratePerHour`,`arrivalPattern.batchSize`]:[]),...scenario.resources.flatMap(resource=>[`resource.${resource.id}.capacity`,`resource.${resource.id}.costPerHour`]),...Object.keys(scenario.activities).flatMap(id=>[`activity.${id}.processingTime.value`,`activity.${id}.processingTime.mean`,`activity.${id}.waitingTime.value`,`activity.${id}.waitingTime.mean`,`activity.${id}.priority`]),...Object.keys(scenario.flows).map(id=>`flow.${id}.probability`)];
+  const simulationRuns=runs.filter(run=>run.runType==='simulation'&&run.status==='completed'&&run.result) as Array<SimulationRun&{result:SimulationResult}>;
+  const [compareA,setCompareA]=useState('');
+  const [compareB,setCompareB]=useState('');
+  const comparisonA=simulationRuns.find(run=>run.id===compareA);
+  const comparisonB=simulationRuns.find(run=>run.id===compareB);
   return <div className="space-y-5">
     <div className="grid lg:grid-cols-3 gap-5">
       <Card><CardHeader title="Capacity sweep" subtitle="Run the same seeded experiment for every capacity."/><div className="p-6 pt-2 space-y-4">
@@ -189,6 +208,7 @@ function Campaigns({scenario,input,setInput,experimentInput,setExperimentInput,r
       <Card className="lg:col-span-2"><CardHeader title={result?.recommendedCapacity?`Recommended capacity: ${result.recommendedCapacity}`:'Capacity comparison'} subtitle="The first capacity meeting all non-zero targets is recommended."/>{result?<Table><Thead><tr><Th>Capacity</Th><Th>Mean cycle</Th><Th>p95</Th><Th>Throughput</Th><Th>Utilization</Th><Th>Mean cost</Th><Th>Target</Th></tr></Thead><tbody>{result.points.map(point=><Tr key={point.capacity}><Td>{point.capacity}</Td><Td>{point.meanCycleMinutes.toFixed(1)} min</Td><Td>{point.p95CycleMinutes.toFixed(1)} min</Td><Td>{point.throughputPerHour.toFixed(2)}/h</Td><Td>{(point.utilization*100).toFixed(1)}%</Td><Td>{point.meanCost.toFixed(2)}</Td><Td>{point.meetsTarget?'✓':'—'}</Td></Tr>)}</tbody></Table>:<p className="p-8 text-sm text-gray-500 text-center">Launch a sweep or open a completed campaign.</p>}</Card>
     </div>
     <div className="grid lg:grid-cols-3 gap-5"><Card><CardHeader title="Multi-parameter experiment" subtitle="Run a full-factorial design with up to 256 combinations."/><div className="p-6 pt-2 space-y-4"><Field label="Optimization objective"><select value={experimentInput.objective??'mean_cycle'} onChange={e=>setExperimentInput({...experimentInput,objective:e.target.value as ExperimentRequest['objective']})} className="input"><option value="mean_cycle">Minimize mean cycle</option><option value="p95_cycle">Minimize p95 cycle</option><option value="cost">Minimize mean cost</option><option value="throughput">Maximize throughput</option></select></Field>{experimentInput.dimensions.map((dimension,index)=><div key={index} className="border rounded-lg p-3 space-y-2"><Field label={`Parameter ${index+1}`}><input list="experiment-paths" value={dimension.path} onChange={e=>setExperimentInput({...experimentInput,dimensions:experimentInput.dimensions.map((item,i)=>i===index?{...item,path:e.target.value}:item)})} className="input"/></Field><Field label="Values (comma separated)"><input value={dimension.values.join(', ')} onChange={e=>setExperimentInput({...experimentInput,dimensions:experimentInput.dimensions.map((item,i)=>i===index?{...item,values:parseCommaList(e.target.value).map(Number).filter(Number.isFinite)}:item)})} className="input"/></Field><button onClick={()=>setExperimentInput({...experimentInput,dimensions:experimentInput.dimensions.filter((_,i)=>i!==index)})} className="text-xs text-red-600">Remove dimension</button></div>)}<datalist id="experiment-paths">{suggestedPaths.map(path=><option key={path} value={path}/>)}</datalist><button onClick={()=>setExperimentInput({...experimentInput,dimensions:[...experimentInput.dimensions,{path:suggestedPaths[0]??'arrivalRatePerHour',values:[1,2]}]})} className="text-sm text-blue-600">+ Add dimension</button><div className="grid grid-cols-2 gap-3"><NumberField label="Max mean cycle" value={experimentInput.targetMeanCycleMinutes??0} onChange={value=>setExperimentInput({...experimentInput,targetMeanCycleMinutes:value})}/><NumberField label="Max p95 cycle" value={experimentInput.targetP95CycleMinutes??0} onChange={value=>setExperimentInput({...experimentInput,targetP95CycleMinutes:value})}/><NumberField label="Max mean cost" value={experimentInput.maximumMeanCost??0} onChange={value=>setExperimentInput({...experimentInput,maximumMeanCost:value})}/><NumberField label="Min throughput" value={experimentInput.minimumThroughput??0} onChange={value=>setExperimentInput({...experimentInput,minimumThroughput:value})}/></div><button disabled={disabled||experimentInput.dimensions.length===0||experimentInput.dimensions.some(d=>!d.path||d.values.length===0)} onClick={onStartExperiment} className="w-full px-4 py-2 rounded-lg bg-blue-600 disabled:bg-blue-300 text-white text-sm">Run factorial experiment</button></div></Card><Card className="lg:col-span-2"><CardHeader title={experimentResult?.recommendedPoint!=null?`Recommended combination #${experimentResult.recommendedPoint+1}`:'Experiment comparison'} subtitle="The best feasible point is selected using the configured objective."/>{experimentResult?<div className="overflow-x-auto"><Table><Thead><tr><Th>#</Th><Th>Parameters</Th><Th>Mean cycle</Th><Th>p95</Th><Th>Throughput</Th><Th>Cost</Th><Th>Feasible</Th></tr></Thead><tbody>{experimentResult.points.map((point,index)=><Tr key={index}><Td>{index+1}{experimentResult.recommendedPoint===index?' ★':''}</Td><Td><code className="text-xs whitespace-nowrap">{Object.entries(point.parameters).map(([path,value])=>`${path}=${value}`).join(', ')}</code>{point.error&&<p className="text-xs text-red-600">{point.error}</p>}</Td><Td>{point.error?'—':point.meanCycleMinutes.toFixed(1)}</Td><Td>{point.error?'—':point.p95CycleMinutes.toFixed(1)}</Td><Td>{point.error?'—':point.throughputPerHour.toFixed(2)}</Td><Td>{point.error?'—':point.meanCost.toFixed(2)}</Td><Td>{point.meetsConstraints?'✓':'—'}</Td></Tr>)}</tbody></Table></div>:<p className="p-8 text-sm text-gray-500 text-center">Configure two or more parameters to explore process-design tradeoffs.</p>}</Card></div>
+    <Card><CardHeader title="Run comparison dashboard" subtitle="Compare two completed simulation campaigns of this scenario."/><div className="p-6 pt-2 space-y-4"><div className="grid sm:grid-cols-2 gap-4"><Field label="Baseline run"><select value={compareA} onChange={e=>setCompareA(e.target.value)} className="input"><option value="">Select a run</option>{simulationRuns.map(run=><option key={run.id} value={run.id}>{new Date(run.completedAt??run.startedAt).toLocaleString()}</option>)}</select></Field><Field label="Comparison run"><select value={compareB} onChange={e=>setCompareB(e.target.value)} className="input"><option value="">Select a run</option>{simulationRuns.map(run=><option key={run.id} value={run.id}>{new Date(run.completedAt??run.startedAt).toLocaleString()}</option>)}</select></Field></div>{comparisonA&&comparisonB?<Table><Thead><tr><Th>Metric</Th><Th>Baseline</Th><Th>Comparison</Th><Th>Change</Th></tr></Thead><tbody>{[['Mean cycle',comparisonA.result.metrics.meanCycleMinutes,comparisonB.result.metrics.meanCycleMinutes],['p95 cycle',comparisonA.result.metrics.p95CycleMinutes,comparisonB.result.metrics.p95CycleMinutes],['Throughput / hour',comparisonA.result.metrics.throughputPerHour,comparisonB.result.metrics.throughputPerHour],['Mean cost',comparisonA.result.metrics.meanCost,comparisonB.result.metrics.meanCost],['Cycle efficiency (%)',comparisonA.result.metrics.cycleTimeEfficiency*100,comparisonB.result.metrics.cycleTimeEfficiency*100]].map(([label,left,right])=><Tr key={String(label)}><Td>{label}</Td><Td>{Number(left).toFixed(2)}</Td><Td>{Number(right).toFixed(2)}</Td><Td>{delta(Number(right),Number(left),'')}</Td></Tr>)}</tbody></Table>:<p className="text-sm text-gray-500">Select two completed simulation runs to compare their operational outcomes.</p>}</div></Card>
     <Card><CardHeader title="Campaign history" subtitle="Queued and running campaigns survive page navigation and application restarts."/>{runs.length===0?<p className="p-8 text-sm text-gray-500 text-center">No campaign for this scenario.</p>:<Table><Thead><tr><Th>Type</Th><Th>Status</Th><Th>Progress</Th><Th>Started</Th><Th></Th></tr></Thead><tbody>{runs.map(run=><Tr key={run.id}><Td>{run.runType==='capacity_sweep'?'Capacity sweep':run.runType==='experiment'?'Experiment':'Simulation'}</Td><Td><span className="capitalize">{run.status}</span></Td><Td>{run.progress}%</Td><Td>{new Date(run.startedAt).toLocaleString()}</Td><Td><div className="flex gap-2">{run.status==='completed'&&run.result&&<button onClick={()=>onOpen(run)} className="text-xs text-blue-600">Open</button>}{(run.status==='queued'||run.status==='running')&&<><button onClick={()=>onTrack(run)} className="text-xs text-blue-600">Track</button><button onClick={()=>onCancel(run)} className="text-xs text-red-600">Cancel</button></>}</div></Td></Tr>)}</tbody></Table>}</Card>
   </div>;
 }

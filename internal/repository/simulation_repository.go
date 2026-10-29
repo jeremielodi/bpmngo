@@ -14,29 +14,93 @@ type SimulationRepository struct{ db *sqlx.DB }
 func NewSimulationRepository(db *sqlx.DB) *SimulationRepository { return &SimulationRepository{db: db} }
 
 func (r *SimulationRepository) CreateScenario(name, bpmnXML string, configuration json.RawMessage, userID uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
 	var row models.SimulationScenario
-	err := r.db.Get(&row, `INSERT INTO simulation_scenarios(name,bpmn_xml,configuration,created_by,tenant_id)
-		VALUES($1,$2,$3,$4,$5) RETURNING id,name,bpmn_xml,configuration,created_by,tenant_id,created_at,updated_at`, name, bpmnXML, configuration, nullableUUID(userID), nullableText(tenantID))
-	return &row, err
+	err = tx.Get(&row, `INSERT INTO simulation_scenarios(name,bpmn_xml,configuration,created_by,tenant_id)
+		VALUES($1,$2,$3,$4,$5) RETURNING id,name,bpmn_xml,configuration,created_by,tenant_id,current_version,created_at,updated_at`, name, bpmnXML, configuration, nullableUUID(userID), nullableText(tenantID))
+	if err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(`INSERT INTO simulation_scenario_versions(scenario_id,version,name,bpmn_xml,configuration,created_by)
+		VALUES($1,$2,$3,$4,$5,$6)`, row.ID, row.CurrentVersion, row.Name, row.BPMNXML, row.Configuration, nullableUUID(userID)); err != nil {
+		return nil, err
+	}
+	return &row, tx.Commit()
 }
 
-func (r *SimulationRepository) UpdateScenario(id uuid.UUID, name, bpmnXML string, configuration json.RawMessage, tenantID string) (*models.SimulationScenario, error) {
+func (r *SimulationRepository) UpdateScenario(id uuid.UUID, name, bpmnXML string, configuration json.RawMessage, userID uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
 	var row models.SimulationScenario
-	err := r.db.Get(&row, `UPDATE simulation_scenarios SET name=$2,bpmn_xml=$3,configuration=$4,updated_at=NOW()
-		WHERE id=$1 AND ($5='' OR tenant_id=$5) RETURNING id,name,bpmn_xml,configuration,created_by,tenant_id,created_at,updated_at`, id, name, bpmnXML, configuration, tenantID)
-	return &row, err
+	err = tx.Get(&row, `UPDATE simulation_scenarios SET name=$2,bpmn_xml=$3,configuration=$4,current_version=current_version+1,updated_at=NOW()
+		WHERE id=$1 AND ($5='' OR tenant_id=$5) RETURNING id,name,bpmn_xml,configuration,created_by,tenant_id,current_version,created_at,updated_at`, id, name, bpmnXML, configuration, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(`INSERT INTO simulation_scenario_versions(scenario_id,version,name,bpmn_xml,configuration,created_by)
+		VALUES($1,$2,$3,$4,$5,$6)`, row.ID, row.CurrentVersion, row.Name, row.BPMNXML, row.Configuration, nullableUUID(userID)); err != nil {
+		return nil, err
+	}
+	return &row, tx.Commit()
 }
 
 func (r *SimulationRepository) GetScenario(id uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
 	var row models.SimulationScenario
-	err := r.db.Get(&row, `SELECT id,name,bpmn_xml,configuration,created_by,tenant_id,created_at,updated_at FROM simulation_scenarios WHERE id=$1 AND ($2='' OR tenant_id=$2)`, id, tenantID)
+	err := r.db.Get(&row, `SELECT id,name,bpmn_xml,configuration,created_by,tenant_id,current_version,created_at,updated_at FROM simulation_scenarios WHERE id=$1 AND ($2='' OR tenant_id=$2)`, id, tenantID)
 	return &row, err
 }
 
 func (r *SimulationRepository) ListScenarios(tenantID string) ([]models.SimulationScenario, error) {
 	rows := []models.SimulationScenario{}
-	err := r.db.Select(&rows, `SELECT id,name,bpmn_xml,configuration,created_by,tenant_id,created_at,updated_at FROM simulation_scenarios WHERE ($1='' OR tenant_id=$1) ORDER BY updated_at DESC`, tenantID)
+	err := r.db.Select(&rows, `SELECT id,name,bpmn_xml,configuration,created_by,tenant_id,current_version,created_at,updated_at FROM simulation_scenarios WHERE ($1='' OR tenant_id=$1) ORDER BY updated_at DESC`, tenantID)
 	return rows, err
+}
+
+func (r *SimulationRepository) ListScenarioVersions(scenarioID uuid.UUID, tenantID string) ([]models.SimulationScenarioVersion, error) {
+	rows := []models.SimulationScenarioVersion{}
+	err := r.db.Select(&rows, `SELECT v.id,v.scenario_id,v.version,v.name,v.created_by,v.created_at
+		FROM simulation_scenario_versions v JOIN simulation_scenarios s ON s.id=v.scenario_id
+		WHERE v.scenario_id=$1 AND ($2='' OR s.tenant_id=$2) ORDER BY v.version DESC`, scenarioID, tenantID)
+	return rows, err
+}
+
+func (r *SimulationRepository) GetScenarioVersion(scenarioID uuid.UUID, version int, tenantID string) (*models.SimulationScenarioVersion, error) {
+	var row models.SimulationScenarioVersion
+	err := r.db.Get(&row, `SELECT v.id,v.scenario_id,v.version,v.name,v.bpmn_xml,v.configuration,v.created_by,v.created_at
+		FROM simulation_scenario_versions v JOIN simulation_scenarios s ON s.id=v.scenario_id
+		WHERE v.scenario_id=$1 AND v.version=$2 AND ($3='' OR s.tenant_id=$3)`, scenarioID, version, tenantID)
+	return &row, err
+}
+
+func (r *SimulationRepository) RestoreScenarioVersion(scenarioID uuid.UUID, version int, userID uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var source models.SimulationScenarioVersion
+	if err = tx.Get(&source, `SELECT v.id,v.scenario_id,v.version,v.name,v.bpmn_xml,v.configuration,v.created_by,v.created_at
+		FROM simulation_scenario_versions v JOIN simulation_scenarios s ON s.id=v.scenario_id
+		WHERE v.scenario_id=$1 AND v.version=$2 AND ($3='' OR s.tenant_id=$3) FOR UPDATE OF s`, scenarioID, version, tenantID); err != nil {
+		return nil, err
+	}
+	var row models.SimulationScenario
+	if err = tx.Get(&row, `UPDATE simulation_scenarios SET name=$2,bpmn_xml=$3,configuration=$4,current_version=current_version+1,updated_at=NOW()
+		WHERE id=$1 RETURNING id,name,bpmn_xml,configuration,created_by,tenant_id,current_version,created_at,updated_at`, scenarioID, source.Name, source.BPMNXML, source.Configuration); err != nil {
+		return nil, err
+	}
+	if _, err = tx.Exec(`INSERT INTO simulation_scenario_versions(scenario_id,version,name,bpmn_xml,configuration,created_by)
+		VALUES($1,$2,$3,$4,$5,$6)`, row.ID, row.CurrentVersion, row.Name, row.BPMNXML, row.Configuration, nullableUUID(userID)); err != nil {
+		return nil, err
+	}
+	return &row, tx.Commit()
 }
 
 func (r *SimulationRepository) DeleteScenario(id uuid.UUID, tenantID string) error {
