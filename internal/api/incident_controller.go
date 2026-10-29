@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-
 	"errors"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -13,6 +12,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
+	"strconv"
 )
 
 type IncidentController struct {
@@ -53,10 +53,7 @@ func (ctrl *IncidentController) checkIncidentAccess(c *fiber.Ctx, instanceID uui
 // (real Zeebe's own Gateway protocol has none either — real clients learn
 // incident keys from Operate/exporters, outside the Gateway).
 func (ctrl *IncidentController) withZeebeKey(inc *models.Incident) (map[string]interface{}, error) {
-	zeebeKey, err := ctrl.zeebeKeys.GetOrAssignKey("incident", inc.ID)
-	if err != nil {
-		return nil, err
-	}
+	zeebeKey := inc.ID
 	b, err := json.Marshal(inc)
 	if err != nil {
 		return nil, err
@@ -117,7 +114,7 @@ func (ctrl *IncidentController) ListIncidents(c *fiber.Ctx) error {
 
 // GET /engine-rest/incident/:id
 func (ctrl *IncidentController) GetIncident(c *fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"message": "invalid incident id"})
 	}
@@ -140,7 +137,7 @@ func (ctrl *IncidentController) GetIncident(c *fiber.Ctx) error {
 
 // DELETE /engine-rest/incident/:id
 func (ctrl *IncidentController) DeleteIncident(c *fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"message": "invalid incident id"})
 	}
@@ -188,7 +185,7 @@ func (ctrl *IncidentController) GetByProcessInstance(c *fiber.Ctx) error {
 // POST /engine-rest/job/:id/retries   {"retries": N}
 // Sets retries on a failed job so it can be picked up again, and resolves any open incident.
 func (ctrl *IncidentController) SetJobRetries(c *fiber.Ctx) error {
-	jobID, err := uuid.Parse(c.Params("id"))
+	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"message": "invalid job id"})
 	}
@@ -204,7 +201,7 @@ func (ctrl *IncidentController) SetJobRetries(c *fiber.Ctx) error {
 	}
 
 	var instanceID uuid.UUID
-	if err := ctrl.db.Get(&instanceID, `SELECT process_instance_id FROM public.jobs WHERE id = $1`, jobID); err == nil && !ctrl.checkIncidentAccess(c, instanceID, "MANAGE") {
+	if err := ctrl.db.Get(&instanceID, `SELECT pi.id FROM public.jobs j JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key WHERE j.engine_key = $1`, jobID); err == nil && !ctrl.checkIncidentAccess(c, instanceID, "MANAGE") {
 		return c.Status(404).JSON(fiber.Map{"message": "job not found"})
 	}
 
@@ -219,7 +216,7 @@ func (ctrl *IncidentController) SetJobRetries(c *fiber.Ctx) error {
 // the incident is resolved and, for one the runtime raised on an element,
 // the element runs again.
 func (ctrl *IncidentController) ResolveIncident(c *fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"message": "invalid incident id"})
 	}

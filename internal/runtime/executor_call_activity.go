@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 )
@@ -69,21 +69,31 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 	}
 
 	now := time.Now()
-	childInstanceID := uuid.New()
-	childExecID := uuid.New()
+	childInstanceID := ids.NewGlobalID()
+	childExecID := ids.NewEngineKey()
 
 	tx, err := r.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("callActivity: begin tx: %w", err)
 	}
 	defer tx.Rollback()
+	definitionKey, err := repository.ProcessDefinitionEngineKey(tx, procDef.ID)
+	if err != nil {
+		return fmt.Errorf("callActivity: resolve child definition: %w", err)
+	}
+	parentInstanceKey, err := repository.ProcessInstanceEngineKey(tx, exec.ProcessInstanceID)
+	if err != nil {
+		return fmt.Errorf("callActivity: resolve parent instance: %w", err)
+	}
+	childInstanceKey := ids.NewEngineKey()
 
 	// Create child process instance with parent tracking
 	_, err = tx.Exec(`
 		INSERT INTO process_instances
-		  (id, process_definition_id, status, started_at, parent_instance_id, parent_execution_id, tenant_id)
-		VALUES ($1, $2, 'running', $3, $4, $5, $6)
-	`, childInstanceID, procDef.ID, now, exec.ProcessInstanceID, exec.ID, parentTenant)
+		  (id, engine_key, process_definition_id, process_definition_key, status, started_at,
+		   parent_instance_id, parent_process_instance_key, parent_execution_key, tenant_id)
+		VALUES ($1, $2, $3, $4, 'running', $5, $6, $7, $8, $9)
+	`, childInstanceID, childInstanceKey, procDef.ID, definitionKey, now, exec.ProcessInstanceID, parentInstanceKey, exec.ID, parentTenant)
 	if err != nil {
 		return fmt.Errorf("callActivity: create child instance: %w", err)
 	}
@@ -112,17 +122,18 @@ func (r *Runtime) executeCallActivity(ctx context.Context, engineRepo *repositor
 	// Create child execution at start node
 	_, err = tx.Exec(`
 		INSERT INTO executions
-		  (id, process_instance_id, current_element_id, status, is_active, created_at, updated_at)
+		  (engine_key, process_instance_key, current_element_id, status, is_active, created_at, updated_at)
 		VALUES ($1, $2, $3, 'active', true, $4, $4)
-	`, childExecID, childInstanceID, startNodeID, now)
+	`, childExecID, childInstanceKey, startNodeID, now)
 	if err != nil {
 		return fmt.Errorf("callActivity: create child execution: %w", err)
 	}
 
 	// Park parent execution (waiting for child to complete)
 	_, err = tx.Exec(`
-		UPDATE executions SET status = 'waiting', updated_at = NOW() WHERE process_instance_id = $1 AND id = $2
-	`, exec.ProcessInstanceID, exec.ID)
+		UPDATE executions SET status = 'waiting', updated_at = NOW()
+		WHERE process_instance_key = $1 AND engine_key = $2
+	`, parentInstanceKey, exec.ID)
 	if err != nil {
 		return fmt.Errorf("callActivity: park parent: %w", err)
 	}

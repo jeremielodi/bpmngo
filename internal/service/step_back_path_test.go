@@ -2,10 +2,10 @@ package service
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/models"
 )
@@ -27,7 +27,7 @@ func stepBackGraph() *engine.ProcessGraph {
 }
 
 type hop struct {
-	exec     uuid.UUID
+	exec     int64
 	from, to string
 	stepBack bool
 }
@@ -36,7 +36,7 @@ func hopLogs(t *testing.T, hops ...hop) []models.AuditLog {
 	now := time.Now()
 	logs := make([]models.AuditLog, 0, len(hops))
 	for i, h := range hops {
-		data := map[string]interface{}{"executionId": h.exec.String(), "fromNode": h.from, "toNode": h.to}
+		data := map[string]interface{}{"executionId": strconv.FormatInt(h.exec, 10), "fromNode": h.from, "toNode": h.to}
 		if h.stepBack {
 			data["stepBack"] = true
 		}
@@ -50,7 +50,7 @@ func hopLogs(t *testing.T, hops ...hop) []models.AuditLog {
 }
 
 func TestStepBackPath_KeepsOnlyWaitStates(t *testing.T) {
-	e := uuid.New()
+	e := int64(101)
 	logs := hopLogs(t,
 		hop{e, "start", "a", false},
 		hop{e, "a", "gw", false},
@@ -65,7 +65,7 @@ func TestStepBackPath_KeepsOnlyWaitStates(t *testing.T) {
 }
 
 func TestStepBackPath_IgnoresOtherExecutions(t *testing.T) {
-	e, other := uuid.New(), uuid.New()
+	e, other := int64(101), int64(102)
 	logs := hopLogs(t,
 		hop{e, "start", "a", false},
 		hop{other, "x", "b", false},
@@ -79,7 +79,7 @@ func TestStepBackPath_IgnoresOtherExecutions(t *testing.T) {
 
 // Pressing "previous" twice from c must reach a, not bounce back to c.
 func TestStepBackPath_EarlierStepBackPops(t *testing.T) {
-	e := uuid.New()
+	e := int64(101)
 	logs := hopLogs(t,
 		hop{e, "start", "a", false},
 		hop{e, "a", "b", false},
@@ -93,7 +93,7 @@ func TestStepBackPath_EarlierStepBackPops(t *testing.T) {
 }
 
 func TestStepBackPath_ParallelGatewayIsABarrier(t *testing.T) {
-	e := uuid.New()
+	e := int64(101)
 	logs := hopLogs(t,
 		hop{e, "start", "a", false},
 		hop{e, "a", "fork", false},
@@ -109,7 +109,7 @@ func TestStepBackPath_ParallelGatewayIsABarrier(t *testing.T) {
 // A parallel branch is created right at its first task, with no entry for
 // arriving there: its first move starts from it.
 func TestStepBackPath_BranchCreatedAtItsFirstTask(t *testing.T) {
-	e := uuid.New()
+	e := int64(101)
 	logs := hopLogs(t,
 		hop{e, "b", "gw", false},
 		hop{e, "gw", "c", false},
@@ -121,7 +121,7 @@ func TestStepBackPath_BranchCreatedAtItsFirstTask(t *testing.T) {
 }
 
 func TestStepBackPath_StaysInScopeAndSkipsMultiInstance(t *testing.T) {
-	e := uuid.New()
+	e := int64(101)
 	logs := hopLogs(t,
 		hop{e, "start", "a", false},
 		hop{e, "a", "inner", false},
@@ -136,7 +136,7 @@ func TestStepBackPath_StaysInScopeAndSkipsMultiInstance(t *testing.T) {
 }
 
 func TestStepBackPath_CollapsesRepeatedElement(t *testing.T) {
-	e := uuid.New()
+	e := int64(101)
 	logs := hopLogs(t,
 		hop{e, "start", "a", false},
 		hop{e, "a", "a", false},

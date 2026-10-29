@@ -161,7 +161,7 @@ func (pc *Camunda7ProcessController) Start(c *fiber.Ctx) error {
 		resp["ended"] = true // finished (and archived) while starting
 	}
 	if body.WithVariablesInReturn {
-		current, _ := repository.VariablesForExecution(pc.db, instanceID, uuid.Nil)
+		current, _ := repository.VariablesForExecution(pc.db, instanceID, 0)
 		if len(current) == 0 {
 			current = vars
 		}

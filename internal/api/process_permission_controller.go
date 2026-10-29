@@ -3,9 +3,11 @@ package api
 
 import (
 	"errors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/repository"
+	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jeremielodi/bpmngo/pkg/common"
 	"github.com/jmoiron/sqlx"
 )
@@ -93,6 +95,7 @@ func (pc *ProcessPermissionController) GrantPermission(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
 	}
+	service.InvalidateProcessAuthorization(key)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"permission": perm})
 }
 
@@ -117,5 +120,6 @@ func (pc *ProcessPermissionController) RevokePermission(c *fiber.Ctx) error {
 	if !deleted {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "no such permission on this process"})
 	}
+	service.InvalidateProcessAuthorization(key)
 	return c.JSON(fiber.Map{"message": "permission revoked"})
 }

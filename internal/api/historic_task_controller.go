@@ -3,6 +3,7 @@ package api
 
 import (
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -106,7 +107,7 @@ func toHistoricTaskResponse(task repository.HistoricTask) HistoricTaskResponse {
 		duration = &d
 	}
 	return HistoricTaskResponse{
-		Id:                   task.ID.String(),
+		Id:                   strconv.FormatInt(task.ID, 10),
 		ProcessInstanceId:    task.ProcessInstanceID.String(),
 		ProcessDefinitionId:  task.ProcessDefinitionID.String(),
 		ProcessDefinitionKey: task.ProcessDefinitionKey,

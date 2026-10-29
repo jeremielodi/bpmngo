@@ -166,7 +166,7 @@ type correlateArgs struct {
 
 type correlateOutcome struct {
 	ProcessInstanceID uuid.UUID `json:"processInstanceId"`
-	ExecutionID       uuid.UUID `json:"executionId"`
+	ExecutionID       int64     `json:"executionId"`
 }
 
 func (ic *instanceCommands) correlate(_ context.Context, a correlateArgs) (correlateOutcome, error) {

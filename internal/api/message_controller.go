@@ -128,7 +128,7 @@ func (mc *MessageController) CorrelateMessage(c *fiber.Ctx) error {
 // scoped by a single correlation key and a target instance) and merges
 // variables into that process instance. Like a published message, it runs
 // on the partition of its correlation key.
-func (mc *MessageController) Correlate(ctx context.Context, messageName string, correlationKeys, variables map[string]interface{}, target MessageTarget) (uuid.UUID, uuid.UUID, error) {
+func (mc *MessageController) Correlate(ctx context.Context, messageName string, correlationKeys, variables map[string]interface{}, target MessageTarget) (uuid.UUID, int64, error) {
 	key := cmdbus.NameKey("message", messageName, fmt.Sprint(correlationKeys))
 	var out correlateOutcome
 	err := cmdbus.Do(ctx, cmdbus.Key(key), cmdCorrelateMessage,
@@ -164,7 +164,7 @@ func (mc *MessageController) keepTarget(subs []repository.EventSubscription, tar
 	return kept, nil
 }
 
-func (mc *MessageController) correlate(messageName string, correlationKeys, variables map[string]interface{}, target MessageTarget) (uuid.UUID, uuid.UUID, error) {
+func (mc *MessageController) correlate(messageName string, correlationKeys, variables map[string]interface{}, target MessageTarget) (uuid.UUID, int64, error) {
 	subRepo := repository.NewEventSubscriptionRepository(mc.db)
 
 	// Determine correlation filtering
@@ -179,14 +179,14 @@ func (mc *MessageController) correlate(messageName string, correlationKeys, vari
 
 	subs, err := subRepo.FindByMessageName(messageName, corrVarName, corrVarValue)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, err
+		return uuid.Nil, 0, err
 	}
 	if subs, err = mc.keepTarget(subs, target); err != nil {
-		return uuid.Nil, uuid.Nil, err
+		return uuid.Nil, 0, err
 	}
 
 	if len(subs) == 0 {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("%w: %s", ErrNoMatchingSubscription, messageName)
+		return uuid.Nil, 0, fmt.Errorf("%w: %s", ErrNoMatchingSubscription, messageName)
 	}
 
 	// Correlate to the first matching subscription (1:1 message correlation)
@@ -194,7 +194,7 @@ func (mc *MessageController) correlate(messageName string, correlationKeys, vari
 
 	// Node the execution is currently parked at, for audit purposes.
 	var fromNode string
-	mc.db.QueryRow(`SELECT current_element_id FROM executions WHERE process_instance_id = $1 AND id = $2`, sub.ProcessInstanceID, sub.ExecutionID).Scan(&fromNode)
+	mc.db.QueryRow(`SELECT current_element_id FROM executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1) AND engine_key = $2`, sub.ProcessInstanceID, sub.ExecutionID).Scan(&fromNode)
 
 	// Determine target element (for regular catch event: next outgoing; stored in target_element_id for EBG)
 	targetElementID := ""
@@ -240,7 +240,7 @@ func (mc *MessageController) correlate(messageName string, correlationKeys, vari
 
 	// Reactivate the execution and advance to target node
 	if err := repository.ResumeWaitingExecution(mc.db, sub.ProcessInstanceID, sub.ExecutionID, targetElementID); err != nil {
-		return uuid.Nil, uuid.Nil, err
+		return uuid.Nil, 0, err
 	}
 	service.LogAuditErr("message correlated", mc.auditService.LogMessageCorrelated(sub.ProcessInstanceID, messageName))
 	if fromNode != "" && targetElementID != "" {
@@ -249,13 +249,13 @@ func (mc *MessageController) correlate(messageName string, correlationKeys, vari
 	if p := eventlog.Global(); p != nil {
 		p.MessageCorrelated(sub.ProcessInstanceID.String(), messageName)
 		if fromNode != "" && targetElementID != "" {
-			p.ExecutionMoved(sub.ProcessInstanceID.String(), sub.ExecutionID.String(), fromNode, targetElementID)
+			p.ExecutionMoved(sub.ProcessInstanceID.String(), strconv.FormatInt(sub.ExecutionID, 10), fromNode, targetElementID)
 		}
 	}
 
 	// Resume execution
 	if err := runtime.ResumeExecution(mc.db, sub.ExecutionID, mc.dispatcher); err != nil {
-		return uuid.Nil, uuid.Nil, err
+		return uuid.Nil, 0, err
 	}
 
 	return sub.ProcessInstanceID, sub.ExecutionID, nil

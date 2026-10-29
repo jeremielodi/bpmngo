@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
@@ -31,7 +33,7 @@ func NewInclusiveGatewayExecutor(db *sqlx.DB, dispatcher *events.TaskEventDispat
 // ExecuteFork evaluates conditions and creates child executions only for matching flows.
 func (e *InclusiveGatewayExecutor) ExecuteFork(
 	ctx context.Context,
-	execID uuid.UUID,
+	execID int64,
 	gatewayNode *engine.Node,
 	variables map[string]interface{},
 ) error {
@@ -40,7 +42,7 @@ func (e *InclusiveGatewayExecutor) ExecuteFork(
 		return fmt.Errorf("failed to get execution: %w", err)
 	}
 	if exec == nil {
-		return fmt.Errorf("execution not found: %s", execID)
+		return fmt.Errorf("execution not found: %d", execID)
 	}
 
 	activeBranches, err := common.ResolveInclusiveBranches(gatewayNode, variables)
@@ -57,8 +59,8 @@ func (e *InclusiveGatewayExecutor) ExecuteFork(
 	branchVars, _ := json.Marshal(variables)
 
 	for i, flow := range activeBranches {
-		childExecID := uuid.New()
-		pathID := fmt.Sprintf("%s_%d", exec.ID.String(), i)
+		childExecID := ids.NewEngineKey()
+		pathID := fmt.Sprintf("%d_%d", exec.ID, i)
 
 		if err = e.engineRepo.CreateExecutionTx(tx, &repository.Execution{
 			ID:                childExecID,
@@ -73,7 +75,7 @@ func (e *InclusiveGatewayExecutor) ExecuteFork(
 		}
 
 		if _, err = tx.Exec(`
-			INSERT INTO public.execution_variables (execution_id, variables, created_at)
+			INSERT INTO public.execution_variables (execution_key, variables, created_at)
 			VALUES ($1, $2, NOW())
 		`, childExecID, branchVars); err != nil {
 			return fmt.Errorf("failed to store branch variables: %w", err)
@@ -95,7 +97,7 @@ func (e *InclusiveGatewayExecutor) ExecuteFork(
 // the actual number of child executions created at fork time.
 func (e *InclusiveGatewayExecutor) ExecuteJoin(
 	ctx context.Context,
-	execID uuid.UUID,
+	execID int64,
 	gatewayNode *engine.Node,
 ) error {
 	exec, err := e.engineRepo.GetActiveExecution(ctx, execID)
@@ -103,7 +105,7 @@ func (e *InclusiveGatewayExecutor) ExecuteJoin(
 		return fmt.Errorf("failed to get execution: %w", err)
 	}
 	if exec == nil {
-		return fmt.Errorf("execution not found: %s", execID)
+		return fmt.Errorf("execution not found: %d", execID)
 	}
 	if exec.ParentExecutionID == nil {
 		return fmt.Errorf("join gateway called on execution with no parent")
@@ -117,11 +119,12 @@ func (e *InclusiveGatewayExecutor) ExecuteJoin(
 
 	var gatewayState models.GatewayState
 	err = tx.Get(&gatewayState, `
-		SELECT id, process_instance_id, expected_incoming, received_incoming, status, joined_flows
-		FROM public.gateway_state
-		WHERE process_instance_id = $1 AND gateway_id = $2 AND status = 'waiting'
+		SELECT g.id, pi.id AS process_instance_id, g.process_instance_key, g.expected_incoming, g.received_incoming, g.status, g.joined_flows
+		FROM public.gateway_state g
+		JOIN public.process_instances pi ON pi.engine_key = g.process_instance_key
+		WHERE g.process_instance_key = $1 AND g.gateway_id = $2 AND g.status = 'waiting'
 		FOR UPDATE
-	`, exec.ProcessInstanceID, gatewayNode.ID)
+	`, exec.ProcessInstanceKey, gatewayNode.ID)
 
 	isFirstJoin := err != nil
 
@@ -135,13 +138,14 @@ func (e *InclusiveGatewayExecutor) ExecuteJoin(
 		joinedFlowsJSON, _ := json.Marshal(joinedFlows)
 
 		gatewayState = models.GatewayState{
-			ID:                uuid.New(),
-			ProcessInstanceID: exec.ProcessInstanceID,
-			GatewayID:         gatewayNode.ID,
-			ExpectedIncoming:  childCount,
-			ReceivedIncoming:  1,
-			Status:            "waiting",
-			JoinedFlows:       joinedFlowsJSON,
+			ID:                 uuid.New(),
+			ProcessInstanceID:  exec.ProcessInstanceID,
+			ProcessInstanceKey: exec.ProcessInstanceKey,
+			GatewayID:          gatewayNode.ID,
+			ExpectedIncoming:   childCount,
+			ReceivedIncoming:   1,
+			Status:             "waiting",
+			JoinedFlows:        joinedFlowsJSON,
 		}
 
 		created, err := e.engineRepo.CreateGatewayStateTx(tx, &gatewayState)
@@ -153,11 +157,12 @@ func (e *InclusiveGatewayExecutor) ExecuteJoin(
 			// just created and fall through to the join-update path below.
 			isFirstJoin = false
 			if err := tx.Get(&gatewayState, `
-				SELECT id, process_instance_id, expected_incoming, received_incoming, status, joined_flows
-				FROM public.gateway_state
-				WHERE process_instance_id = $1 AND gateway_id = $2 AND status = 'waiting'
+				SELECT g.id, pi.id AS process_instance_id, g.process_instance_key, g.expected_incoming, g.received_incoming, g.status, g.joined_flows
+				FROM public.gateway_state g
+				JOIN public.process_instances pi ON pi.engine_key = g.process_instance_key
+				WHERE g.process_instance_key = $1 AND g.gateway_id = $2 AND g.status = 'waiting'
 				FOR UPDATE
-			`, exec.ProcessInstanceID, gatewayNode.ID); err != nil {
+			`, exec.ProcessInstanceKey, gatewayNode.ID); err != nil {
 				return fmt.Errorf("failed to re-fetch gateway state after losing create race: %w", err)
 			}
 		}
@@ -174,8 +179,8 @@ func (e *InclusiveGatewayExecutor) ExecuteJoin(
 		if _, err = tx.Exec(`
 			UPDATE public.gateway_state
 			SET received_incoming = $1, joined_flows = $2
-			WHERE process_instance_id = $3 AND id = $4
-		`, newReceived, joinedFlowsJSON, gatewayState.ProcessInstanceID, gatewayState.ID); err != nil {
+			WHERE process_instance_key = $3 AND id = $4
+		`, newReceived, joinedFlowsJSON, gatewayState.ProcessInstanceKey, gatewayState.ID); err != nil {
 			return fmt.Errorf("failed to update gateway state: %w", err)
 		}
 
@@ -209,8 +214,8 @@ func (e *InclusiveGatewayExecutor) ExecuteJoin(
 
 		if _, err = tx.Exec(`
 			UPDATE public.gateway_state SET status = 'completed', completed_at = NOW()
-			WHERE process_instance_id = $1 AND id = $2
-		`, gatewayState.ProcessInstanceID, gatewayState.ID); err != nil {
+			WHERE process_instance_key = $1 AND id = $2
+		`, gatewayState.ProcessInstanceKey, gatewayState.ID); err != nil {
 			return fmt.Errorf("failed to complete gateway state: %w", err)
 		}
 
@@ -229,43 +234,43 @@ func (e *InclusiveGatewayExecutor) ExecuteJoin(
 		}
 		service.LogAuditErr("execution moved", auditService.LogExecutionMoved(*exec.ParentExecutionID, exec.ProcessInstanceID, gatewayNode.ID, nextNodeID, nil))
 		if p := eventlog.Global(); p != nil {
-			p.ExecutionMoved(exec.ProcessInstanceID.String(), exec.ParentExecutionID.String(), gatewayNode.ID, nextNodeID)
+			p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(*exec.ParentExecutionID, 10), gatewayNode.ID, nextNodeID)
 		}
 	}
 
 	return nil
 }
 
-func (e *InclusiveGatewayExecutor) getChildExecutionCount(tx *sqlx.Tx, parentExecID *uuid.UUID) (int, error) {
+func (e *InclusiveGatewayExecutor) getChildExecutionCount(tx *sqlx.Tx, parentExecID *int64) (int, error) {
 	if parentExecID == nil {
 		return 0, fmt.Errorf("parent execution ID is nil")
 	}
 	var count int
 	err := tx.Get(&count, `
 		SELECT COUNT(*) FROM public.executions
-		WHERE parent_execution_id = $1 AND is_active = true
+		WHERE parent_execution_key = $1 AND is_active = true
 	`, parentExecID)
 	return count, err
 }
 
 func (e *InclusiveGatewayExecutor) mergeBranchVariables(
 	tx *sqlx.Tx,
-	parentExecID *uuid.UUID,
+	parentExecID *int64,
 ) (map[string]interface{}, error) {
 	if parentExecID == nil {
 		return make(map[string]interface{}), nil
 	}
 
 	var childExecs []struct {
-		ID        string
+		ID        int64
 		Variables json.RawMessage
 	}
 
 	err := tx.Select(&childExecs, `
-		SELECT e.id, ev.variables
+		SELECT e.engine_key, ev.variables
 		FROM public.executions e
-		JOIN public.execution_variables ev ON ev.execution_id = e.id
-		WHERE e.parent_execution_id = $1 AND e.is_active = false
+		JOIN public.execution_variables ev ON ev.execution_key = e.engine_key
+		WHERE e.parent_execution_key = $1 AND e.is_active = false
 	`, parentExecID)
 	if err != nil {
 		return nil, err

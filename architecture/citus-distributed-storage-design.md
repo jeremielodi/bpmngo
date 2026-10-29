@@ -1,9 +1,9 @@
 # BpmnGo — Citus-Backed Distributed Storage (Design Scope)
 
-Status: **complete (2026-10-20)** — reference tables, the per-instance
-colocation group (jobs and timers included, section 5), local tables in
-the metadata, full regression on a real cluster. Phases 1–2 shipped
-2026-07-05. This is a separate architectural axis from
+Status: **complete (2026-10-29)** — reference tables, direct-BIGINT
+per-instance colocation (jobs and timers included), local tables in the
+metadata, and 47/47 behavioral scenarios on a real coordinator plus two
+workers. Phases 1–2 shipped 2026-07-05. This is a separate architectural axis from
 `event-sourced-kafka-design.md` — that document is about the *write path*
 (how a command reaches Postgres); this one is about *storage itself* (how
 many Postgres nodes the data lives on). They're complementary, not
@@ -11,6 +11,36 @@ alternatives: the long-term direction is a Kafka-partitioned write path
 whose partition key also determines Citus shard placement, so that a given
 process instance's command ownership and storage ownership line up — see
 "Where this is headed" at the end.
+
+## 0. Current key and sharding model (supersedes the historical phase notes)
+
+The earlier sections preserve the implementation history and therefore still
+mention UUID runtime foreign keys. The production model after migrations
+013–017 is:
+
+- `process_instances` is distributed by its `engine_key BIGINT` primary key;
+- `executions`, `tasks`, `variables`, `gateway_state`,
+  `multi_instance_executions`, `incidents`, `jobs`, `timer_jobs` and
+  `scope_variables` are distributed by the identical
+  `process_instance_key BIGINT`, so every row of one instance is colocated;
+- child primary keys include `process_instance_key` where Citus requires it,
+  while globally generated engine keys keep their lookup indexes;
+- repositories resolve a public UUID once and pass the BIGINT key as a query
+  parameter. Distributed `INSERT`, routed `UPDATE`/`DELETE`, and `FOR UPDATE`
+  queries contain no scalar UUID-to-key subquery;
+- colocated foreign keys to `process_instances(engine_key)` are restored after
+  distribution. Cross-shard constraints that Citus cannot represent are
+  maintained explicitly by repository cleanup;
+- aggregate roots retain one public UUIDv7 (`id`) for APIs and portability.
+  Hot runtime entities have BIGINT identities only. On Citus, uniqueness of a
+  root UUID cannot be a distributed unique constraint because it does not
+  include the distribution column; globally generated UUIDv7 values and lookup
+  indexes preserve the application invariant.
+
+The final verification used the same 47-scenario behavior benchmark on plain
+PostgreSQL and Citus; both completed with zero failures. It covers parallel and
+inclusive gateways, messages/signals, timers, incidents, user tasks,
+multi-instance, call activities, compensation and history.
 
 ## 1. Why this exists
 

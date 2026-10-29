@@ -47,19 +47,19 @@ type HistoricProcessInstance struct {
 // HistoricActivityInstanceRow mirrors historic_activity_instances — shaped
 // like service.TokenHistoryStep so the archive step can convert 1:1.
 type HistoricActivityInstanceRow struct {
-	ProcessInstanceID uuid.UUID  `db:"process_instance_id"`
-	ExecutionID       *uuid.UUID `db:"execution_id"`
-	Action            string     `db:"action"`
-	ElementID         *string    `db:"element_id"`
-	ElementName       *string    `db:"element_name"`
-	TaskID            *uuid.UUID `db:"task_id"`
-	Detail            *string    `db:"detail"`
-	OccurredAt        time.Time  `db:"occurred_at"`
+	ProcessInstanceID uuid.UUID `db:"process_instance_id"`
+	ExecutionID       *int64    `db:"execution_key"`
+	Action            string    `db:"action"`
+	ElementID         *string   `db:"element_id"`
+	ElementName       *string   `db:"element_name"`
+	TaskID            *int64    `db:"task_key"`
+	Detail            *string   `db:"detail"`
+	OccurredAt        time.Time `db:"occurred_at"`
 }
 
 // HistoricTaskRow mirrors historic_tasks.
 type HistoricTaskRow struct {
-	ID                uuid.UUID  `db:"id"`
+	ID                int64      `db:"engine_key"`
 	ProcessInstanceID uuid.UUID  `db:"process_instance_id"`
 	TaskDefinitionKey string     `db:"task_definition_key"`
 	TaskName          *string    `db:"task_name"`
@@ -73,10 +73,10 @@ type HistoricTaskRow struct {
 
 // HistoricIncidentRow mirrors historic_incidents.
 type HistoricIncidentRow struct {
-	ID                   uuid.UUID  `db:"id"`
+	ID                   int64      `db:"engine_key"`
 	ProcessInstanceID    uuid.UUID  `db:"process_instance_id"`
 	ProcessDefinitionKey string     `db:"process_definition_key"`
-	JobID                *uuid.UUID `db:"job_id"`
+	JobID                *int64     `db:"job_key"`
 	IncidentType         string     `db:"incident_type"`
 	ActivityID           string     `db:"activity_id"`
 	ErrorMessage         *string    `db:"error_message"`
@@ -107,7 +107,7 @@ func (r *HistoricArchiveRepository) InsertActivityInstancesTx(tx *sqlx.Tx, rows 
 		batch := rows[start:min(start+activityInsertBatch, len(rows))]
 		var sb strings.Builder
 		sb.WriteString(`INSERT INTO public.historic_activity_instances
-			(process_instance_id, execution_id, action, element_id, element_name, task_id, detail, occurred_at) VALUES `)
+			(process_instance_id, execution_key, action, element_id, element_name, task_key, detail, occurred_at) VALUES `)
 		args := make([]interface{}, 0, len(batch)*8)
 		for i, row := range batch {
 			if i > 0 {
@@ -128,7 +128,7 @@ func (r *HistoricArchiveRepository) InsertTasksTx(tx *sqlx.Tx, instanceID uuid.U
 	for _, row := range rows {
 		_, err := tx.Exec(`
 			INSERT INTO public.historic_tasks
-				(id, process_instance_id, task_definition_key, task_name, assignee, status, priority, created_at, claimed_at, completed_at)
+				(engine_key, process_instance_id, task_definition_key, task_name, assignee, status, priority, created_at, claimed_at, completed_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		`, row.ID, instanceID, row.TaskDefinitionKey, row.TaskName, row.Assignee, row.Status, row.Priority, row.CreatedAt, row.ClaimedAt, row.CompletedAt)
 		if err != nil {
@@ -142,7 +142,7 @@ func (r *HistoricArchiveRepository) InsertIncidentsTx(tx *sqlx.Tx, rows []Histor
 	for _, row := range rows {
 		_, err := tx.Exec(`
 			INSERT INTO public.historic_incidents
-				(id, process_instance_id, process_definition_key, job_id, incident_type,
+				(engine_key, process_instance_id, process_definition_key, job_key, incident_type,
 				 activity_id, error_message, error_code, state, created_at, resolved_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		`, row.ID, row.ProcessInstanceID, row.ProcessDefinitionKey, row.JobID, row.IncidentType,
@@ -184,12 +184,15 @@ func (r *HistoricArchiveRepository) InsertVariablesTx(tx *sqlx.Tx, instanceID uu
 // value is lost.
 func (r *HistoricArchiveRepository) CleanupOrphanExecutionStateTx(tx *sqlx.Tx, instanceID uuid.UUID) error {
 	for _, table := range []string{
-		"gateway_state", "event_subprocesses", "event_subscriptions", "boundary_events",
+		"event_subprocesses", "event_subscriptions", "boundary_events",
 		"jobs", "timer_jobs", "audit_logs", "scope_variables",
 	} {
-		if _, err := tx.Exec(`DELETE FROM public.`+table+` WHERE process_instance_id = $1`, instanceID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM public.`+table+` WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)`, instanceID); err != nil {
 			return err
 		}
+	}
+	if _, err := tx.Exec(`DELETE FROM public.gateway_state WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)`, instanceID); err != nil {
+		return err
 	}
 
 	// multi_instance_children and execution_variables have no
@@ -199,14 +202,14 @@ func (r *HistoricArchiveRepository) CleanupOrphanExecutionStateTx(tx *sqlx.Tx, i
 	// process_instances -> executions cascade, runs after this).
 	if _, err := tx.Exec(`
 		DELETE FROM public.multi_instance_children
-		WHERE parent_execution_id IN (SELECT id FROM public.executions WHERE process_instance_id = $1)
-		   OR child_execution_id  IN (SELECT id FROM public.executions WHERE process_instance_id = $1)
+		WHERE parent_execution_key IN (SELECT engine_key FROM public.executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1))
+		   OR child_execution_key  IN (SELECT engine_key FROM public.executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1))
 	`, instanceID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`
 		DELETE FROM public.execution_variables
-		WHERE execution_id IN (SELECT id FROM public.executions WHERE process_instance_id = $1)
+		WHERE execution_key IN (SELECT engine_key FROM public.executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1))
 	`, instanceID); err != nil {
 		return err
 	}
@@ -310,7 +313,7 @@ func (r *HistoricArchiveRepository) FindAllProcessInstances(f HistoricProcessIns
 func (r *HistoricArchiveRepository) FindActivityInstancesByProcessInstance(id uuid.UUID) ([]HistoricActivityInstanceRow, error) {
 	var rows []HistoricActivityInstanceRow
 	err := r.db.Select(&rows, `
-		SELECT process_instance_id, execution_id, action, element_id, element_name, task_id, detail, occurred_at
+		SELECT process_instance_id, execution_key, action, element_id, element_name, task_key, detail, occurred_at
 		FROM public.historic_activity_instances
 		WHERE process_instance_id = $1
 		ORDER BY occurred_at ASC
@@ -321,7 +324,7 @@ func (r *HistoricArchiveRepository) FindActivityInstancesByProcessInstance(id uu
 func (r *HistoricArchiveRepository) FindTasksByProcessInstance(id uuid.UUID) ([]HistoricTaskRow, error) {
 	var rows []HistoricTaskRow
 	err := r.db.Select(&rows, `
-		SELECT id, process_instance_id, task_definition_key, task_name, assignee, status, priority, created_at, claimed_at, completed_at
+		SELECT engine_key, process_instance_id, task_definition_key, task_name, assignee, status, priority, created_at, claimed_at, completed_at
 		FROM public.historic_tasks
 		WHERE process_instance_id = $1
 		ORDER BY created_at DESC
@@ -338,7 +341,7 @@ func (r *HistoricArchiveRepository) FindTasksByProcessInstance(id uuid.UUID) ([]
 func (r *HistoricArchiveRepository) FindTasksForHistoricQuery(params HistoricTaskQueryParams) ([]HistoricTask, error) {
 	query := `
 		SELECT
-			t.id,
+			t.engine_key AS id,
 			t.process_instance_id,
 			hpi.process_definition_id as process_definition_id,
 			hpi.process_definition_key as process_definition_key,
@@ -361,7 +364,7 @@ func (r *HistoricArchiveRepository) FindTasksForHistoricQuery(params HistoricTas
 	idx := 1
 
 	if params.TaskId != "" {
-		conditions = append(conditions, `t.id = $`+strconv.Itoa(idx))
+		conditions = append(conditions, `t.engine_key = $`+strconv.Itoa(idx))
 		args = append(args, params.TaskId)
 		idx++
 	}

@@ -4,6 +4,7 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -32,6 +33,42 @@ var keyCache = struct {
 type keyOfType struct {
 	resourceType string
 	key          int64
+}
+
+// Resources migrated by 009 own their protocol key. zeebe_keys remains a
+// compatibility registry for resource types that do not have an engine_key
+// column (signals, for example).
+var engineKeyTables = map[string]string{
+	"deployment":         "deployments",
+	"process_definition": "process_definitions",
+	"process_instance":   "process_instances",
+	"message":            "published_messages",
+}
+
+func directEngineKey(db sqlx.Queryer, resourceType string, resourceID uuid.UUID) (int64, bool, error) {
+	table, migrated := engineKeyTables[resourceType]
+	if !migrated {
+		return 0, false, nil
+	}
+	var key int64
+	err := sqlx.Get(db, &key, fmt.Sprintf(`SELECT engine_key FROM public.%s WHERE id = $1`, table), resourceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	return key, err == nil, err
+}
+
+func directResourceID(db sqlx.Queryer, resourceType string, key int64) (uuid.UUID, bool, error) {
+	table, migrated := engineKeyTables[resourceType]
+	if !migrated {
+		return uuid.Nil, false, nil
+	}
+	var id uuid.UUID
+	err := sqlx.Get(db, &id, fmt.Sprintf(`SELECT id FROM public.%s WHERE engine_key = $1`, table), key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return uuid.Nil, false, nil
+	}
+	return id, err == nil, err
 }
 
 // keyCacheMax bounds each map (a new instance brings new keys forever);
@@ -73,6 +110,12 @@ func (r *ZeebeKeyRepository) GetOrAssignKey(resourceType string, resourceID uuid
 	if key, ok := cachedKey(ref); ok {
 		return key, nil
 	}
+	if key, found, err := directEngineKey(r.db, resourceType, resourceID); err != nil {
+		return 0, err
+	} else if found {
+		rememberKey(ref, key)
+		return key, nil
+	}
 	var key int64
 	err := r.db.Get(&key, `
 		INSERT INTO public.zeebe_keys (resource_type, resource_id)
@@ -112,6 +155,11 @@ func (r *ZeebeKeyRepository) GetOrAssignKeys(refs []KeyRef) (map[KeyRef]int64, e
 		seen[ref] = true
 		if key, ok := cachedKey(ref); ok {
 			keys[ref] = key
+		} else if key, found, err := directEngineKey(r.db, ref.ResourceType, ref.ResourceID); err != nil {
+			return nil, err
+		} else if found {
+			keys[ref] = key
+			rememberKey(ref, key)
 		} else {
 			missing = append(missing, ref)
 		}
@@ -180,6 +228,12 @@ func (r *ZeebeKeyRepository) GetOrAssignKeys(refs []KeyRef) (map[KeyRef]int64, e
 // issued int64 key refers to, scoped to resourceType.
 func (r *ZeebeKeyRepository) ResolveKey(resourceType string, key int64) (uuid.UUID, error) {
 	if id, ok := cachedID(resourceType, key); ok {
+		return id, nil
+	}
+	if id, found, err := directResourceID(r.db, resourceType, key); err != nil {
+		return uuid.Nil, err
+	} else if found {
+		rememberKey(KeyRef{resourceType, id}, key)
 		return id, nil
 	}
 	var resourceID uuid.UUID

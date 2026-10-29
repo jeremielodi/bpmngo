@@ -14,6 +14,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
@@ -36,21 +37,21 @@ import (
 // innerInstance is an execution running one iteration of a multi-instance
 // activity.
 type innerInstance struct {
-	BodyID     uuid.UUID
+	BodyID     int64
 	LoopIndex  int
 	ActivityID string
 }
 
 // lookupInnerInstance tells whether execID runs an iteration of a
 // multi-instance activity that is still going.
-func lookupInnerInstance(q sqlx.Queryer, instanceID, execID uuid.UUID) (*innerInstance, error) {
+func lookupInnerInstance(q sqlx.Queryer, instanceID uuid.UUID, execID int64) (*innerInstance, error) {
 	var child struct {
-		BodyID    uuid.UUID `db:"parent_execution_id"`
-		LoopIndex int       `db:"loop_index"`
+		BodyID    int64 `db:"parent_execution_key"`
+		LoopIndex int   `db:"loop_index"`
 	}
 	err := sqlx.Get(q, &child, `
-		SELECT parent_execution_id, loop_index FROM public.multi_instance_children
-		WHERE child_execution_id = $1 AND status = 'active'
+		SELECT parent_execution_key, loop_index FROM public.multi_instance_children
+		WHERE child_execution_key = $1 AND status = 'active'
 	`, execID)
 	if err != nil {
 		return nil, nil // not an inner instance
@@ -58,7 +59,8 @@ func lookupInnerInstance(q sqlx.Queryer, instanceID, execID uuid.UUID) (*innerIn
 	var activityID string
 	if err := sqlx.Get(q, &activityID, `
 		SELECT activity_id FROM public.multi_instance_executions
-		WHERE process_instance_id = $1 AND execution_id = $2 AND status = 'active'
+		WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)
+		  AND execution_key = $2 AND status = 'active'
 	`, instanceID, child.BodyID); err != nil {
 		return nil, nil
 	}
@@ -116,13 +118,17 @@ func (r *Runtime) startMultiInstanceBody(ctx context.Context, engineRepo *reposi
 		return err
 	}
 	defer tx.Rollback()
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, exec.ProcessInstanceID)
+	if err != nil {
+		return err
+	}
 
 	if _, err := tx.Exec(`
 		INSERT INTO public.multi_instance_executions
-		  (id, process_instance_id, execution_id, activity_id, is_sequential, total_count, completed_count,
+		  (id, process_instance_key, execution_key, activity_id, is_sequential, total_count, completed_count,
 		   completion_condition, element_variable, input_collection, output_collection, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9, $10, 'active', NOW(), NOW())
-	`, uuid.New(), exec.ProcessInstanceID, exec.ID, node.ID, cfg.IsSequential, total,
+	`, uuid.New(), instanceKey, exec.ID, node.ID, cfg.IsSequential, total,
 		cfg.CompletionCondition, cfg.Element(), cfg.Collection(), cfg.Output()); err != nil {
 		return fmt.Errorf("multi-instance %s: %w", node.ID, err)
 	}
@@ -154,7 +160,7 @@ func (r *Runtime) startMultiInstanceBody(ctx context.Context, engineRepo *reposi
 	if cfg.IsSequential {
 		count = 1
 	}
-	inners := make([]uuid.UUID, 0, count)
+	inners := make([]int64, 0, count)
 	for i := 0; i < count; i++ {
 		id, err := r.createInnerInstanceTx(tx, engineRepo, exec, node, i, items)
 		if err != nil {
@@ -167,16 +173,16 @@ func (r *Runtime) startMultiInstanceBody(ctx context.Context, engineRepo *reposi
 	}
 	for _, id := range inners {
 		if err := r.ExecuteExecution(ctx, id); err != nil {
-			return fmt.Errorf("multi-instance %s, instance %s: %w", node.ID, id, err)
+			return fmt.Errorf("multi-instance %s, instance %d: %w", node.ID, id, err)
 		}
 	}
 	return nil
 }
 
 // createInnerInstanceTx creates the inner instance for loop index i.
-func (r *Runtime) createInnerInstanceTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, body *repository.Execution, node *engine.Node, i int, items []interface{}) (uuid.UUID, error) {
-	id := uuid.New()
-	pathID := fmt.Sprintf("%s#%d", body.ID, i+1)
+func (r *Runtime) createInnerInstanceTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, body *repository.Execution, node *engine.Node, i int, items []interface{}) (int64, error) {
+	id := ids.NewEngineKey()
+	pathID := fmt.Sprintf("%d#%d", body.ID, i+1)
 	if err := engineRepo.CreateExecutionTx(tx, &repository.Execution{
 		ID:                id,
 		ProcessInstanceID: body.ProcessInstanceID,
@@ -186,7 +192,7 @@ func (r *Runtime) createInnerInstanceTx(tx *sqlx.Tx, engineRepo *repository.Engi
 		IsActive:          true,
 		PathID:            &pathID,
 	}); err != nil {
-		return uuid.Nil, fmt.Errorf("multi-instance %s: creating instance %d: %w", node.ID, i+1, err)
+		return 0, fmt.Errorf("multi-instance %s: creating instance %d: %w", node.ID, i+1, err)
 	}
 	locals := map[string]interface{}{"loopCounter": i + 1}
 	// An outputElement that names a variable gets it, null, on each inner
@@ -204,10 +210,10 @@ func (r *Runtime) createInnerInstanceTx(tx *sqlx.Tx, engineRepo *repository.Engi
 	}
 	elementJSON, _ := json.Marshal(element)
 	if _, err := tx.Exec(`
-		INSERT INTO public.multi_instance_children (parent_execution_id, child_execution_id, loop_index, element_value, status, created_at)
+		INSERT INTO public.multi_instance_children (parent_execution_key, child_execution_key, loop_index, element_value, status, created_at)
 		VALUES ($1, $2, $3, $4, 'active', NOW())
 	`, body.ID, id, i, string(elementJSON)); err != nil {
-		return uuid.Nil, err
+		return 0, err
 	}
 	return id, repository.SetLocalVariablesTx(tx, body.ProcessInstanceID, id, locals)
 }
@@ -266,7 +272,7 @@ func (r *Runtime) completeInnerInstance(ctx context.Context, engineRepo *reposit
 
 	if _, err := tx.Exec(`
 		UPDATE public.multi_instance_children SET status = 'completed', completed_at = NOW()
-		WHERE child_execution_id = $1
+		WHERE child_execution_key = $1
 	`, exec.ID); err != nil {
 		return err
 	}
@@ -286,21 +292,23 @@ func (r *Runtime) completeInnerInstance(ctx context.Context, engineRepo *reposit
 		SELECT COUNT(*) FILTER (WHERE status = 'completed') AS completed,
 		       COUNT(*) FILTER (WHERE status = 'active') AS active,
 		       COUNT(*) FILTER (WHERE status = 'terminated') AS terminated
-		FROM public.multi_instance_children WHERE parent_execution_id = $1
+		FROM public.multi_instance_children WHERE parent_execution_key = $1
 	`, body.ID); err != nil {
 		return err
 	}
 	var total int
 	if err := tx.Get(&total, `
 		SELECT total_count FROM public.multi_instance_executions
-		WHERE process_instance_id = $1 AND execution_id = $2 AND status = 'active'
+		WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)
+		  AND execution_key = $2 AND status = 'active'
 	`, instanceID, body.ID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`
 		UPDATE public.multi_instance_executions
 		SET completed_count = $3, nr_of_completed_instances = $3, nr_of_active_instances = $4, loop_counter = $5, updated_at = NOW()
-		WHERE process_instance_id = $1 AND execution_id = $2 AND status = 'active'
+		WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)
+		  AND execution_key = $2 AND status = 'active'
 	`, instanceID, body.ID, counts.Completed, counts.Active, inner.LoopIndex+1); err != nil {
 		return err
 	}
@@ -336,7 +344,7 @@ func (r *Runtime) completeInnerInstance(ctx context.Context, engineRepo *reposit
 	}
 
 	if !done {
-		var next uuid.UUID
+		var next int64
 		if cfg.IsSequential {
 			items, _, err := multiInstanceItems(cfg, view)
 			if err != nil && cfg.Collection() != "" {
@@ -350,7 +358,7 @@ func (r *Runtime) completeInnerInstance(ctx context.Context, engineRepo *reposit
 			return err
 		}
 		r.logExecutionCompleted(exec, node.ID)
-		if next != uuid.Nil {
+		if next != 0 {
 			return r.ExecuteExecution(ctx, next)
 		}
 		return nil
@@ -373,11 +381,11 @@ func (r *Runtime) completeInnerInstance(ctx context.Context, engineRepo *reposit
 
 // terminateInnerInstancesTx stops the inner instances still running (the
 // completion condition was met).
-func (r *Runtime) terminateInnerInstancesTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, instanceID, bodyID uuid.UUID) error {
-	var active []uuid.UUID
+func (r *Runtime) terminateInnerInstancesTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, instanceID uuid.UUID, bodyID int64) error {
+	var active []int64
 	if err := tx.Select(&active, `
-		SELECT child_execution_id FROM public.multi_instance_children
-		WHERE parent_execution_id = $1 AND status = 'active'
+		SELECT child_execution_key FROM public.multi_instance_children
+		WHERE parent_execution_key = $1 AND status = 'active'
 	`, bodyID); err != nil {
 		return err
 	}
@@ -386,7 +394,7 @@ func (r *Runtime) terminateInnerInstancesTx(tx *sqlx.Tx, engineRepo *repository.
 		if err != nil {
 			return err
 		}
-		scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, instanceID, id, uuid.Nil)
+		scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, instanceID, id, 0)
 		if err != nil {
 			return err
 		}
@@ -399,7 +407,7 @@ func (r *Runtime) terminateInnerInstancesTx(tx *sqlx.Tx, engineRepo *repository.
 		if err := repository.ClearLocalVariablesTx(tx, instanceID, id); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE public.multi_instance_children SET status = 'terminated', completed_at = NOW() WHERE child_execution_id = $1`, id); err != nil {
+		if _, err := tx.Exec(`UPDATE public.multi_instance_children SET status = 'terminated', completed_at = NOW() WHERE child_execution_key = $1`, id); err != nil {
 			return err
 		}
 		r.logCancelled(instanceID, append(tasks, scopeTasks...), append(jobs, scopeJobs...), "multi-instance completion condition met")
@@ -430,7 +438,8 @@ func (r *Runtime) finishMultiInstanceBodyTx(tx *sqlx.Tx, engineRepo *repository.
 	}
 	if _, err := tx.Exec(`
 		UPDATE public.multi_instance_executions SET status = 'completed', updated_at = NOW()
-		WHERE process_instance_id = $1 AND execution_id = $2 AND status = 'active'
+		WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)
+		  AND execution_key = $2 AND status = 'active'
 	`, instanceID, body.ID); err != nil {
 		return "", err
 	}
@@ -456,19 +465,19 @@ func (r *Runtime) logBodyLeft(body *repository.Execution, from, to string) {
 	log.Printf("multi-instance %s completed", from)
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(body.ID, body.ProcessInstanceID, from, to, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(body.ProcessInstanceID.String(), body.ID.String(), from, to)
+		p.ExecutionMoved(body.ProcessInstanceID.String(), fmt.Sprintf("%d", body.ID), from, to)
 	}
 }
 
 // outputScope is where a synchronous activity's results are set from: its
 // own scope, or with output mappings (already applied to the results) its
 // enclosing scope, as in Camunda 8.
-func outputScope(exec *repository.Execution, node *engine.Node) uuid.UUID {
+func outputScope(exec *repository.Execution, node *engine.Node) int64 {
 	if len(node.OutputMappings) > 0 {
 		if exec.ParentExecutionID != nil {
 			return *exec.ParentExecutionID
 		}
-		return uuid.Nil
+		return 0
 	}
 	return exec.ID
 }

@@ -1,0 +1,31 @@
+backend_type,object,context,reads,read_time,writes,write_time,writebacks,writeback_time,extends,extend_time,hits,evictions,reuses,fsyncs,fsync_time,stats_reset
+autovacuum launcher,relation,bulkread,0,0,0,0,0,0,,,0,0,0,,,2026-10-29 15:09:24.054671+00
+autovacuum launcher,relation,normal,8,0,3,0,0,0,,,67,5,,0,0,2026-10-29 15:09:24.054671+00
+autovacuum worker,relation,bulkread,0,0,0,0,0,0,,,0,0,0,,,2026-10-29 15:09:24.054671+00
+autovacuum worker,relation,normal,10972,33.063,3447,0,0,0,211,0.139,386051,9501,,0,0,2026-10-29 15:09:24.054671+00
+autovacuum worker,relation,vacuum,520479,38.074,155794,0.163,0,0,0,0,232815,587,519367,,,2026-10-29 15:09:24.054671+00
+background worker,relation,bulkread,7200,163.659,0,0,0,0,,,6577,64,7136,,,2026-10-29 15:09:24.054671+00
+background worker,relation,bulkwrite,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+background worker,relation,normal,3252,19.618000000000002,328,1.565,0,0,0,0,3783,450,,0,0,2026-10-29 15:09:24.054671+00
+background worker,relation,vacuum,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+background worker,temp relation,normal,0,0,0,0,,,0,0,0,0,,,,2026-10-29 15:09:24.054671+00
+background writer,relation,normal,,,223358,3744.876,223296,196.439,,,,,,0,0,2026-10-29 15:09:24.054671+00
+checkpointer,relation,normal,,,65632,0,65632,0,,,,,,1499,0,2026-10-29 15:09:24.054671+00
+client backend,relation,bulkread,132023,316.342,22563,1774.332,0,0,,,55320,14446,116729,,,2026-10-29 15:09:24.054671+00
+client backend,relation,bulkwrite,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+client backend,relation,normal,369317,951.616,206287,1753.227,0,0,136900,1420.291,130186411,454152,,0,0,2026-10-29 15:09:24.054671+00
+client backend,relation,vacuum,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+client backend,temp relation,normal,0,0,0,0,,,769,1.997,1490,0,,,,2026-10-29 15:09:24.054671+00
+standalone backend,relation,bulkread,0,0,0,0,0,0,,,0,0,0,,,2026-10-29 15:09:24.054671+00
+standalone backend,relation,bulkwrite,0,0,0,0,0,0,8,0,7,0,0,,,2026-10-29 15:09:24.054671+00
+standalone backend,relation,normal,535,0,1013,0,1013,0,667,0,88880,0,,0,0,2026-10-29 15:09:24.054671+00
+standalone backend,relation,vacuum,10,0,0,0,0,0,0,0,911,0,0,,,2026-10-29 15:09:24.054671+00
+startup,relation,bulkread,0,0,0,0,0,0,,,0,0,0,,,2026-10-29 15:09:24.054671+00
+startup,relation,bulkwrite,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+startup,relation,normal,0,0,0,0,0,0,0,0,0,0,,0,0,2026-10-29 15:09:24.054671+00
+startup,relation,vacuum,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+walsender,relation,bulkread,0,0,0,0,0,0,,,0,0,0,,,2026-10-29 15:09:24.054671+00
+walsender,relation,bulkwrite,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+walsender,relation,normal,0,0,0,0,0,0,0,0,0,0,,0,0,2026-10-29 15:09:24.054671+00
+walsender,relation,vacuum,0,0,0,0,0,0,0,0,0,0,0,,,2026-10-29 15:09:24.054671+00
+walsender,temp relation,normal,0,0,0,0,,,0,0,0,0,,,,2026-10-29 15:09:24.054671+00

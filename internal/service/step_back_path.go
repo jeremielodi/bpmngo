@@ -2,8 +2,8 @@ package service
 
 import (
 	"encoding/json"
+	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/models"
 )
@@ -39,7 +39,7 @@ func IsStepBackTarget(n *engine.Node) bool {
 //   - an earlier step back (newData.stepBack) pops the path back to its
 //     target, so "previous" pressed twice goes back two steps instead of
 //     bouncing between the last two.
-func StepBackPath(logs []models.AuditLog, graph *engine.ProcessGraph, execID uuid.UUID, scope string) []string {
+func StepBackPath(logs []models.AuditLog, graph *engine.ProcessGraph, execID int64, scope string) []string {
 	var path []string
 	isBarrier := func(id string) bool {
 		n := graph.Nodes[id]
@@ -66,7 +66,7 @@ func StepBackPath(logs []models.AuditLog, graph *engine.ProcessGraph, execID uui
 			ToNode      string `json:"toNode"`
 			StepBack    bool   `json:"stepBack"`
 		}
-		if json.Unmarshal(l.NewData, &d) != nil || d.ExecutionID != execID.String() {
+		if json.Unmarshal(l.NewData, &d) != nil || d.ExecutionID != strconv.FormatInt(execID, 10) {
 			continue
 		}
 		// An execution created right at an element (a parallel branch)

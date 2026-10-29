@@ -1,0 +1,1240 @@
+{
+  "engine": "bpmngo-improved-pass2",
+  "generated_at": "2026-10-29T16:09:59.440458Z",
+  "scenarios": [
+    {
+      "name": "exclusive-one-true",
+      "category": "gateway",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462749",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {
+              "x": 1
+            }
+          }
+        ],
+        "observed_elements": [
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "exclusive-default",
+      "category": "gateway",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "b"
+        ],
+        "jobs": [
+          {
+            "elementId": "b",
+            "headers": {},
+            "key": "462754",
+            "retries": 3,
+            "type": "route-b",
+            "variables": {
+              "x": 9
+            }
+          }
+        ],
+        "observed_elements": [
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "exclusive-two-true-reference-order",
+      "category": "gateway",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "b"
+        ],
+        "jobs": [
+          {
+            "elementId": "b",
+            "headers": {},
+            "key": "462759",
+            "retries": 3,
+            "type": "route-b",
+            "variables": {
+              "x": 1
+            }
+          }
+        ],
+        "observed_elements": [
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "inclusive-two-true",
+      "category": "gateway",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a",
+          "b"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462764",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {
+              "x": 5
+            }
+          },
+          {
+            "elementId": "b",
+            "headers": {},
+            "key": "462766",
+            "retries": 3,
+            "type": "route-b",
+            "variables": {
+              "x": 5
+            }
+          }
+        ],
+        "observed_elements": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "inclusive-default",
+      "category": "gateway",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "b"
+        ],
+        "jobs": [
+          {
+            "elementId": "b",
+            "headers": {},
+            "key": "462771",
+            "retries": 3,
+            "type": "route-b",
+            "variables": {
+              "x": 9
+            }
+          }
+        ],
+        "observed_elements": [
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "parallel-split",
+      "category": "gateway",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a",
+          "b"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462776",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {}
+          },
+          {
+            "elementId": "b",
+            "headers": {},
+            "key": "462778",
+            "retries": 3,
+            "type": "route-b",
+            "variables": {}
+          }
+        ],
+        "observed_elements": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "feel-number",
+      "category": "feel",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462783",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {
+              "price": 2.5,
+              "qty": 5
+            }
+          }
+        ],
+        "observed_elements": [
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "feel-null",
+      "category": "feel",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462788",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {}
+          }
+        ],
+        "observed_elements": [
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "feel-string",
+      "category": "feel",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462793",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {
+              "name": "Ada"
+            }
+          }
+        ],
+        "observed_elements": [
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "feel-list",
+      "category": "feel",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462798",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {
+              "items": [
+                {
+                  "price": 1
+                },
+                {
+                  "price": 3
+                },
+                {
+                  "price": 4
+                }
+              ]
+            }
+          }
+        ],
+        "observed_elements": [
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "feel-context",
+      "category": "feel",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462803",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {
+              "customer": {
+                "address": {
+                  "country": "BE"
+                }
+              }
+            }
+          }
+        ],
+        "observed_elements": [
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "feel-date-duration",
+      "category": "feel",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "expected_elements": [
+          "a"
+        ],
+        "jobs": [
+          {
+            "elementId": "a",
+            "headers": {},
+            "key": "462808",
+            "retries": 3,
+            "type": "route-a",
+            "variables": {}
+          }
+        ],
+        "observed_elements": [
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "boundary-timer-interrupting",
+      "category": "boundary",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "caught",
+            "headers": {},
+            "key": "462813",
+            "retries": 3,
+            "type": "timer-caught",
+            "variables": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "boundary-timer-non-interrupting",
+      "category": "boundary",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "first": {
+          "elementId": "work",
+          "headers": {},
+          "key": "462818",
+          "retries": 3,
+          "type": "main-work",
+          "variables": {}
+        },
+        "first_count": 1,
+        "second": {
+          "elementId": "caught",
+          "headers": {},
+          "key": "462820",
+          "retries": 3,
+          "type": "timer-caught",
+          "variables": {}
+        },
+        "second_count": 1
+      }
+    },
+    {
+      "name": "boundary-message",
+      "category": "boundary",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "caught": {
+          "elementId": "caught",
+          "headers": {},
+          "key": "462828",
+          "retries": 3,
+          "type": "message-caught",
+          "variables": {
+            "fromMessage": true,
+            "orderId": "BOUNDARY"
+          }
+        },
+        "caught_count": 1,
+        "main": {
+          "elementId": "work",
+          "headers": {},
+          "key": "462825",
+          "retries": 3,
+          "type": "main-work",
+          "variables": {
+            "orderId": "BOUNDARY"
+          }
+        },
+        "publication": {
+          "messageKey": "462827",
+          "tenantId": "\u003cdefault\u003e"
+        }
+      }
+    },
+    {
+      "name": "boundary-signal-non-interrupting",
+      "category": "boundary",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "broadcast": {
+          "errors": null,
+          "resumed": 1,
+          "signalName": "BoundarySignalB16"
+        },
+        "caught": {
+          "elementId": "caught",
+          "headers": {},
+          "key": "462834",
+          "retries": 3,
+          "type": "signal-caught",
+          "variables": {
+            "fromSignal": true
+          }
+        },
+        "caught_count": 1,
+        "main": {
+          "elementId": "work",
+          "headers": {},
+          "key": "462832",
+          "retries": 3,
+          "type": "main-work",
+          "variables": {}
+        }
+      }
+    },
+    {
+      "name": "boundary-error-exact",
+      "category": "boundary",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "caught": {
+          "elementId": "caught",
+          "headers": {},
+          "key": "462841",
+          "retries": 3,
+          "type": "error-caught",
+          "variables": {}
+        },
+        "throw_code": "OK"
+      }
+    },
+    {
+      "name": "boundary-error-catch-all",
+      "category": "boundary",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "caught": {
+          "elementId": "caught",
+          "headers": {},
+          "key": "462847",
+          "retries": 3,
+          "type": "error-caught",
+          "variables": {}
+        },
+        "throw_code": "OK"
+      }
+    },
+    {
+      "name": "boundary-escalation",
+      "category": "boundary",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "caught",
+            "headers": {},
+            "key": "462851",
+            "retries": 3,
+            "type": "escalation-caught",
+            "variables": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "job-fail-retries-remaining",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "first": {
+          "elementId": "work",
+          "headers": {},
+          "key": "462856",
+          "retries": 3,
+          "type": "fail-job",
+          "variables": {}
+        },
+        "second": {
+          "elementId": "work",
+          "headers": {},
+          "key": "462856",
+          "retries": 2,
+          "type": "fail-job",
+          "variables": {}
+        }
+      }
+    },
+    {
+      "name": "job-fail-no-retries-incident",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "http_status": 200,
+        "response": {
+          "items": [
+            {
+              "creationTime": "2026-10-29T16:10:11.328284Z",
+              "elementId": "work",
+              "errorMessage": "permanent",
+              "errorType": "JOB_NO_RETRIES",
+              "incidentKey": "462863",
+              "jobKey": "462861",
+              "processInstanceKey": "462860",
+              "state": "ACTIVE"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "job-fail-backoff",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "early_count": 0,
+        "job": {
+          "elementId": "work",
+          "headers": {},
+          "key": "462867",
+          "retries": 2,
+          "type": "backoff-job",
+          "variables": {}
+        },
+        "redelivery_ms": 762
+      }
+    },
+    {
+      "name": "fail-job-variables",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "redelivered": {
+          "elementId": "work",
+          "headers": {},
+          "key": "462872",
+          "retries": 2,
+          "type": "fail-vars",
+          "variables": {
+            "failureReason": "bank"
+          }
+        }
+      }
+    },
+    {
+      "name": "throw-error-variables",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "caught": {
+          "elementId": "caught",
+          "headers": {},
+          "key": "462879",
+          "retries": 3,
+          "type": "error-caught",
+          "variables": {}
+        },
+        "throw_code": "OK"
+      }
+    },
+    {
+      "name": "job-custom-headers",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "work",
+            "headers": {
+              "currency": "EUR",
+              "source": "fair-bench"
+            },
+            "key": "462883",
+            "retries": 3,
+            "type": "header-job",
+            "variables": {
+              "amount": 7
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "job-input-mapping",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "work",
+            "headers": {},
+            "key": "462888",
+            "retries": 3,
+            "type": "input-job",
+            "variables": {
+              "amount": 7,
+              "double": 14,
+              "secret": "outer"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "job-output-mapping",
+      "category": "jobs",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "after": {
+          "elementId": "after",
+          "headers": {},
+          "key": "462895",
+          "retries": 3,
+          "type": "mapped-after",
+          "variables": {
+            "mapped": 42
+          }
+        }
+      }
+    },
+    {
+      "name": "event-subprocess-message",
+      "category": "event-subprocess",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "event": {
+          "elementId": "eventJob",
+          "headers": {},
+          "key": "462902",
+          "retries": 3,
+          "type": "event-sub-job",
+          "variables": {
+            "orderId": "EVENTSUB"
+          }
+        },
+        "event_count": 1,
+        "main": {
+          "elementId": "main",
+          "headers": {},
+          "key": "462899",
+          "retries": 3,
+          "type": "main-work",
+          "variables": {
+            "orderId": "EVENTSUB"
+          }
+        },
+        "publication": {
+          "messageKey": "462901",
+          "tenantId": "\u003cdefault\u003e"
+        }
+      }
+    },
+    {
+      "name": "multi-instance-parallel",
+      "category": "multi-instance",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 3,
+        "expected": 3,
+        "jobs": [
+          {
+            "elementId": "each",
+            "headers": {},
+            "key": "462907",
+            "retries": 3,
+            "type": "mi-job",
+            "variables": {
+              "item": 3,
+              "items": [
+                3,
+                1,
+                2
+              ],
+              "loopCounter": 1
+            }
+          },
+          {
+            "elementId": "each",
+            "headers": {},
+            "key": "462909",
+            "retries": 3,
+            "type": "mi-job",
+            "variables": {
+              "item": 1,
+              "items": [
+                3,
+                1,
+                2
+              ],
+              "loopCounter": 2
+            }
+          },
+          {
+            "elementId": "each",
+            "headers": {},
+            "key": "462911",
+            "retries": 3,
+            "type": "mi-job",
+            "variables": {
+              "item": 2,
+              "items": [
+                3,
+                1,
+                2
+              ],
+              "loopCounter": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "multi-instance-sequential",
+      "category": "multi-instance",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "seen": [
+          {
+            "item": 3,
+            "items": [
+              3,
+              1,
+              2
+            ],
+            "loopCounter": 1
+          },
+          {
+            "item": 1,
+            "items": [
+              3,
+              1,
+              2
+            ],
+            "loopCounter": 2
+          },
+          {
+            "item": 2,
+            "items": [
+              3,
+              1,
+              2
+            ],
+            "loopCounter": 3
+          }
+        ]
+      }
+    },
+    {
+      "name": "multi-instance-output-collection",
+      "category": "multi-instance",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "after": {
+          "elementId": "after",
+          "headers": {},
+          "key": "462931",
+          "retries": 3,
+          "type": "mi-after",
+          "variables": {
+            "items": [
+              3,
+              1,
+              2
+            ],
+            "results": [
+              3,
+              1,
+              2
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "multi-instance-completion-condition",
+      "category": "multi-instance",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "activated": 3,
+        "after": {
+          "elementId": "after",
+          "headers": {},
+          "key": "462942",
+          "retries": 3,
+          "type": "mi-after",
+          "variables": {
+            "items": [
+              1,
+              2,
+              3
+            ]
+          }
+        },
+        "completed": 2
+      }
+    },
+    {
+      "name": "multi-instance-empty-collection",
+      "category": "multi-instance",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "after",
+            "headers": {},
+            "key": "462947",
+            "retries": 3,
+            "type": "mi-after",
+            "variables": {
+              "items": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "call-activity",
+      "category": "call-activity",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "child": {
+          "elementId": "cj",
+          "headers": {},
+          "key": "462953",
+          "retries": 3,
+          "type": "child-job",
+          "variables": {
+            "amount": 21
+          }
+        },
+        "count": 1
+      }
+    },
+    {
+      "name": "message-correlation-key",
+      "category": "messages",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "after",
+            "headers": {},
+            "key": "462960",
+            "retries": 3,
+            "type": "message-after",
+            "variables": {
+              "orderId": "A-42",
+              "paid": true
+            }
+          }
+        ],
+        "publication": {
+          "messageKey": "462959",
+          "tenantId": "\u003cdefault\u003e"
+        }
+      }
+    },
+    {
+      "name": "message-id-deduplication",
+      "category": "messages",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "after",
+            "headers": {},
+            "key": "462966",
+            "retries": 3,
+            "type": "message-after",
+            "variables": {
+              "orderId": "D-1"
+            }
+          }
+        ],
+        "publish_codes": [
+          "HTTP_200_true",
+          "HTTP_409_false"
+        ]
+      }
+    },
+    {
+      "name": "message-start-event",
+      "category": "messages",
+      "deploy_code": "OK",
+      "start_code": "SKIPPED_EVENT_START",
+      "observations": {
+        "count": 1,
+        "job": {
+          "elementId": "after",
+          "headers": {},
+          "key": "462971",
+          "retries": 3,
+          "type": "message-started",
+          "variables": {
+            "orderId": "S-1"
+          }
+        },
+        "publication": {
+          "messageKey": "462970",
+          "tenantId": "\u003cdefault\u003e"
+        }
+      }
+    },
+    {
+      "name": "event-based-gateway-message",
+      "category": "messages",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "mj",
+            "headers": {},
+            "key": "462978",
+            "retries": 3,
+            "type": "event-message",
+            "variables": {
+              "orderId": "E-1"
+            }
+          }
+        ],
+        "publication": {
+          "messageKey": "462977",
+          "tenantId": "\u003cdefault\u003e"
+        }
+      }
+    },
+    {
+      "name": "signal-intermediate-catch",
+      "category": "signals",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "broadcast": {
+          "errors": null,
+          "resumed": 1,
+          "signalName": "GoB39"
+        },
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "after",
+            "headers": {},
+            "key": "462983",
+            "retries": 3,
+            "type": "signal-after",
+            "variables": {
+              "signalValue": 9
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "timer-duration",
+      "category": "timers",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "after",
+            "headers": {},
+            "key": "462988",
+            "retries": 3,
+            "type": "timer-after",
+            "variables": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "timer-date-past",
+      "category": "timers",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "after",
+            "headers": {},
+            "key": "462993",
+            "retries": 3,
+            "type": "timer-after",
+            "variables": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "timer-cycle",
+      "category": "timers",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 2,
+        "expected": 2,
+        "jobs": [
+          {
+            "elementId": "tick",
+            "headers": {},
+            "key": "462998",
+            "retries": 3,
+            "type": "timer-tick",
+            "variables": {}
+          },
+          {
+            "elementId": "tick",
+            "headers": {},
+            "key": "463000",
+            "retries": 3,
+            "type": "timer-tick",
+            "variables": {}
+          }
+        ]
+      }
+    },
+    {
+      "name": "timer-feel-duration",
+      "category": "timers",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "count": 1,
+        "jobs": [
+          {
+            "elementId": "after",
+            "headers": {},
+            "key": "463005",
+            "retries": 3,
+            "type": "timer-after",
+            "variables": {
+              "delay": "PT0.2S"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "user-task-rest-completion",
+      "category": "rest-v2",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "completion": null,
+        "completion_status": 204,
+        "search_status": 200,
+        "task": {
+          "assignee": null,
+          "candidateGroups": null,
+          "creationDate": "2026-10-29T16:10:19.338222Z",
+          "elementId": "review",
+          "formKey": "",
+          "name": "",
+          "priority": 50,
+          "processInstanceKey": "463009",
+          "state": "CREATED",
+          "userTaskKey": "463010"
+        }
+      }
+    },
+    {
+      "name": "compensation",
+      "category": "compensation",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "book": {
+          "elementId": "book",
+          "headers": {},
+          "key": "463014",
+          "retries": 3,
+          "type": "book",
+          "variables": {}
+        },
+        "undo": {
+          "elementId": "undo",
+          "headers": {},
+          "key": "463016",
+          "retries": 3,
+          "type": "undo-book",
+          "variables": {}
+        },
+        "undo_count": 1
+      }
+    },
+    {
+      "name": "grpc-key-usable-in-rest",
+      "category": "api",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "grpc_key": "463020",
+        "job": {
+          "elementId": "work",
+          "headers": {},
+          "key": "463021",
+          "retries": 3,
+          "type": "key-job",
+          "variables": {
+            "kept": "yes"
+          }
+        },
+        "rest": {
+          "endDate": null,
+          "processDefinitionId": "B46",
+          "processDefinitionKey": "463019",
+          "processDefinitionVersion": 4,
+          "processInstanceKey": "463020",
+          "startDate": "2026-10-29T16:10:19.364607Z",
+          "state": "ACTIVE"
+        },
+        "rest_status": 200
+      }
+    },
+    {
+      "name": "finished-instance-elements-and-variables",
+      "category": "api",
+      "deploy_code": "OK",
+      "start_code": "OK",
+      "observations": {
+        "elements": {
+          "items": [
+            {
+              "elementId": "start",
+              "endDate": "2026-10-29T16:10:19.374016Z",
+              "flowNodeInstanceKey": "463028",
+              "processInstanceKey": "463025",
+              "startDate": "2026-10-29T16:10:19.373426Z",
+              "state": "COMPLETED"
+            },
+            {
+              "elementId": "work",
+              "endDate": "2026-10-29T16:10:19.37735Z",
+              "flowNodeInstanceKey": "463029",
+              "processInstanceKey": "463025",
+              "startDate": "2026-10-29T16:10:19.374016Z",
+              "state": "COMPLETED"
+            },
+            {
+              "elementId": "end",
+              "endDate": "2026-10-29T16:10:19.378357Z",
+              "flowNodeInstanceKey": "463030",
+              "processInstanceKey": "463025",
+              "startDate": "2026-10-29T16:10:19.37735Z",
+              "state": "COMPLETED"
+            }
+          ]
+        },
+        "elements_status": 200,
+        "variables": {
+          "items": [
+            {
+              "name": "done",
+              "processInstanceKey": "463025",
+              "value": true
+            },
+            {
+              "name": "kept",
+              "processInstanceKey": "463025",
+              "value": "yes"
+            }
+          ]
+        },
+        "variables_status": 200
+      }
+    }
+  ]
+}

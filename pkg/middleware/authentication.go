@@ -256,6 +256,19 @@ func UserFromBasicAuth(db *sqlx.DB, header string) *models.User {
 	if !strings.HasPrefix(header, "Basic ") {
 		return nil
 	}
+	cacheKey := sha256.Sum256([]byte(header))
+	now := time.Now()
+	basicIdentityMu.Lock()
+	entry, cached := basicIdentities[cacheKey]
+	if cached && now.Before(entry.expires) {
+		user := entry.user
+		basicIdentityMu.Unlock()
+		return &user
+	}
+	if cached {
+		delete(basicIdentities, cacheKey)
+	}
+	basicIdentityMu.Unlock()
 	payload, err := base64.StdEncoding.DecodeString(header[len("Basic "):])
 	if err != nil {
 		return nil
@@ -268,8 +281,29 @@ func UserFromBasicAuth(db *sqlx.DB, header string) *models.User {
 	if err != nil || !user.IsActive || !basicPasswordMatches(hash, password) {
 		return nil
 	}
+	basicIdentityMu.Lock()
+	if len(basicIdentities) >= basicIdentityMax {
+		basicIdentities = map[[32]byte]basicIdentityEntry{}
+	}
+	basicIdentities[cacheKey] = basicIdentityEntry{user: user, expires: now.Add(basicIdentityTTL)}
+	basicIdentityMu.Unlock()
 	return &user
 }
+
+type basicIdentityEntry struct {
+	user    models.User
+	expires time.Time
+}
+
+var (
+	basicIdentityMu sync.Mutex
+	basicIdentities = map[[32]byte]basicIdentityEntry{}
+)
+
+const (
+	basicIdentityTTL = 15 * time.Second
+	basicIdentityMax = 10000
+)
 
 // basicVerified remembers, for basicVerifiedTTL, the (stored hash, password)
 // pairs bcrypt already accepted: a Basic client sends its password on every

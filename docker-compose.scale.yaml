@@ -24,6 +24,26 @@ services:
       - -c
       - max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
       - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
+      - -c
+      - track_wal_io_timing=on
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-768MB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-8MB}
+      - -c
+      - maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB}
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - max_wal_size=${POSTGRES_MAX_WAL_SIZE:-2GB}
+      - -c
       - statement_timeout=30000
       - -c
       - idle_in_transaction_session_timeout=60000
@@ -33,7 +53,7 @@ services:
       - ./deploy/pg_hba.conf:/etc/goflow/pg_hba.conf:ro
 
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    image: edoburu/pgbouncer:v1.26.0-p0
     container_name: bpmngo-pgbouncer
     depends_on:
       postgres:
@@ -50,6 +70,11 @@ services:
       DEFAULT_POOL_SIZE: ${PGBOUNCER_POOL_SIZE:-80}
       MAX_PREPARED_STATEMENTS: 200
       IGNORE_STARTUP_PARAMETERS: extra_float_digits,statement_timeout,idle_in_transaction_session_timeout
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U goflow -d goflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     networks:
       - bpmngo-network
     restart: unless-stopped
@@ -61,7 +86,7 @@ services:
     ports: !reset []
     depends_on:
       pgbouncer:
-        condition: service_started
+        condition: service_healthy
       postgres-replica:
         condition: service_healthy
     environment:
@@ -70,7 +95,11 @@ services:
       DB_DIRECT_PORT: 5432
       TASK_EVENTS_FANOUT: "true"
       DB_READ_HOST: postgres-replica
-      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-100}
+      # With three replicas this exposes at most 120 client connections to
+      # PgBouncer, which multiplexes them onto its 80 server connections.
+      # Increase only after measuring wait_count in SHOW POOLS.
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-40}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-10}
 
   lb:
     image: nginx:1.29.2-alpine
@@ -80,7 +109,7 @@ services:
         condition: service_healthy
     ports:
       - "${SERVER_PORT:-8080}:8080"
-      - "26500:26500"
+      - "${GRPC_PORT:-26500}:26500"
     volumes:
       - ./deploy/nginx-lb.conf:/etc/nginx/nginx.conf:ro
     networks:

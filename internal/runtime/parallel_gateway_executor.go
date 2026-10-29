@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
@@ -28,7 +29,7 @@ func NewParallelGatewayExecutor(db *sqlx.DB, dispatcher *events.TaskEventDispatc
 // ExecuteFork handles the fork side of a parallel gateway
 func (p *ParallelGatewayExecutor) ExecuteFork(
 	ctx context.Context,
-	execID uuid.UUID,
+	execID int64,
 	gatewayNode *engine.Node,
 	variables map[string]interface{},
 ) error {
@@ -38,7 +39,7 @@ func (p *ParallelGatewayExecutor) ExecuteFork(
 		return fmt.Errorf("failed to get execution: %w", err)
 	}
 	if exec == nil {
-		return fmt.Errorf("execution not found: %s", execID)
+		return fmt.Errorf("execution not found: %d", execID)
 	}
 
 	if len(gatewayNode.Outgoing) == 0 {
@@ -53,8 +54,8 @@ func (p *ParallelGatewayExecutor) ExecuteFork(
 
 	// Create child executions for each outgoing flow
 	for i, flow := range gatewayNode.Outgoing {
-		childExecID := uuid.New()
-		pathID := fmt.Sprintf("%s_%d", exec.ID.String(), i)
+		childExecID := ids.NewEngineKey()
+		pathID := fmt.Sprintf("%d_%d", exec.ID, i)
 
 		// Create branch variables (copy or reference)
 		branchVars, _ := json.Marshal(variables)
@@ -75,7 +76,7 @@ func (p *ParallelGatewayExecutor) ExecuteFork(
 
 		// Store branch variables
 		_, err = tx.Exec(`
-            INSERT INTO public.execution_variables (execution_id, variables, created_at)
+			INSERT INTO public.execution_variables (execution_key, variables, created_at)
             VALUES ($1, $2, NOW())
         `, childExecID, branchVars)
 		if err != nil {
@@ -98,7 +99,7 @@ func (p *ParallelGatewayExecutor) ExecuteFork(
 // ExecuteJoin handles the join side of a parallel gateway
 func (p *ParallelGatewayExecutor) ExecuteJoin(
 	ctx context.Context,
-	execID uuid.UUID,
+	execID int64,
 	gatewayNode *engine.Node,
 ) error {
 	// Get current execution
@@ -107,7 +108,7 @@ func (p *ParallelGatewayExecutor) ExecuteJoin(
 		return fmt.Errorf("failed to get execution: %w", err)
 	}
 	if exec == nil {
-		return fmt.Errorf("execution not found: %s", execID)
+		return fmt.Errorf("execution not found: %d", execID)
 	}
 
 	if exec.ParentExecutionID == nil {
@@ -123,11 +124,12 @@ func (p *ParallelGatewayExecutor) ExecuteJoin(
 	// Find the gateway state
 	var gatewayState models.GatewayState
 	err = tx.Get(&gatewayState, `
-        SELECT id, process_instance_id, expected_incoming, received_incoming, status, joined_flows
-        FROM public.gateway_state
-        WHERE process_instance_id = $1 AND gateway_id = $2 AND status = 'waiting'
+		SELECT g.id, pi.id AS process_instance_id, g.process_instance_key, g.expected_incoming, g.received_incoming, g.status, g.joined_flows
+		FROM public.gateway_state g
+		JOIN public.process_instances pi ON pi.engine_key = g.process_instance_key
+		WHERE g.process_instance_key = $1 AND g.gateway_id = $2 AND g.status = 'waiting'
         FOR UPDATE
-    `, exec.ProcessInstanceID, gatewayNode.ID)
+	`, exec.ProcessInstanceKey, gatewayNode.ID)
 
 	isFirstJoin := err != nil
 
@@ -144,13 +146,14 @@ func (p *ParallelGatewayExecutor) ExecuteJoin(
 		joinedFlowsJSON, _ := json.Marshal(joinedFlows)
 
 		gatewayState = models.GatewayState{
-			ID:                uuid.New(),
-			ProcessInstanceID: exec.ProcessInstanceID,
-			GatewayID:         gatewayNode.ID,
-			ExpectedIncoming:  childCount,
-			ReceivedIncoming:  1,
-			Status:            "waiting",
-			JoinedFlows:       joinedFlowsJSON,
+			ID:                 uuid.New(),
+			ProcessInstanceID:  exec.ProcessInstanceID,
+			ProcessInstanceKey: exec.ProcessInstanceKey,
+			GatewayID:          gatewayNode.ID,
+			ExpectedIncoming:   childCount,
+			ReceivedIncoming:   1,
+			Status:             "waiting",
+			JoinedFlows:        joinedFlowsJSON,
 		}
 
 		created, err := p.engineRepo.CreateGatewayStateTx(tx, &gatewayState)
@@ -162,11 +165,12 @@ func (p *ParallelGatewayExecutor) ExecuteJoin(
 			// just created and fall through to the join-update path below.
 			isFirstJoin = false
 			if err := tx.Get(&gatewayState, `
-				SELECT id, process_instance_id, expected_incoming, received_incoming, status, joined_flows
-				FROM public.gateway_state
-				WHERE process_instance_id = $1 AND gateway_id = $2 AND status = 'waiting'
+				SELECT g.id, pi.id AS process_instance_id, g.process_instance_key, g.expected_incoming, g.received_incoming, g.status, g.joined_flows
+				FROM public.gateway_state g
+				JOIN public.process_instances pi ON pi.engine_key = g.process_instance_key
+				WHERE g.process_instance_key = $1 AND g.gateway_id = $2 AND g.status = 'waiting'
 				FOR UPDATE
-			`, exec.ProcessInstanceID, gatewayNode.ID); err != nil {
+			`, exec.ProcessInstanceKey, gatewayNode.ID); err != nil {
 				return fmt.Errorf("failed to re-fetch gateway state after losing create race: %w", err)
 			}
 		}
@@ -183,8 +187,8 @@ func (p *ParallelGatewayExecutor) ExecuteJoin(
 		_, err = tx.Exec(`
             UPDATE public.gateway_state
             SET received_incoming = $1, joined_flows = $2
-            WHERE process_instance_id = $3 AND id = $4
-        `, newReceived, joinedFlowsJSON, gatewayState.ProcessInstanceID, gatewayState.ID)
+			WHERE process_instance_key = $3 AND id = $4
+		`, newReceived, joinedFlowsJSON, gatewayState.ProcessInstanceKey, gatewayState.ID)
 		if err != nil {
 			return fmt.Errorf("failed to update gateway state: %w", err)
 		}
@@ -228,8 +232,8 @@ func (p *ParallelGatewayExecutor) ExecuteJoin(
 		_, err = tx.Exec(`
             UPDATE public.gateway_state
             SET status = 'completed', completed_at = NOW()
-            WHERE process_instance_id = $1 AND id = $2
-        `, gatewayState.ProcessInstanceID, gatewayState.ID)
+			WHERE process_instance_key = $1 AND id = $2
+		`, gatewayState.ProcessInstanceKey, gatewayState.ID)
 		if err != nil {
 			return fmt.Errorf("failed to complete gateway: %w", err)
 		}
@@ -242,7 +246,7 @@ func (p *ParallelGatewayExecutor) ExecuteJoin(
 }
 
 // Helper: Get number of child executions
-func (p *ParallelGatewayExecutor) getChildExecutionCount(tx *sqlx.Tx, parentExecID *uuid.UUID) (int, error) {
+func (p *ParallelGatewayExecutor) getChildExecutionCount(tx *sqlx.Tx, parentExecID *int64) (int, error) {
 	if parentExecID == nil {
 		return 0, fmt.Errorf("parent execution ID is nil")
 	}
@@ -251,7 +255,7 @@ func (p *ParallelGatewayExecutor) getChildExecutionCount(tx *sqlx.Tx, parentExec
 	err := tx.Get(&count, `
         SELECT COUNT(*)
         FROM public.executions
-        WHERE parent_execution_id = $1 AND is_active = true
+		WHERE parent_execution_key = $1 AND is_active = true
     `, parentExecID)
 	return count, err
 }
@@ -259,7 +263,7 @@ func (p *ParallelGatewayExecutor) getChildExecutionCount(tx *sqlx.Tx, parentExec
 // Helper: Merge variables from all parallel branches
 func (p *ParallelGatewayExecutor) mergeBranchVariables(
 	tx *sqlx.Tx,
-	parentExecID *uuid.UUID,
+	parentExecID *int64,
 ) (map[string]interface{}, error) {
 	if parentExecID == nil {
 		return make(map[string]interface{}), nil
@@ -267,15 +271,15 @@ func (p *ParallelGatewayExecutor) mergeBranchVariables(
 
 	// Get all child executions
 	var childExecs []struct {
-		ID        string
+		ID        int64
 		Variables json.RawMessage
 	}
 
 	err := tx.Select(&childExecs, `
-        SELECT e.id, ev.variables
+		SELECT e.engine_key, ev.variables
         FROM public.executions e
-        JOIN public.execution_variables ev ON ev.execution_id = e.id
-        WHERE e.parent_execution_id = $1 AND e.is_active = false
+		JOIN public.execution_variables ev ON ev.execution_key = e.engine_key
+		WHERE e.parent_execution_key = $1 AND e.is_active = false
     `, parentExecID)
 	if err != nil {
 		return nil, err
@@ -309,7 +313,7 @@ func (p *ParallelGatewayExecutor) getNextNodeAfterGateway(gatewayNode *engine.No
 // ResumeParentExecution resumes the parent after all children complete
 func (p *ParallelGatewayExecutor) ResumeParentExecution(
 	ctx context.Context,
-	parentExecID uuid.UUID,
+	parentExecID int64,
 	processInstanceID uuid.UUID,
 	nextNodeID string,
 	variables map[string]interface{},

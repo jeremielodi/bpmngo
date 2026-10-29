@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -26,7 +27,7 @@ const maxStepBackSteps = 50
 // element it waits at when only one token waits there.
 type StepBackArgs struct {
 	InstanceID  uuid.UUID  `json:"instanceId"`
-	ExecutionID uuid.UUID  `json:"executionId"`
+	ExecutionID int64      `json:"executionId"`
 	ElementID   string     `json:"elementId"`
 	Steps       int        `json:"steps"`
 	DryRun      bool       `json:"dryRun"`
@@ -37,12 +38,12 @@ type StepBackArgs struct {
 }
 
 type StepBackResult struct {
-	ExecutionID    uuid.UUID   `json:"executionId"`
-	FromElementID  string      `json:"fromElementId"`
-	ToElementID    string      `json:"toElementId"`
-	ToElementName  string      `json:"toElementName,omitempty"`
-	Applied        bool        `json:"applied"`
-	CancelledTasks []uuid.UUID `json:"cancelledTaskIds,omitempty"`
+	ExecutionID    int64   `json:"executionId"`
+	FromElementID  string  `json:"fromElementId"`
+	ToElementID    string  `json:"toElementId"`
+	ToElementName  string  `json:"toElementName,omitempty"`
+	Applied        bool    `json:"applied"`
+	CancelledTasks []int64 `json:"cancelledTaskIds,omitempty"`
 }
 
 // StepBack sends a token back to the wait state it went through `Steps`
@@ -65,7 +66,8 @@ func (c *commands) stepBack(ctx context.Context, a StepBackArgs) (StepBackResult
 		var applied bool
 		if err := c.db.Get(&applied, `
 			SELECT EXISTS (SELECT 1 FROM public.audit_logs
-			WHERE process_instance_id = $1 AND action = 'EXECUTION_MOVED' AND new_data->>'requestId' = $2)
+			WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)
+			  AND action = 'EXECUTION_MOVED' AND new_data->>'requestId' = $2)
 		`, a.InstanceID, a.RequestID.String()); err != nil {
 			return StepBackResult{}, err
 		}
@@ -198,7 +200,7 @@ func (r *Runtime) StepBack(ctx context.Context, a StepBackArgs) (StepBackResult,
 		service.LogAuditErr("task cancelled", r.auditService.LogTaskCancelled(taskID, a.InstanceID, "step back"))
 	}
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(a.InstanceID.String(), exec.ID.String(), node.ID, target.ID)
+		p.ExecutionMoved(a.InstanceID.String(), strconv.FormatInt(exec.ID, 10), node.ID, target.ID)
 	}
 
 	if err := r.ExecuteExecution(ctx, exec.ID); err != nil {
@@ -220,13 +222,13 @@ func (r *Runtime) stepBackSource(a StepBackArgs) (*repository.Execution, error) 
 		if e.Status != "waiting" || (e.PathID != nil && strings.Contains(*e.PathID, ":")) {
 			continue
 		}
-		if (a.ExecutionID != uuid.Nil && e.ID == a.ExecutionID) ||
-			(a.ExecutionID == uuid.Nil && a.ElementID != "" && e.CurrentElementID == a.ElementID) {
+		if (a.ExecutionID != 0 && e.ID == a.ExecutionID) ||
+			(a.ExecutionID == 0 && a.ElementID != "" && e.CurrentElementID == a.ElementID) {
 			matched = append(matched, e)
 		}
 	}
 	switch {
-	case a.ExecutionID == uuid.Nil && a.ElementID == "":
+	case a.ExecutionID == 0 && a.ElementID == "":
 		return nil, refuse("executionId or elementId is required")
 	case len(matched) == 0:
 		return nil, refuse("no waiting token found")

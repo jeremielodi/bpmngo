@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
@@ -36,11 +37,12 @@ func (r *Runtime) executeBoundaryTimerNode(ctx context.Context, engineRepo *repo
 	}
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(exec.ID, exec.ProcessInstanceID, node.ID, nextNodeID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), exec.ID.String(), node.ID, nextNodeID)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), node.ID, nextNodeID)
 	}
 
 	return nextNodeID, nil
 }
+
 // executeIntermediateTimer handles an intermediate catch event (timer). Creates a timer job
 // and parks the execution in "waiting" state until the timer fires.
 func (r *Runtime) executeIntermediateTimer(ctx context.Context, engineRepo *repository.EngineRepository, exec *repository.Execution, node *engine.Node) error {

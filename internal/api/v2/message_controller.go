@@ -54,19 +54,14 @@ func (mc *MessageController) PublishMessage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "PUBLISH_FAILED", "detail": err.Error()})
 	}
 
-	body := fiber.Map{
-		"key":                           res.MessageID,
-		"tenantId":                      req.TenantID,
-		"correlatedProcessInstanceKeys": nonNilIDs(res.Correlated),
-		"startedProcessInstanceKeys":    nonNilIDs(res.Started),
+	return c.JSON(messagePublicationResponse(res, req.TenantID))
+}
+
+func messagePublicationResponse(res runtime.PublishResult, tenantID string) fiber.Map {
+	if tenantID == "" {
+		tenantID = "<default>"
 	}
-	// Kept from BpmnGo's earlier 1:1 response.
-	if len(res.Correlated) > 0 {
-		body["processInstanceKey"] = res.Correlated[0]
-	} else if len(res.Started) > 0 {
-		body["processInstanceKey"] = res.Started[0]
-	}
-	return c.JSON(body)
+	return fiber.Map{"messageKey": res.MessageID, "tenantId": tenantID}
 }
 
 func nonNilIDs(ids []uuid.UUID) []uuid.UUID {

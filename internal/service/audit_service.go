@@ -60,7 +60,7 @@ func (s *AuditService) LogProcessCompleted(processInstanceID uuid.UUID, finalVar
 }
 
 // LogExecutionCreated logs when a new execution (token) is created
-func (s *AuditService) LogExecutionCreated(executionID, processInstanceID uuid.UUID, parentExecutionID *uuid.UUID, nodeID string) error {
+func (s *AuditService) LogExecutionCreated(executionID int64, processInstanceID uuid.UUID, parentExecutionID *int64, nodeID string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"executionId":       executionID,
 		"currentElementId":  nodeID,
@@ -80,14 +80,8 @@ func (s *AuditService) LogExecutionCreated(executionID, processInstanceID uuid.U
 }
 
 // LogExecutionMoved logs when execution moves to a new node
-func (s *AuditService) LogExecutionMoved(executionID, processInstanceID uuid.UUID, fromNode, toNode string, variables map[string]interface{}) error {
-	newData, _ := json.Marshal(map[string]interface{}{
-		"executionId": executionID,
-		"fromNode":    fromNode,
-		"toNode":      toNode,
-		"variables":   variables,
-		"timestamp":   time.Now(),
-	})
+func (s *AuditService) LogExecutionMoved(executionID int64, processInstanceID uuid.UUID, fromNode, toNode string, _ map[string]interface{}) error {
+	newData := executionMovedAuditData(executionID, fromNode, toNode)
 
 	log := &models.AuditLog{
 		ID:                uuid.New(),
@@ -100,12 +94,22 @@ func (s *AuditService) LogExecutionMoved(executionID, processInstanceID uuid.UUI
 	return s.auditRepo.CreateAuditLog(log)
 }
 
+func executionMovedAuditData(executionID int64, fromNode, toNode string) []byte {
+	data, _ := json.Marshal(map[string]interface{}{
+		"executionId": executionID,
+		"fromNode":    fromNode,
+		"toNode":      toNode,
+		"timestamp":   time.Now(),
+	})
+	return data
+}
+
 // LogExecutionSteppedBack logs a token sent back to an element it already
 // went through (the "previous" button). It is an EXECUTION_MOVED entry, so
 // the token history shows it like any other hop; stepBack marks it for
 // StepBackPath. Written in the step back's own transaction: the next step
 // back reads it to know where the token came from.
-func (s *AuditService) LogExecutionSteppedBackTx(tx *sqlx.Tx, executionID, processInstanceID uuid.UUID, fromNode, toNode string, userID *uuid.UUID, requestID uuid.UUID) error {
+func (s *AuditService) LogExecutionSteppedBackTx(tx *sqlx.Tx, executionID int64, processInstanceID uuid.UUID, fromNode, toNode string, userID *uuid.UUID, requestID uuid.UUID) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"executionId": executionID,
 		"fromNode":    fromNode,
@@ -128,7 +132,7 @@ func (s *AuditService) LogExecutionSteppedBackTx(tx *sqlx.Tx, executionID, proce
 }
 
 // LogTaskCreated logs when a user task is created
-func (s *AuditService) LogTaskCreated(taskID, processInstanceID uuid.UUID, taskName string, assignee *string, candidateGroup *string) error {
+func (s *AuditService) LogTaskCreated(taskID int64, processInstanceID uuid.UUID, taskName string, assignee *string, candidateGroup *string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"taskId":         taskID,
 		"taskName":       taskName,
@@ -154,7 +158,7 @@ func (s *AuditService) LogTaskCreated(taskID, processInstanceID uuid.UUID, taskN
 // often BPMN-expression-derived strings ("${customer}") rather than
 // registered platform users, so this can't require a uuid.UUID like most
 // other audit methods do.
-func (s *AuditService) LogTaskClaimed(taskID, processInstanceID uuid.UUID, assignee string) error {
+func (s *AuditService) LogTaskClaimed(taskID int64, processInstanceID uuid.UUID, assignee string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"taskId":    taskID,
 		"claimedBy": assignee,
@@ -174,7 +178,7 @@ func (s *AuditService) LogTaskClaimed(taskID, processInstanceID uuid.UUID, assig
 }
 
 // LogTaskCompleted logs when a task is completed
-func (s *AuditService) LogTaskCompleted(taskID, processInstanceID uuid.UUID, userID *uuid.UUID, formData map[string]interface{}) error {
+func (s *AuditService) LogTaskCompleted(taskID int64, processInstanceID uuid.UUID, userID *uuid.UUID, formData map[string]interface{}) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"taskId":      taskID,
 		"completedBy": userID,
@@ -252,7 +256,7 @@ func (s *AuditService) LogGatewayJoined(processInstanceID uuid.UUID, gatewayID s
 }
 
 // LogTimerCreated logs when a timer is scheduled
-func (s *AuditService) LogTimerCreated(processInstanceID uuid.UUID, executionID *uuid.UUID, dueAt time.Time, timerType string) error {
+func (s *AuditService) LogTimerCreated(processInstanceID uuid.UUID, executionID *int64, dueAt time.Time, timerType string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"executionId": executionID,
 		"dueAt":       dueAt,
@@ -272,7 +276,7 @@ func (s *AuditService) LogTimerCreated(processInstanceID uuid.UUID, executionID 
 }
 
 // LogTimerTriggered logs when a timer triggers
-func (s *AuditService) LogTimerTriggered(processInstanceID uuid.UUID, timerID uuid.UUID, timerType string) error {
+func (s *AuditService) LogTimerTriggered(processInstanceID uuid.UUID, timerID int64, timerType string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"timerId":     timerID,
 		"timerType":   timerType,
@@ -291,7 +295,7 @@ func (s *AuditService) LogTimerTriggered(processInstanceID uuid.UUID, timerID uu
 }
 
 // LogJobCreated logs when a job is created
-func (s *AuditService) LogJobCreated(processInstanceID uuid.UUID, jobID uuid.UUID, jobType string) error {
+func (s *AuditService) LogJobCreated(processInstanceID uuid.UUID, jobID int64, jobType string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"jobId":     jobID,
 		"jobType":   jobType,
@@ -310,7 +314,7 @@ func (s *AuditService) LogJobCreated(processInstanceID uuid.UUID, jobID uuid.UUI
 }
 
 // LogExecutionCompleted logs when an execution (token) reaches an end event
-func (s *AuditService) LogExecutionCompleted(executionID, processInstanceID uuid.UUID, nodeID string) error {
+func (s *AuditService) LogExecutionCompleted(executionID int64, processInstanceID uuid.UUID, nodeID string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"executionId": executionID,
 		"nodeId":      nodeID,
@@ -329,7 +333,7 @@ func (s *AuditService) LogExecutionCompleted(executionID, processInstanceID uuid
 }
 
 // LogExecutionWaited logs when an execution parks at a catch event (timer/message/signal)
-func (s *AuditService) LogExecutionWaited(executionID, processInstanceID uuid.UUID, nodeID, waitType string) error {
+func (s *AuditService) LogExecutionWaited(executionID int64, processInstanceID uuid.UUID, nodeID, waitType string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"executionId": executionID,
 		"nodeId":      nodeID,
@@ -349,7 +353,7 @@ func (s *AuditService) LogExecutionWaited(executionID, processInstanceID uuid.UU
 }
 
 // LogTaskUnclaimed logs when a user unclaims a task
-func (s *AuditService) LogTaskUnclaimed(taskID, processInstanceID uuid.UUID) error {
+func (s *AuditService) LogTaskUnclaimed(taskID int64, processInstanceID uuid.UUID) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"taskId":      taskID,
 		"unclaimedAt": time.Now(),
@@ -369,7 +373,7 @@ func (s *AuditService) LogTaskUnclaimed(taskID, processInstanceID uuid.UUID) err
 
 // LogTaskCancelled logs when an open task is cancelled (e.g. a Move Token
 // modification cancels the execution it was attached to)
-func (s *AuditService) LogTaskCancelled(taskID, processInstanceID uuid.UUID, reason string) error {
+func (s *AuditService) LogTaskCancelled(taskID int64, processInstanceID uuid.UUID, reason string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"taskId":      taskID,
 		"reason":      reason,
@@ -389,7 +393,7 @@ func (s *AuditService) LogTaskCancelled(taskID, processInstanceID uuid.UUID, rea
 }
 
 // LogJobLocked logs when a worker locks a job via fetch-and-lock
-func (s *AuditService) LogJobLocked(jobID, processInstanceID uuid.UUID, lockOwner string) error {
+func (s *AuditService) LogJobLocked(jobID int64, processInstanceID uuid.UUID, lockOwner string) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"jobId":     jobID,
 		"lockOwner": lockOwner,
@@ -408,7 +412,7 @@ func (s *AuditService) LogJobLocked(jobID, processInstanceID uuid.UUID, lockOwne
 }
 
 // LogJobCompleted logs when a worker completes a job
-func (s *AuditService) LogJobCompleted(jobID, processInstanceID uuid.UUID, result map[string]interface{}) error {
+func (s *AuditService) LogJobCompleted(jobID int64, processInstanceID uuid.UUID, result map[string]interface{}) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"jobId":       jobID,
 		"result":      result,
@@ -428,7 +432,7 @@ func (s *AuditService) LogJobCompleted(jobID, processInstanceID uuid.UUID, resul
 
 // LogJobFailed logs when a job fails, whether it will be retried or has
 // permanently failed (retriesLeft distinguishes the two).
-func (s *AuditService) LogJobFailed(jobID, processInstanceID uuid.UUID, errorMessage string, retriesLeft int) error {
+func (s *AuditService) LogJobFailed(jobID int64, processInstanceID uuid.UUID, errorMessage string, retriesLeft int) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"jobId":        jobID,
 		"errorMessage": errorMessage,
@@ -469,7 +473,7 @@ func (s *AuditService) LogVariablesMerged(processInstanceID uuid.UUID, merged ma
 
 // LogTimerCancelled logs when a scheduled timer is cancelled (e.g. a boundary
 // timer's main task completes first, so the race is cancelled)
-func (s *AuditService) LogTimerCancelled(processInstanceID uuid.UUID, executionID *uuid.UUID) error {
+func (s *AuditService) LogTimerCancelled(processInstanceID uuid.UUID, executionID *int64) error {
 	newData, _ := json.Marshal(map[string]interface{}{
 		"executionId": executionID,
 		"cancelledAt": time.Now(),

@@ -1,0 +1,20 @@
+{
+  "engine": "hybrid-keys-20261029/bpmngo",
+  "generated_at": "2026-10-29T17:43:32.188477Z",
+  "clients": 100,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 10,
+  "seconds": 60.270922917,
+  "completed": 13032,
+  "instances_per_second": 216.22366755436224,
+  "errors": {},
+  "latency": {
+    "count": 13032,
+    "errors": 0,
+    "p50_us": 432085,
+    "p95_us": 838682,
+    "p99_us": 1032503,
+    "mean_us": 461470.7806169429
+  }
+}

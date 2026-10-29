@@ -17,27 +17,31 @@ import (
 func TestFailJob_RetriesExhausted_PermanentlyFailsAndCreatesIncident(t *testing.T) {
 	db, mock := newMockDB(t)
 
-	jobID := uuid.New()
-	execID := uuid.New()
+	jobID := int64(101)
+	execID := int64(201)
+	instanceKey := int64(401)
 	instID := uuid.New()
 
 	mock.ExpectBegin()
 
-	jobRows := sqlmock.NewRows([]string{"execution_id", "process_instance_id", "current_element_id", "status", "retries"}).
+	jobRows := sqlmock.NewRows([]string{"execution_key", "process_instance_id", "current_element_id", "status", "retries"}).
 		AddRow(execID, instID, "reviewTask", "locked", 1)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT process_instance_id FROM public.jobs")).WithArgs(jobID).
-		WillReturnRows(sqlmock.NewRows([]string{"process_instance_id"}).AddRow(instID))
-	mock.ExpectQuery(regexp.QuoteMeta("j.execution_id")).WithArgs(instID, jobID).WillReturnRows(jobRows)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT process_instance_key FROM public.jobs")).WithArgs(jobID).
+		WillReturnRows(sqlmock.NewRows([]string{"process_instance_key"}).AddRow(instanceKey))
+	mock.ExpectQuery(regexp.QuoteMeta("j.execution_key")).WithArgs(instanceKey, jobID).WillReturnRows(jobRows)
 
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE public.jobs")).
 		WithArgs("boom", "", instID, jobID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT engine_key FROM public.process_instances WHERE id = $1")).
+		WithArgs(instID).
+		WillReturnRows(sqlmock.NewRows([]string{"engine_key"}).AddRow(instanceKey))
 
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO public.incidents")).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "process_instance_id", "job_id", "incident_type", "activity_id",
+			"engine_key", "job_key", "incident_type", "activity_id",
 			"error_message", "error_code", "state", "created_at", "resolved_at",
-		}).AddRow(uuid.New(), instID, jobID, "failedExternalTask", "reviewTask", "boom", "", "open", time.Now(), nil))
+		}).AddRow(int64(301), jobID, "failedExternalTask", "reviewTask", "boom", "", "open", time.Now(), nil))
 
 	mock.ExpectCommit()
 
@@ -63,17 +67,18 @@ func TestFailJob_RetriesExhausted_PermanentlyFailsAndCreatesIncident(t *testing.
 func TestFailJob_RetriesRemaining_DoesNotPermanentlyFail(t *testing.T) {
 	db, mock := newMockDB(t)
 
-	jobID := uuid.New()
-	execID := uuid.New()
+	jobID := int64(102)
+	execID := int64(202)
+	instanceKey := int64(402)
 	instID := uuid.New()
 
 	mock.ExpectBegin()
 
-	jobRows := sqlmock.NewRows([]string{"execution_id", "process_instance_id", "current_element_id", "status", "retries"}).
+	jobRows := sqlmock.NewRows([]string{"execution_key", "process_instance_id", "current_element_id", "status", "retries"}).
 		AddRow(execID, instID, "reviewTask", "locked", 3)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT process_instance_id FROM public.jobs")).WithArgs(jobID).
-		WillReturnRows(sqlmock.NewRows([]string{"process_instance_id"}).AddRow(instID))
-	mock.ExpectQuery(regexp.QuoteMeta("j.execution_id")).WithArgs(instID, jobID).WillReturnRows(jobRows)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT process_instance_key FROM public.jobs")).WithArgs(jobID).
+		WillReturnRows(sqlmock.NewRows([]string{"process_instance_key"}).AddRow(instanceKey))
+	mock.ExpectQuery(regexp.QuoteMeta("j.execution_key")).WithArgs(instanceKey, jobID).WillReturnRows(jobRows)
 
 	// ResetJobForRetryTx goes through pkg/database's named-parameter
 	// adapter rather than a plain positional query — match loosely by

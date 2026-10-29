@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"strconv"
+	"time"
 
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
+	"github.com/jeremielodi/bpmngo/internal/metrics"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 )
@@ -20,8 +22,12 @@ func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
+	txStarted, committed := time.Now(), false
+	defer func() {
+		metrics.ObserveEngineTransaction("create_service_job", txStarted, committed, "operation_error")
+	}()
 
-	if err := engineRepo.UpdateExecutionStatusAndNodeTx(tx, exec.ProcessInstanceID, exec.ID, "active", node.ID); err != nil {
+	if err := engineRepo.UpdateExecutionStatusAndNodeByKeyTx(tx, exec.ProcessInstanceKey, exec.ID, "active", node.ID); err != nil {
 		return fmt.Errorf("failed to update execution: %w", err)
 	}
 
@@ -39,7 +45,7 @@ func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository
 			payloadVars[k] = v
 		}
 		// Input mappings are the activity's local variables.
-		if err := repository.SetLocalVariablesTx(tx, exec.ProcessInstanceID, exec.ID, mapped); err != nil {
+		if err := repository.SetLocalVariablesByKeyTx(tx, exec.ProcessInstanceID, exec.ProcessInstanceKey, exec.ID, mapped); err != nil {
 			return models.WithIncidentType(models.IncidentIOMappingError, fmt.Errorf("service task %s: input mappings: %w", node.ID, err))
 		}
 	}
@@ -49,12 +55,12 @@ func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository
 		return fmt.Errorf("failed to marshal variables: %w", err)
 	}
 
-	jobID := uuid.New()
-	if err := engineRepo.CreateJobTx(tx, jobID, exec.ProcessInstanceID, exec.ID, *node.JobType, payload); err != nil {
+	jobID := ids.NewEngineKey()
+	if err := engineRepo.CreateJobByKeyTx(tx, jobID, exec.ProcessInstanceKey, exec.ID, *node.JobType, payload); err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
 
-	if err := engineRepo.UpdateExecutionStatusTx(tx, exec.ProcessInstanceID, exec.ID, "waiting"); err != nil {
+	if err := engineRepo.UpdateExecutionStatusByKeyTx(tx, exec.ProcessInstanceKey, exec.ID, "waiting"); err != nil {
 		return fmt.Errorf("failed to update execution status: %w", err)
 	}
 
@@ -65,21 +71,18 @@ func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository
 	if err := r.armBoundaryEventsTx(tx, engineRepo, graph, exec, node); err != nil {
 		return err
 	}
+	if err := repository.NotifyJobAvailableTx(tx, *node.JobType); err != nil {
+		return fmt.Errorf("failed to queue job notification: %w", err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
-	if err := repository.NotifyJobAvailable(r.DB, *node.JobType); err != nil {
-		// Best-effort: the job row is already committed and fetchable via
-		// the normal poll, so a failed wake-up notify only costs latency,
-		// not correctness.
-		log.Printf("failed to notify job available for type %s: %v", *node.JobType, err)
-	}
+	committed = true
 	r.auditService.LogJobCreated(exec.ProcessInstanceID, jobID, *node.JobType)
 
 	if p := eventlog.Global(); p != nil {
-		p.JobCreated(exec.ProcessInstanceID.String(), jobID.String(), exec.ID.String(), *node.JobType)
+		p.JobCreated(exec.ProcessInstanceID.String(), strconv.FormatInt(jobID, 10), strconv.FormatInt(exec.ID, 10), *node.JobType)
 	}
 	return nil
 }

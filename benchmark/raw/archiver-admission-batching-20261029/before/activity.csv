@@ -1,0 +1,3 @@
+state,wait_event_type,wait_event,sessions,oldest_transaction_seconds
+idle,Client,ClientRead,6,
+active,,,1,0.001041

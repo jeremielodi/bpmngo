@@ -22,9 +22,21 @@ var (
 // terminated. Must only be called once that status is committed.
 func NotifyInstanceFinished(db *sqlx.DB, instanceID uuid.UUID) error {
 	wakeInstance(instanceID)
-	_, err := db.Exec(`SELECT pg_notify($1, $2)`, InstanceFinishedChannel, instanceID.String())
+	return NotifyInstanceFinishedTx(db, instanceID)
+}
+
+// NotifyInstanceFinishedTx queues the cross-instance notification in the
+// transaction that changes the process status. PostgreSQL publishes it only
+// if and after that transaction commits.
+func NotifyInstanceFinishedTx(tx sqlx.Execer, instanceID uuid.UUID) error {
+	_, err := tx.Exec(`SELECT pg_notify($1, $2)`, InstanceFinishedChannel, instanceID.String())
 	return err
 }
+
+// WakeInstanceFinishedLocal wakes waiters in this process after the status
+// transaction commits. The LISTEN notification also calls this function; a
+// duplicate wake is harmless.
+func WakeInstanceFinishedLocal(instanceID uuid.UUID) { wakeInstance(instanceID) }
 
 // InstanceFinishedChannelFor returns a channel closed once instanceID is
 // announced finished. Grab it *before* checking the instance's status, so

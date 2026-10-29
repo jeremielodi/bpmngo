@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jmoiron/sqlx"
 )
@@ -24,16 +25,32 @@ func NewProcessInstanceRepository(db *sqlx.DB) *ProcessInstanceRepository {
 // tenant / untenanted deployment) so list/search/get endpoints can filter
 // by the caller's tenant without a join.
 func (r *ProcessInstanceRepository) CreateProcessInstanceTx(tx *sqlx.Tx, instanceID, processDefID uuid.UUID, startedAt time.Time, tenantID *string) error {
-	_, err := tx.Exec(`
+	return r.CreateProcessInstanceByKeyTx(tx, instanceID, ids.NewEngineKey(), processDefID, startedAt, tenantID)
+}
+
+func (r *ProcessInstanceRepository) CreateProcessInstanceByKeyTx(tx *sqlx.Tx, instanceID uuid.UUID, instanceKey int64, processDefID uuid.UUID, startedAt time.Time, tenantID *string) error {
+	definitionKey, err := processDefinitionEngineKey(tx, processDefID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
 		INSERT INTO public.process_instances
-			(id, process_definition_id, status, started_at, tenant_id)
-		VALUES ($1, $2, 'running', $3, $4)
-	`, instanceID, processDefID, startedAt, tenantID)
+			(id, engine_key, process_definition_id, process_definition_key, status, started_at, tenant_id)
+		VALUES ($1, $2, $3, $4, 'running', $5, $6)
+	`, instanceID, instanceKey, processDefID, definitionKey, startedAt, tenantID)
 	return err
 }
 
 // CreateVariables creates initial variables for a process instance
 func (r *ProcessInstanceRepository) CreateVariablesTx(tx *sqlx.Tx, instanceID uuid.UUID, variables map[string]interface{}, updatedAt time.Time) error {
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
+	return r.CreateVariablesByKeyTx(tx, instanceID, instanceKey, variables, updatedAt)
+}
+
+func (r *ProcessInstanceRepository) CreateVariablesByKeyTx(tx *sqlx.Tx, instanceID uuid.UUID, instanceKey int64, variables map[string]interface{}, updatedAt time.Time) error {
 	varData, err := json.Marshal(variables)
 	if err != nil {
 		return err
@@ -41,26 +58,34 @@ func (r *ProcessInstanceRepository) CreateVariablesTx(tx *sqlx.Tx, instanceID uu
 
 	_, err = tx.Exec(`
 		INSERT INTO public.variables
-			(id, process_instance_id, data, updated_at)
+			(engine_key, process_instance_key, data, updated_at)
 		VALUES ($1, $2, $3, $4)
-	`, uuid.New(), instanceID, varData, updatedAt)
+	`, ids.NewEngineKey(), instanceKey, varData, updatedAt)
 	return notifyVariables(tx, instanceID, err)
 }
 
 // CreateExecution creates an initial execution record
-func (r *ProcessInstanceRepository) CreateExecutionTx(tx *sqlx.Tx, execID, instanceID uuid.UUID, startNodeID string, now time.Time) error {
+func (r *ProcessInstanceRepository) CreateExecutionTx(tx *sqlx.Tx, execID int64, instanceID uuid.UUID, startNodeID string, now time.Time) error {
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
+	return r.CreateExecutionByKeyTx(tx, execID, instanceKey, startNodeID, now)
+}
+
+func (r *ProcessInstanceRepository) CreateExecutionByKeyTx(tx *sqlx.Tx, execID, instanceKey int64, startNodeID string, now time.Time) error {
 	_, err := tx.Exec(`
 		INSERT INTO public.executions
-			(id, process_instance_id, current_element_id, status, is_active, created_at, updated_at)
+			(engine_key, process_instance_key, current_element_id, status, is_active, created_at, updated_at)
 		VALUES ($1, $2, $3, 'active', true, $4, $5)
-	`, execID, instanceID, startNodeID, now, now)
+	`, execID, instanceKey, startNodeID, now, now)
 	return err
 }
 
 // GetVariables returns the current variables for a process instance
 func (r *ProcessInstanceRepository) GetVariables(instanceID uuid.UUID) (map[string]interface{}, error) {
 	var data []byte
-	err := r.db.Get(&data, `SELECT data FROM public.variables WHERE process_instance_id = $1`, instanceID)
+	err := r.db.Get(&data, `SELECT data FROM public.variables WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)`, instanceID)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -79,12 +104,16 @@ func (r *ProcessInstanceRepository) UpsertVariablesTx(tx *sqlx.Tx, instanceID uu
 	if err != nil {
 		return err
 	}
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
 	_, err = tx.Exec(`
-		INSERT INTO public.variables (id, process_instance_id, data, updated_at)
+		INSERT INTO public.variables (engine_key, process_instance_key, data, updated_at)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (process_instance_id) DO UPDATE
+		ON CONFLICT (process_instance_key) DO UPDATE
 		SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-	`, uuid.New(), instanceID, jsonData, time.Now())
+	`, ids.NewEngineKey(), instanceKey, jsonData, time.Now())
 	return notifyVariables(tx, instanceID, err)
 }
 
@@ -123,12 +152,16 @@ func (r *ProcessInstanceRepository) UpsertVariables(instanceID uuid.UUID, variab
 	if err != nil {
 		return err
 	}
+	instanceKey, err := processInstanceEngineKey(r.db, instanceID)
+	if err != nil {
+		return err
+	}
 
 	// Check if variables exist
 	var exists bool
 	err = r.db.Get(&exists, `
-		SELECT EXISTS(SELECT 1 FROM public.variables WHERE process_instance_id = $1)
-	`, instanceID)
+		SELECT EXISTS(SELECT 1 FROM public.variables WHERE process_instance_key = $1)
+	`, instanceKey)
 	if err != nil {
 		return err
 	}
@@ -137,13 +170,13 @@ func (r *ProcessInstanceRepository) UpsertVariables(instanceID uuid.UUID, variab
 		_, err = r.db.Exec(`
 			UPDATE public.variables 
 			SET data = $1, updated_at = NOW()
-			WHERE process_instance_id = $2
-		`, jsonData, instanceID)
+			WHERE process_instance_key = $2
+		`, jsonData, instanceKey)
 	} else {
 		_, err = r.db.Exec(`
-			INSERT INTO public.variables (id, process_instance_id, data, updated_at)
+			INSERT INTO public.variables (engine_key, process_instance_key, data, updated_at)
 			VALUES ($1, $2, $3, NOW())
-		`, uuid.New(), instanceID, jsonData)
+		`, ids.NewEngineKey(), instanceKey, jsonData)
 	}
 	return notifyVariables(r.db, instanceID, err)
 }
@@ -284,10 +317,10 @@ func (r *ProcessInstanceRepository) UpdateStatusTx(tx *sqlx.Tx, instanceID uuid.
 func (r *ProcessInstanceRepository) GetActiveExecutions(instanceID uuid.UUID) ([]Execution, error) {
 	var executions []Execution
 	err := r.db.Select(&executions, `
-		SELECT id, process_instance_id, current_element_id, status, is_active,
-		       parent_execution_id, path_id, created_at, updated_at
-		FROM public.executions
-		WHERE process_instance_id = $1 AND is_active = true
+		SELECT e.engine_key, pi.id AS process_instance_id, e.process_instance_key, e.current_element_id, e.status, e.is_active,
+		       e.parent_execution_key, e.path_id, e.created_at, e.updated_at
+		FROM public.executions e JOIN public.process_instances pi ON pi.engine_key = e.process_instance_key
+		WHERE pi.id = $1 AND e.is_active = true
 	`, instanceID)
 	return executions, err
 }
@@ -299,11 +332,11 @@ func (r *ProcessInstanceRepository) GetActiveExecutions(instanceID uuid.UUID) ([
 func (r *ProcessInstanceRepository) FindExecutionsByInstance(instanceID uuid.UUID) ([]Execution, error) {
 	var executions []Execution
 	err := r.db.Select(&executions, `
-		SELECT id, process_instance_id, current_element_id, status, is_active,
-		       parent_execution_id, path_id, created_at, updated_at
-		FROM public.executions
-		WHERE process_instance_id = $1
-		ORDER BY created_at ASC
+		SELECT e.engine_key, pi.id AS process_instance_id, e.process_instance_key, e.current_element_id, e.status, e.is_active,
+		       e.parent_execution_key, e.path_id, e.created_at, e.updated_at
+		FROM public.executions e JOIN public.process_instances pi ON pi.engine_key = e.process_instance_key
+		WHERE pi.id = $1
+		ORDER BY e.created_at ASC
 	`, instanceID)
 	return executions, err
 }
@@ -313,10 +346,10 @@ func (r *ProcessInstanceRepository) FindExecutionsByInstance(instanceID uuid.UUI
 func (r *ProcessInstanceRepository) FindRecentExecutions(limit int) ([]Execution, error) {
 	var executions []Execution
 	err := r.db.Select(&executions, `
-		SELECT id, process_instance_id, current_element_id, status, is_active,
-		       parent_execution_id, path_id, created_at, updated_at
-		FROM public.executions
-		ORDER BY created_at DESC
+		SELECT e.engine_key, pi.id AS process_instance_id, e.process_instance_key, e.current_element_id, e.status, e.is_active,
+		       e.parent_execution_key, e.path_id, e.created_at, e.updated_at
+		FROM public.executions e JOIN public.process_instances pi ON pi.engine_key = e.process_instance_key
+		ORDER BY e.created_at DESC
 		LIMIT $1
 	`, limit)
 	return executions, err
@@ -328,11 +361,16 @@ func (r *ProcessInstanceRepository) FindRecentExecutions(limit int) ([]Execution
 // live queries (e.g. v2 flownode-instance search, which keys off is_active)
 // for a process that no longer runs.
 func (r *ProcessInstanceRepository) TerminateActiveExecutionsByProcessInstanceTx(tx *sqlx.Tx, instanceID uuid.UUID) error {
-	_, err := tx.Exec(`
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
 		UPDATE public.executions
 		SET status = 'terminated', is_active = false, updated_at = NOW()
-		WHERE process_instance_id = $1 AND status IN ('active', 'waiting')
-	`, instanceID)
+		WHERE process_instance_key = $1
+		  AND status IN ('active', 'waiting')
+	`, instanceKey)
 	return err
 }
 
@@ -511,11 +549,19 @@ func (r *ProcessInstanceRepository) IsActive(instanceID uuid.UUID) (bool, error)
 
 // CreateAuditLog creates an audit log entry
 func (r *ProcessInstanceRepository) CreateAuditLog(log models.AuditLog) error {
+	var instanceKey *int64
+	if log.ProcessInstanceID != nil {
+		key, err := processInstanceEngineKey(r.db, *log.ProcessInstanceID)
+		if err != nil {
+			return err
+		}
+		instanceKey = &key
+	}
 	_, err := r.db.Exec(`
 		INSERT INTO public.audit_logs 
-		(id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at)
+		(id, process_instance_key, task_key, user_id, action, old_data, new_data, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, uuid.New(), log.ProcessInstanceID, log.TaskID, log.UserID, log.Action, log.OldData, log.NewData, time.Now())
+	`, uuid.New(), instanceKey, log.TaskID, log.UserID, log.Action, log.OldData, log.NewData, time.Now())
 	return err
 }
 
@@ -524,10 +570,10 @@ func (r *ProcessInstanceRepository) GetAuditLogs(instanceID uuid.UUID) ([]models
 	FlushAuditLogs() // rows still queued for their batch
 	var logs []models.AuditLog
 	err := r.db.Select(&logs, `
-		SELECT id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at
-		FROM public.audit_logs
-		WHERE process_instance_id = $1
-		ORDER BY created_at ASC
+		SELECT a.id, pi.id AS process_instance_id, a.task_key, a.user_id, a.action, a.old_data, a.new_data, a.created_at
+		FROM public.audit_logs a JOIN public.process_instances pi ON pi.engine_key = a.process_instance_key
+		WHERE pi.id = $1
+		ORDER BY a.created_at ASC
 	`, instanceID)
 	return logs, err
 }
@@ -540,11 +586,11 @@ func (r *ProcessInstanceRepository) GetAuditLogs(instanceID uuid.UUID) ([]models
 func (r *ProcessInstanceRepository) GetTasksByProcessInstance(instanceID uuid.UUID) ([]models.Task, error) {
 	var tasks []models.Task
 	err := r.db.Select(&tasks, `
-		SELECT id, process_instance_id, execution_id, task_definition_key, task_name,
-		       assignee, candidate_group, status, form_data, created_at, claimed_at, completed_at
-		FROM public.tasks
-		WHERE process_instance_id = $1
-		ORDER BY created_at ASC
+		SELECT t.engine_key, pi.id AS process_instance_id, t.execution_key, t.task_definition_key, t.task_name,
+		       t.assignee, t.candidate_group, t.status, t.form_data, t.created_at, t.claimed_at, t.completed_at
+		FROM public.tasks t JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
+		WHERE pi.id = $1
+		ORDER BY t.created_at ASC
 	`, instanceID)
 	return tasks, err
 }
@@ -597,13 +643,14 @@ func (r *ProcessInstanceRepository) GetStatistics() (map[string]int, error) {
 
 // Execution represents an execution record
 type Execution struct {
-	ID                uuid.UUID  `db:"id"`
-	ProcessInstanceID uuid.UUID  `db:"process_instance_id"`
-	CurrentElementID  string     `db:"current_element_id"`
-	Status            string     `db:"status"`
-	ParentExecutionID *uuid.UUID `db:"parent_execution_id"`
-	PathID            *string    `db:"path_id"`
-	IsActive          bool       `db:"is_active"`
-	CreatedAt         time.Time  `db:"created_at"`
-	UpdatedAt         time.Time  `db:"updated_at"`
+	ID                 int64     `db:"engine_key"`
+	ProcessInstanceID  uuid.UUID `db:"process_instance_id"`
+	ProcessInstanceKey int64     `db:"process_instance_key"`
+	CurrentElementID   string    `db:"current_element_id"`
+	Status             string    `db:"status"`
+	ParentExecutionID  *int64    `db:"parent_execution_key"`
+	PathID             *string   `db:"path_id"`
+	IsActive           bool      `db:"is_active"`
+	CreatedAt          time.Time `db:"created_at"`
+	UpdatedAt          time.Time `db:"updated_at"`
 }

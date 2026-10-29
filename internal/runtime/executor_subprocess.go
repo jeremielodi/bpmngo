@@ -3,11 +3,13 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
@@ -42,8 +44,8 @@ func (r *Runtime) executeSubProcess(ctx context.Context, engineRepo *repository.
 		}
 	}
 
-	childID := uuid.New()
-	pathID := exec.ID.String() + "_" + node.ID
+	childID := ids.NewEngineKey()
+	pathID := strconv.FormatInt(exec.ID, 10) + "_" + node.ID
 	if err := engineRepo.CreateExecutionTx(tx, &repository.Execution{
 		ID:                childID,
 		ProcessInstanceID: exec.ProcessInstanceID,
@@ -63,7 +65,7 @@ func (r *Runtime) executeSubProcess(ctx context.Context, engineRepo *repository.
 	service.LogAuditErr("execution waited", r.auditService.LogExecutionWaited(exec.ID, exec.ProcessInstanceID, node.ID, "subProcess"))
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(childID, exec.ProcessInstanceID, node.ID, node.StartNodeID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), childID.String(), node.ID, node.StartNodeID)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(childID, 10), node.ID, node.StartNodeID)
 	}
 
 	return r.ExecuteExecution(ctx, childID)
@@ -142,7 +144,7 @@ func (r *Runtime) executeSubProcessEnd(ctx context.Context, engineRepo *reposito
 	r.logExecutionCompleted(exec, node.ID)
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(scopeID, exec.ProcessInstanceID, subNode.ID, next, variables))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), scopeID.String(), subNode.ID, next)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(scopeID, 10), subNode.ID, next)
 	}
 
 	return r.ExecuteExecution(ctx, scopeID)
@@ -151,7 +153,7 @@ func (r *Runtime) executeSubProcessEnd(ctx context.Context, engineRepo *reposito
 func (r *Runtime) logExecutionCompleted(exec *repository.Execution, nodeID string) {
 	service.LogAuditErr("execution completed", r.auditService.LogExecutionCompleted(exec.ID, exec.ProcessInstanceID, nodeID))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionCompleted(exec.ProcessInstanceID.String(), exec.ID.String(), nodeID)
+		p.ExecutionCompleted(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), nodeID)
 	}
 }
 
@@ -160,7 +162,7 @@ func (r *Runtime) logExecutionCompleted(exec *repository.Execution, nodeID strin
 // scope, are set from the enclosing scope, and its local variables go —
 // unless it is an inner instance of a multi-instance sub-process, whose
 // scope still serves its outputElement (completeInnerInstance clears it).
-func leaveScopeVariablesTx(tx *sqlx.Tx, instanceID, scopeID uuid.UUID, subNode *engine.Node) error {
+func leaveScopeVariablesTx(tx *sqlx.Tx, instanceID uuid.UUID, scopeID int64, subNode *engine.Node) error {
 	var mapped map[string]interface{}
 	if len(subNode.OutputMappings) > 0 {
 		view, err := repository.VariablesForExecution(tx, instanceID, scopeID)
@@ -177,11 +179,11 @@ func leaveScopeVariablesTx(tx *sqlx.Tx, instanceID, scopeID uuid.UUID, subNode *
 	if len(mapped) == 0 {
 		return nil
 	}
-	var parent *uuid.UUID
-	if err := tx.Get(&parent, `SELECT parent_execution_id FROM public.executions WHERE process_instance_id = $1 AND id = $2`, instanceID, scopeID); err != nil {
+	var parent *int64
+	if err := tx.Get(&parent, `SELECT parent_execution_key FROM public.executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1) AND engine_key = $2`, instanceID, scopeID); err != nil {
 		return err
 	}
-	from := uuid.Nil
+	var from int64
 	if parent != nil {
 		from = *parent
 	}

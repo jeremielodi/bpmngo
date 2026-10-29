@@ -6,9 +6,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
+	goruntime "runtime"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
@@ -17,6 +21,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/metrics"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
@@ -61,7 +66,129 @@ var (
 		cel.HomogeneousAggregateLiterals(),
 		cel.EagerlyValidateDeclarations(true),
 	}
+
+	runtimeAdmissionOnce       sync.Once
+	runtimeAdmissionController *admissionController
 )
+
+type admissionController struct {
+	mu           sync.Mutex
+	baseLimit    int
+	minimumLimit int
+	softBacklog  int
+	hardBacklog  int
+	limit        int
+	inFlight     int
+	lastRefresh  time.Time
+	refreshing   bool
+	changed      chan struct{}
+}
+
+func configuredPositiveInt(name string, fallback int) int {
+	if configured, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name))); err == nil && configured > 0 {
+		return configured
+	}
+	return fallback
+}
+
+func admissionControl() *admissionController {
+	runtimeAdmissionOnce.Do(func() {
+		limit := goruntime.GOMAXPROCS(0) * 4
+		if limit < 4 {
+			limit = 4
+		}
+		limit = configuredPositiveInt("RUNTIME_MAX_CONCURRENCY", limit)
+		minimum := configuredPositiveInt("RUNTIME_MIN_CONCURRENCY", max(1, limit/4))
+		minimum = min(minimum, limit)
+		runtimeAdmissionController = &admissionController{
+			baseLimit:    limit,
+			minimumLimit: minimum,
+			softBacklog:  configuredPositiveInt("ARCHIVER_BACKLOG_SOFT_LIMIT", 1000),
+			hardBacklog:  configuredPositiveInt("ARCHIVER_BACKLOG_HARD_LIMIT", 5000),
+			limit:        limit,
+			changed:      make(chan struct{}),
+		}
+		metrics.RuntimeAdmissionLimit.Set(float64(limit))
+	})
+	return runtimeAdmissionController
+}
+
+func (a *admissionController) notifyLocked() {
+	close(a.changed)
+	a.changed = make(chan struct{})
+}
+
+func (a *admissionController) limitForBacklog(backlog int) int {
+	if backlog >= a.hardBacklog {
+		return a.minimumLimit
+	}
+	if backlog >= a.softBacklog {
+		return max(a.minimumLimit, a.baseLimit/2)
+	}
+	return a.baseLimit
+}
+
+func (a *admissionController) refreshBacklog(db *sqlx.DB) {
+	a.mu.Lock()
+	if a.refreshing || time.Since(a.lastRefresh) < 500*time.Millisecond {
+		a.mu.Unlock()
+		return
+	}
+	a.refreshing = true
+	a.lastRefresh = time.Now()
+	a.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	var backlog int
+	err := db.GetContext(ctx, &backlog, `SELECT count(*) FROM public.process_instances WHERE status IN ('completed','terminated')`)
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.refreshing = false
+	if err != nil {
+		return // keep the last known safe limit on a transient DB failure
+	}
+	limit := a.limitForBacklog(backlog)
+	changed := limit != a.limit
+	a.limit = limit
+	metrics.RuntimeAdmissionLimit.Set(float64(limit))
+	metrics.RuntimeArchiveBacklog.Set(float64(backlog))
+	if changed {
+		a.notifyLocked()
+	}
+}
+
+func (a *admissionController) acquire(ctx context.Context, db *sqlx.DB) (func(), error) {
+	started := time.Now()
+	for {
+		a.refreshBacklog(db)
+		a.mu.Lock()
+		if a.inFlight < a.limit {
+			a.inFlight++
+			a.mu.Unlock()
+			metrics.RuntimeAdmissionWait.Observe(time.Since(started).Seconds())
+			metrics.RuntimeInFlight.Inc()
+			return func() {
+				a.mu.Lock()
+				a.inFlight--
+				a.notifyLocked()
+				a.mu.Unlock()
+				metrics.RuntimeInFlight.Dec()
+			}, nil
+		}
+		changed := a.changed
+		a.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-changed:
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+type runtimeAdmissionContextKey struct{}
 
 type cachedProgram struct {
 	program cel.Program
@@ -364,7 +491,18 @@ func NewRuntime(Graph *engine.ProcessGraph, DB *sqlx.DB, dispatcher *events.Task
 // that element, as in Camunda 8: the token stays there, and resolving the
 // incident runs the element again (see ResumeAfterIncident). An error is
 // returned only when the execution is gone or can't hold an incident.
-func (r *Runtime) ExecuteExecution(ctx context.Context, execID uuid.UUID) error {
+func (r *Runtime) ExecuteExecution(ctx context.Context, execID int64) error {
+	// Nested runtime calls are part of the same admitted unit of work. Only
+	// top-level starts/resumes consume a slot, avoiding recursive deadlocks
+	// in subprocess, multi-instance and boundary-event execution.
+	if ctx.Value(runtimeAdmissionContextKey{}) == nil {
+		release, err := admissionControl().acquire(ctx, r.DB)
+		if err != nil {
+			return err
+		}
+		defer release()
+		ctx = context.WithValue(ctx, runtimeAdmissionContextKey{}, true)
+	}
 	err := r.executeExecution(ctx, execID)
 	if err == nil {
 		return nil
@@ -378,7 +516,7 @@ func (r *Runtime) ExecuteExecution(ctx context.Context, execID uuid.UUID) error 
 // raiseExecutionIncident records err as an incident on the element execID
 // stopped at. False when the execution is gone or finished (the error is
 // then the caller's), or the incident can't be written.
-func (r *Runtime) raiseExecutionIncident(execID uuid.UUID, cause error) bool {
+func (r *Runtime) raiseExecutionIncident(execID int64, cause error) bool {
 	engineRepo := repository.NewEngineRepository(r.DB, r.dispatcher)
 	exec, err := engineRepo.GetExecutionByID(execID)
 	if err != nil || exec == nil || !exec.IsActive || exec.Status == "completed" || exec.Status == "cancelled" || exec.Status == "terminated" {
@@ -416,7 +554,7 @@ func (r *Runtime) raiseExecutionIncident(execID uuid.UUID, cause error) bool {
 
 // ResumeAfterIncident runs again the execution a resolved runtime incident
 // had stopped.
-func ResumeAfterIncident(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, processInstanceID, incidentID uuid.UUID) error {
+func ResumeAfterIncident(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, processInstanceID uuid.UUID, incidentID int64) error {
 	exec := repository.NewIncidentRepository(db).ExecutionOf(processInstanceID, incidentID)
 	if exec == nil {
 		return nil
@@ -424,33 +562,34 @@ func ResumeAfterIncident(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, pr
 	return ResumeExecution(db, *exec, dispatcher)
 }
 
-func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error {
+func (r *Runtime) executeExecution(ctx context.Context, execID int64) error {
 	engineRepo := repository.NewEngineRepository(r.DB, r.dispatcher)
 
-	// Get active execution
-	exec, err := engineRepo.GetActiveExecution(ctx, execID)
+	// Load the execution, visible scoped variables, process definition key
+	// and multi-instance metadata in one database round trip.
+	runtimeContext, err := engineRepo.GetRuntimeExecutionContext(ctx, execID)
 	if err != nil {
-		return fmt.Errorf("failed to load execution: %w", err)
+		return fmt.Errorf("failed to load runtime execution context: %w", err)
 	}
-	if exec == nil {
+	if runtimeContext == nil {
 		return fmt.Errorf("execution not found or not active")
 	}
-
-	// Get variables
-	variables, err := repository.VariablesForExecution(r.DB, exec.ProcessInstanceID, repository.VariableScopeOf(r.DB, exec.ProcessInstanceID, exec.ID))
-	if err != nil {
-		return fmt.Errorf("failed to load variables: %w", err)
-	}
+	exec := runtimeContext.Execution
+	variables := runtimeContext.Variables
 
 	// Get process graph
-	graph, err := engineRepo.GetProcessGraphByInstanceID(exec.ProcessInstanceID)
+	graph, err := engineRepo.GetProcessGraphByDefinitionID(runtimeContext.ProcessDefinitionID)
 	if err != nil {
 		return fmt.Errorf("failed to load process graph: %w", err)
 	}
 
-	inner, err := lookupInnerInstance(r.DB, exec.ProcessInstanceID, exec.ID)
-	if err != nil {
-		return err
+	var inner *innerInstance
+	if runtimeContext.Inner != nil {
+		inner = &innerInstance{
+			BodyID:     runtimeContext.Inner.BodyID,
+			LoopIndex:  runtimeContext.Inner.LoopIndex,
+			ActivityID: runtimeContext.Inner.ActivityID,
+		}
 	}
 
 	currentID := exec.CurrentElementID
@@ -506,7 +645,7 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 				return err
 			}
 
-			if err = engineRepo.UpdateExecutionNodeTx(tx, exec.ProcessInstanceID, exec.ID, next); err != nil {
+			if err = engineRepo.UpdateExecutionNodeByKeyTx(tx, exec.ProcessInstanceKey, exec.ID, next); err != nil {
 				tx.Rollback()
 				return fmt.Errorf("failed to update execution node: %w", err)
 			}
@@ -518,7 +657,7 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 			currentID = next
 			service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(exec.ID, exec.ProcessInstanceID, fromNode, next, variables))
 			if p := eventlog.Global(); p != nil {
-				p.ExecutionMoved(exec.ProcessInstanceID.String(), exec.ID.String(), fromNode, next)
+				p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), fromNode, next)
 			}
 
 		case engine.ServiceTaskType:
@@ -631,7 +770,7 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 				}
 				for _, child := range children {
 					if err := r.ExecuteExecution(ctx, child.ID); err != nil {
-						return fmt.Errorf("failed to execute child execution %s: %w", child.ID, err)
+						return fmt.Errorf("failed to execute child execution %d: %w", child.ID, err)
 					}
 				}
 				return nil // Parent waits, children continue
@@ -651,8 +790,8 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 				err = tx.Get(&gatewayState, `
 			SELECT expected_incoming, received_incoming
 			FROM public.gateway_state
-			WHERE process_instance_id = $1 AND gateway_id = $2 AND status = 'waiting'
-		`, exec.ProcessInstanceID, node.ID)
+			WHERE process_instance_key = $1 AND gateway_id = $2 AND status = 'waiting'
+		`, exec.ProcessInstanceKey, node.ID)
 
 				expectedCount := 0
 				receivedCount := 0
@@ -677,10 +816,10 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 				err = r.DB.Get(&finalState, `
 			SELECT received_incoming, expected_incoming
 			FROM public.gateway_state
-			WHERE process_instance_id = $1 AND gateway_id = $2
+			WHERE process_instance_key = $1 AND gateway_id = $2
 			ORDER BY created_at DESC
 			LIMIT 1
-		`, exec.ProcessInstanceID, node.ID)
+		`, exec.ProcessInstanceKey, node.ID)
 
 				if err == nil {
 					receivedCount = finalState.ReceivedIncoming
@@ -723,7 +862,7 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 				}
 				for _, child := range children {
 					if err := r.ExecuteExecution(ctx, child.ID); err != nil {
-						return fmt.Errorf("failed to execute inclusive branch %s: %w", child.ID, err)
+						return fmt.Errorf("failed to execute inclusive branch %d: %w", child.ID, err)
 					}
 				}
 				return nil
@@ -740,9 +879,9 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 			r.DB.Get(&finalState, `
 				SELECT received_incoming, expected_incoming
 				FROM public.gateway_state
-				WHERE process_instance_id = $1 AND gateway_id = $2
+				WHERE process_instance_key = $1 AND gateway_id = $2
 				ORDER BY created_at DESC LIMIT 1
-			`, exec.ProcessInstanceID, node.ID)
+			`, exec.ProcessInstanceKey, node.ID)
 
 			r.auditService.LogGatewayJoined(exec.ProcessInstanceID, node.ID, finalState.ExpectedIncoming, finalState.ReceivedIncoming)
 			if p := eventlog.Global(); p != nil {
@@ -836,7 +975,7 @@ func (r *Runtime) executeExecution(ctx context.Context, execID uuid.UUID) error 
 				tx.Rollback()
 				return err
 			}
-			if err = engineRepo.UpdateExecutionNodeTx(tx, exec.ProcessInstanceID, exec.ID, next); err != nil {
+			if err = engineRepo.UpdateExecutionNodeByKeyTx(tx, exec.ProcessInstanceKey, exec.ID, next); err != nil {
 				tx.Rollback()
 				return err
 			}
@@ -873,7 +1012,7 @@ func (r *Runtime) isForkGateway(node *engine.Node, exec *repository.Execution) b
 		}
 		engineRepo := repository.NewEngineRepository(r.DB, r.dispatcher)
 		// Check if this gateway already has a waiting state (means we're joining)
-		var count = engineRepo.CountGatewayWaitingState(exec.ParentExecutionID, node.ID)
+		var count = engineRepo.CountGatewayWaitingState(exec.ProcessInstanceID, node.ID)
 		// If no waiting gateway state, this is a fork
 		return count == 0
 	}

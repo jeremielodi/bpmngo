@@ -1,0 +1,20 @@
+{
+  "engine": "postgresql-tuned-fresh-20261029",
+  "generated_at": "2026-10-29T19:20:06.439678Z",
+  "clients": 10,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 10,
+  "seconds": 60.034736958,
+  "completed": 10446,
+  "instances_per_second": 173.99926324834183,
+  "errors": {},
+  "latency": {
+    "count": 10446,
+    "errors": 0,
+    "p50_us": 54156,
+    "p95_us": 85158,
+    "p99_us": 104146,
+    "mean_us": 57456.70400153169
+  }
+}

@@ -67,6 +67,26 @@ func TestExclusiveGateway_FirstTrueWins(t *testing.T) {
 	}
 }
 
+func TestExclusiveGateway_ExplicitOutgoingOrderWins(t *testing.T) {
+	g, err := engine.BuildGraphForProcess([]byte(explicitOutgoingOrderXML), "p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ResolveNext(g.Nodes["gw"], map[string]interface{}{"amount": 5000.0})
+	if err != nil || got != "huge" {
+		t.Fatalf("got %q, %v; want explicit first outgoing target %q", got, err, "huge")
+	}
+}
+
+const explicitOutgoingOrderXML = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="d">
+  <bpmn:process id="p" isExecutable="true">
+    <bpmn:startEvent id="s"/><bpmn:sequenceFlow id="f0" sourceRef="s" targetRef="gw"/>
+    <bpmn:exclusiveGateway id="gw"><bpmn:outgoing>fHuge</bpmn:outgoing><bpmn:outgoing>fBig</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="fBig" sourceRef="gw" targetRef="big"><bpmn:conditionExpression>= amount &gt; 100</bpmn:conditionExpression></bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="fHuge" sourceRef="gw" targetRef="huge"><bpmn:conditionExpression>= amount &gt; 1000</bpmn:conditionExpression></bpmn:sequenceFlow>
+    <bpmn:userTask id="big"/><bpmn:userTask id="huge"/>
+  </bpmn:process></bpmn:definitions>`
+
 const firstTrueXML = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="d">
   <bpmn:process id="p" isExecutable="true">
     <bpmn:startEvent id="s"/>

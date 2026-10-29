@@ -117,11 +117,14 @@ func closeProcessInstance(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, i
 	if err := repository.NewEventSubscriptionRepository(db).ConsumeByProcessInstanceTx(tx, instanceID); err != nil {
 		return err
 	}
+	if err := repository.NotifyInstanceFinishedTx(tx, instanceID); err != nil {
+		return err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	repository.NotifyInstanceFinished(db, instanceID)
+	repository.WakeInstanceFinishedLocal(instanceID)
 
 	completed := status == "completed"
 	if completed {

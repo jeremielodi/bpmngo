@@ -3,6 +3,7 @@ package v2
 import (
 	"encoding/json"
 	"log"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jeremielodi/bpmngo/internal/events"
@@ -82,6 +83,9 @@ func (jc *JobController) ActivateJobs(c *fiber.Ctx) error {
 	if err := tx.Commit(); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "INTERNAL_ERROR", "detail": err.Error()})
 	}
+	if err := jc.externalTaskRepo.HydrateLockedJobs(topicJobs); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "INTERNAL_ERROR", "detail": err.Error()})
+	}
 	for _, topicJob := range topicJobs {
 		for _, job := range topicJob.Jobs {
 			service.LogAuditErr("job locked", jc.auditService.LogJobLocked(job.ID, job.ProcessInstanceID, req.Worker))
@@ -95,7 +99,7 @@ func (jc *JobController) ActivateJobs(c *fiber.Ctx) error {
 			vars := make(map[string]interface{})
 			if len(job.Payload) > 0 {
 				if err := json.Unmarshal(job.Payload, &vars); err != nil {
-					log.Printf("Warning: failed to parse job payload for job %s: %v", job.ID, err)
+					log.Printf("Warning: failed to parse job payload for job %d: %v", job.ID, err)
 				}
 			}
 
@@ -107,7 +111,7 @@ func (jc *JobController) ActivateJobs(c *fiber.Ctx) error {
 			}
 
 			jobs = append(jobs, v2ActivatedJob{
-				JobKey:             job.ID.String(),
+				JobKey:             strconv.FormatInt(job.ID, 10),
 				Type:               topicJob.TopicName,
 				ProcessInstanceKey: job.ProcessInstanceID.String(),
 				Retries:            job.Retries,

@@ -47,6 +47,42 @@ var (
 		Name: "goflow_retention_deleted_rows_total",
 		Help: "Rows deleted by the retention purge, by table.",
 	}, []string{"table"})
+
+	RuntimeAdmissionWait = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "goflow_runtime_admission_wait_seconds",
+		Help:    "Time execution resumes wait for a runtime concurrency slot.",
+		Buckets: prometheus.DefBuckets,
+	})
+	RuntimeInFlight = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "goflow_runtime_executions_in_flight",
+		Help: "Runtime executions currently consuming an admission slot.",
+	})
+	RuntimeAdmissionLimit = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "goflow_runtime_admission_limit",
+		Help: "Current top-level runtime concurrency limit after archive-backlog throttling.",
+	})
+	RuntimeArchiveBacklog = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "goflow_runtime_archive_backlog",
+		Help: "Completed or terminated live instances waiting for archival, as observed by admission control.",
+	})
+	ArchiveBatchSize = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "goflow_archive_transaction_instances",
+		Help:    "Number of process instances committed in one archive transaction.",
+		Buckets: []float64{1, 2, 5, 10, 20, 50, 100},
+	})
+	EngineTransactions = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "goflow_engine_transactions_total",
+		Help: "Engine transactions by operation and outcome.",
+	}, []string{"operation", "outcome"})
+	EngineTransactionDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "goflow_engine_transaction_duration_seconds",
+		Help:    "Engine transaction duration by operation and outcome.",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"operation", "outcome"})
+	EngineTransactionRollbacks = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "goflow_engine_transaction_rollbacks_total",
+		Help: "Rolled-back engine transactions by operation and bounded reason.",
+	}, []string{"operation", "reason"})
 )
 
 // Register installs every BpmnGo collector on the default registry, which
@@ -57,9 +93,32 @@ func Register(db *sqlx.DB) {
 		httpDuration,
 		RetentionDeletedRows,
 		FeelShadowMismatches,
+		RuntimeAdmissionWait,
+		RuntimeInFlight,
+		RuntimeAdmissionLimit,
+		RuntimeArchiveBacklog,
+		ArchiveBatchSize,
+		EngineTransactions,
+		EngineTransactionDuration,
+		EngineTransactionRollbacks,
 		collectors.NewDBStatsCollector(db.DB, "goflow"),
 		&engineCollector{db: db},
 	)
+}
+
+// ObserveEngineTransaction records one explicitly managed engine
+// transaction. reason must be a bounded program label, never an error string.
+func ObserveEngineTransaction(operation string, started time.Time, committed bool, reason string) {
+	outcome := "commit"
+	if !committed {
+		outcome = "rollback"
+		if reason == "" {
+			reason = "operation_error"
+		}
+		EngineTransactionRollbacks.WithLabelValues(operation, reason).Inc()
+	}
+	EngineTransactions.WithLabelValues(operation, outcome).Inc()
+	EngineTransactionDuration.WithLabelValues(operation, outcome).Observe(time.Since(started).Seconds())
 }
 
 // RegisterGaugeFunc registers a gauge whose value is read at scrape time.

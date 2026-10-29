@@ -554,7 +554,7 @@ Every search takes `{ "filter": { ... } }` and answers `{ "items": [...] }`. Bpm
 
 **Keys.** A key in a path (`/v2/process-instances/:key`, `/v2/jobs/:key/…`, `/v2/user-tasks/:key/…`, `/v2/incidents/:key/…`), a `processInstanceKey` filter or step-back's `executionId` is either a UUID or the int64 key the gRPC gateway uses for the same object, so an instance started over gRPC can be followed over REST. An int64 key nothing was issued for finds nothing (`404` on a lookup).
 
-Answers carry UUIDs by default. With `REST_KEYS=int` (see [Environment Variables](configuration.md)), every key of a `/v2` answer is the int64 key instead: the fields `processInstanceKey`, `processDefinitionKey`, `jobKey`, `userTaskKey`, `elementInstanceKey`, `flowNodeInstanceKey`, `incidentKey` and `jobId`, the lists `correlatedProcessInstanceKeys` and `startedProcessInstanceKeys`, a message publication's `key`, and a deployment's `id` and its definitions' `id`, as a string (`"125"`) like Camunda 8's: the same key as in gRPC. Variables are never rewritten. `/engine-rest` stays on UUIDs either way.
+Answers carry Camunda-compatible int64 keys by default. With `REST_KEYS=uuid` (see [Environment Variables](configuration.md)), the legacy BpmnGo UUID response format is restored. The translated fields include `processInstanceKey`, `rootProcessInstanceKey`, `processDefinitionKey`, `jobKey`, `userTaskKey`, `elementInstanceKey`, `flowNodeInstanceKey`, `incidentKey`, `messageKey`, `signalKey`, `variableKey`, `scopeKey` and `jobId`, plus deployment keys, as strings (`"125"`). Variables are never rewritten. `/engine-rest` stays on UUIDs either way.
 
 **`POST /v2/process-instances/search`** — live and archived instances.
 
