@@ -152,6 +152,22 @@ func (ctrl *SimulationController) RunCapacitySweep(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(run)
 }
 
+func (ctrl *SimulationController) RunExperiment(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return badRequest(c, err)
+	}
+	var request simulation.ExperimentRequest
+	if err = c.BodyParser(&request); err != nil {
+		return badRequest(c, err)
+	}
+	run, err := ctrl.service.EnqueueExperiment(id, currentUserID(c), common.GetTenantId(c), request)
+	if err != nil {
+		return mutationError(c, err)
+	}
+	return c.Status(fiber.StatusAccepted).JSON(run)
+}
+
 func (ctrl *SimulationController) ListRuns(c *fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {

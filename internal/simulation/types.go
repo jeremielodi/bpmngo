@@ -233,3 +233,34 @@ type CapacitySweepResult struct {
 	RecommendedCapacity int                  `json:"recommendedCapacity,omitempty"`
 	Points              []CapacitySweepPoint `json:"points"`
 }
+
+type ExperimentDimension struct {
+	Path   string    `json:"path"`
+	Values []float64 `json:"values"`
+}
+
+type ExperimentRequest struct {
+	Dimensions             []ExperimentDimension `json:"dimensions"`
+	Objective              string                `json:"objective,omitempty"`
+	TargetMeanCycleMinutes float64               `json:"targetMeanCycleMinutes,omitempty"`
+	TargetP95CycleMinutes  float64               `json:"targetP95CycleMinutes,omitempty"`
+	MaximumMeanCost        float64               `json:"maximumMeanCost,omitempty"`
+	MinimumThroughput      float64               `json:"minimumThroughput,omitempty"`
+}
+
+type ExperimentPoint struct {
+	Parameters        map[string]float64 `json:"parameters"`
+	MeanCycleMinutes  float64            `json:"meanCycleMinutes"`
+	P95CycleMinutes   float64            `json:"p95CycleMinutes"`
+	ThroughputPerHour float64            `json:"throughputPerHour"`
+	MeanCost          float64            `json:"meanCost"`
+	MeetsConstraints  bool               `json:"meetsConstraints"`
+	Error             string             `json:"error,omitempty"`
+}
+
+type ExperimentResult struct {
+	ScenarioName     string            `json:"scenarioName"`
+	Objective        string            `json:"objective"`
+	RecommendedPoint *int              `json:"recommendedPoint,omitempty"`
+	Points           []ExperimentPoint `json:"points"`
+}

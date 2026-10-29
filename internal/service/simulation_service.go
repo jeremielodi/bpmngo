@@ -87,6 +87,21 @@ func (s *SimulationService) EnqueueCapacitySweep(id, userID uuid.UUID, tenantID 
 	return s.repository.CreateRun(id, userID, "capacity_sweep", payload)
 }
 
+func (s *SimulationService) EnqueueExperiment(id, userID uuid.UUID, tenantID string, request simulation.ExperimentRequest) (*models.SimulationRun, error) {
+	scenario, err := s.LoadScenario(id, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if err := simulation.ValidateExperiment(scenario, request); err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	return s.repository.CreateRun(id, userID, "experiment", payload)
+}
+
 func (s *SimulationService) StartWorkers(ctx context.Context, count int) error {
 	if count < 1 {
 		count = 1
@@ -215,6 +230,19 @@ func (s *SimulationService) executeRun(parent context.Context, run *models.Simul
 			return fmt.Errorf("decode capacity sweep: %w", err)
 		}
 		result, runErr := simulation.SweepCapacity(ctx, scenario, request, reportProgress)
+		if runErr != nil {
+			return runErr
+		}
+		payload, err = json.Marshal(result)
+	case "experiment":
+		if run.Request == nil {
+			return fmt.Errorf("experiment request is missing")
+		}
+		var request simulation.ExperimentRequest
+		if err = json.Unmarshal(*run.Request, &request); err != nil {
+			return fmt.Errorf("decode experiment: %w", err)
+		}
+		result, runErr := simulation.RunExperiment(ctx, scenario, request, reportProgress)
 		if runErr != nil {
 			return runErr
 		}

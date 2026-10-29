@@ -24,6 +24,10 @@ transactional runtime.
 - asynchronous, resumable campaigns with progress, cancellation, and a
   configurable PostgreSQL-backed worker pool;
 - automatic resource-capacity sweeps with target-based recommendations;
+- full-factorial, multi-parameter experiments (up to 256 combinations) over
+  demand, duration, resource capacity/cost, task durations/priorities, and
+  gateway probabilities, with feasibility constraints and an optimization
+  objective;
 - mean, median, p90 and p95 cycle time, throughput, cost, resource utilization,
   queues, and 95% confidence intervals across replications;
 - an evidence-based issue register, redesign heuristics, and as-is/to-be
@@ -52,9 +56,11 @@ a required workflow or a special execution mode.
    the page, resume tracking later, or cancel it from **Campaigns**.
 6. Run a capacity sweep to compare a resource over a range and select the
    smallest capacity meeting the mean/p95 cycle-time targets.
-7. Mark the result as the as-is baseline, duplicate it as a to-be scenario,
+7. Run a multi-parameter experiment to compare combinations and optimize mean
+   cycle, p95 cycle, cost, or throughput under optional constraints.
+8. Mark the result as the as-is baseline, duplicate it as a to-be scenario,
    change capacity or process parameters, and compare the new result.
-8. Track detected and manually observed problems in **Issues**. Use **Modeler**
+9. Track detected and manually observed problems in **Issues**. Use **Modeler**
    to draw the selected to-be process.
 
 ## API
@@ -71,13 +77,14 @@ All endpoints require authentication. Analysis permissions use
 | `GET/PUT/DELETE /engine-rest/simulation/scenarios/:id` | Read, update, or delete a scenario |
 | `POST /engine-rest/simulation/scenarios/:id/runs` | Queue a persisted simulation |
 | `POST /engine-rest/simulation/scenarios/:id/capacity-sweeps` | Queue an automatic capacity comparison |
+| `POST /engine-rest/simulation/scenarios/:id/experiments` | Queue a full-factorial multi-parameter experiment |
 | `GET /engine-rest/simulation/scenarios/:id/runs` | List prior campaigns |
 | `GET /engine-rest/simulation/runs/:runId` | Read a campaign and its result |
 | `POST /engine-rest/simulation/runs/:runId/cancel` | Cancel queued/running work |
 | `GET/POST /engine-rest/simulation/scenarios/:id/issues` | List or add issues |
 | `PUT/DELETE /engine-rest/simulation/issues/:issueId` | Update or remove an issue |
 
-Install migrations `020` and `021` before deploying this version to an
+Install migrations `020`, `021`, and `022` before deploying this version to an
 existing database. New databases receive the tables from the baseline schema.
 `SIMULATION_WORKERS` controls concurrency (default `2`, maximum `16`).
 

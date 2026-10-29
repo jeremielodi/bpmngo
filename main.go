@@ -772,6 +772,7 @@ func main() {
 	app.Delete("/engine-rest/simulation/scenarios/:id", permissions(db, "CAN_DELETE_PROCESS"), simulationCtrl.DeleteScenario)
 	app.Post("/engine-rest/simulation/scenarios/:id/runs", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunScenario)
 	app.Post("/engine-rest/simulation/scenarios/:id/capacity-sweeps", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunCapacitySweep)
+	app.Post("/engine-rest/simulation/scenarios/:id/experiments", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunExperiment)
 	app.Get("/engine-rest/simulation/scenarios/:id/runs", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListRuns)
 	app.Get("/engine-rest/simulation/scenarios/:id/issues", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListIssues)
 	app.Post("/engine-rest/simulation/scenarios/:id/issues", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.CreateIssue)

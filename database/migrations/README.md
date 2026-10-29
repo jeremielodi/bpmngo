@@ -62,6 +62,7 @@ des incidents déjà enregistrés.
 | 019 | `019_partition_retention.sql` | détache et supprime les partitions historiques expirées devenues vides | la purge ligne par ligne reste l'autorité pour ne pas perdre les audits non liés |
 | 020 | `020_simulation_lab.sql` | scénarios BPMN, campagnes de simulation et registre de problèmes | laboratoire d'analyse, dimensionnement et redesign |
 | 021 | `021_simulation_async_sweeps.sql` | file asynchrone des simulations, progression, annulation et campagnes de capacité | nécessite 020 |
+| 022 | `022_simulation_multi_parameter_experiments.sql` | expériences de simulation multi-paramètres | nécessite 021 |
 
 Pour voir où en est une base :
 

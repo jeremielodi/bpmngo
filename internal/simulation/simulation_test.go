@@ -310,6 +310,40 @@ func TestPriorityQueueStartsMostImportantWorkFirst(t *testing.T) {
 	assertNear(t, result.Metrics.MeanCycleMinutes, 80, 0)
 }
 
+func TestMultiParameterExperimentRunsCartesianDesign(t *testing.T) {
+	scenario := testScenario()
+	scenario.DurationHours = 12
+	scenario.Replications = 1
+	result, err := RunExperiment(context.Background(), scenario, ExperimentRequest{
+		Objective: "mean_cycle",
+		Dimensions: []ExperimentDimension{
+			{Path: "resource.l2.capacity", Values: []float64{1, 2}},
+			{Path: "arrivalRatePerHour", Values: []float64{0.5, 1}},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Points) != 4 {
+		t.Fatalf("points = %d, want 4", len(result.Points))
+	}
+	if result.RecommendedPoint == nil || *result.RecommendedPoint < 0 || *result.RecommendedPoint >= len(result.Points) {
+		t.Fatalf("invalid recommendation: %#v", result.RecommendedPoint)
+	}
+	for _, point := range result.Points {
+		if len(point.Parameters) != 2 || point.Error != "" {
+			t.Fatalf("unexpected experiment point: %#v", point)
+		}
+	}
+}
+
+func TestExperimentRejectsUnknownParameterPath(t *testing.T) {
+	err := ValidateExperiment(testScenario(), ExperimentRequest{Dimensions: []ExperimentDimension{{Path: "unknown.value", Values: []float64{1}}}})
+	if err == nil {
+		t.Fatal("expected unsupported path error")
+	}
+}
+
 func newTestRNG() *rand.Rand { return rand.New(rand.NewSource(42)) }
 
 func assertNear(t *testing.T, got, want, tolerance float64) {

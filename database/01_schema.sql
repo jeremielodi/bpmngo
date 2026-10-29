@@ -1140,7 +1140,7 @@ CREATE TABLE IF NOT EXISTS public.simulation_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     scenario_id UUID NOT NULL REFERENCES public.simulation_scenarios(id) ON DELETE CASCADE,
     status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
-    run_type TEXT NOT NULL DEFAULT 'simulation' CHECK (run_type IN ('simulation', 'capacity_sweep')),
+    run_type TEXT NOT NULL DEFAULT 'simulation' CHECK (run_type IN ('simulation', 'capacity_sweep', 'experiment')),
     request JSONB,
     progress INTEGER NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
     worker_id TEXT,
@@ -1238,6 +1238,10 @@ ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
 VALUES ('021', 'campagnes de capacité et exécution asynchrone des simulations')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('022', 'expériences de simulation multi-paramètres')
 ON CONFLICT (version) DO NOTHING;
 
 -- Finalise la transition hybride construite ci-dessus. `\ir` est résolu

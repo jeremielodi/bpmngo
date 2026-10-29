@@ -25,7 +25,10 @@ export type SimulationResult = {
 export type StoredScenario = { id:string;name:string;bpmnXml:string;configuration:Omit<Scenario,'name'|'bpmnXml'>;createdAt:string;updatedAt:string };
 export type CapacitySweepRequest = { resourceId:string;minimumCapacity:number;maximumCapacity:number;step:number;targetMeanCycleMinutes?:number;targetP95CycleMinutes?:number };
 export type CapacitySweepResult = { scenarioName:string;resourceId:string;recommendedCapacity?:number;points:Array<{capacity:number;meanCycleMinutes:number;p95CycleMinutes:number;throughputPerHour:number;meanCost:number;utilization:number;meanQueueLength:number;maximumQueueSize:number;meetsTarget:boolean}> };
-export type SimulationRun = { id:string;scenarioId:string;status:'queued'|'running'|'completed'|'failed'|'cancelled';runType:'simulation'|'capacity_sweep';request?:CapacitySweepRequest;progress:number;result?:SimulationResult|CapacitySweepResult;errorMessage?:string;startedAt:string;completedAt?:string };
+export type ExperimentDimension = { path:string;values:number[] };
+export type ExperimentRequest = { dimensions:ExperimentDimension[];objective?:'mean_cycle'|'p95_cycle'|'cost'|'throughput';targetMeanCycleMinutes?:number;targetP95CycleMinutes?:number;maximumMeanCost?:number;minimumThroughput?:number };
+export type ExperimentResult = { scenarioName:string;objective:string;recommendedPoint?:number;points:Array<{parameters:Record<string,number>;meanCycleMinutes:number;p95CycleMinutes:number;throughputPerHour:number;meanCost:number;meetsConstraints:boolean;error?:string}> };
+export type SimulationRun = { id:string;scenarioId:string;status:'queued'|'running'|'completed'|'failed'|'cancelled';runType:'simulation'|'capacity_sweep'|'experiment';request?:CapacitySweepRequest|ExperimentRequest;progress:number;result?:SimulationResult|CapacitySweepResult|ExperimentResult;errorMessage?:string;startedAt:string;completedAt?:string };
 export type StaffingResult = { minimumServers:number;points:Array<{servers:number;utilization:number;probabilityOfWait:number;meanWaitingHours:number;meanSystemHours:number;meetsTarget:boolean;stable:boolean}> };
 
 export async function analyzeScenario(scenario: Scenario) { return (await apiClient.post<AnalyticResult>('/engine-rest/simulation/analyze', scenario)).data; }
@@ -36,6 +39,7 @@ export async function createScenario(scenario:Scenario) { return (await apiClien
 export async function updateScenario(id:string,scenario:Scenario) { return (await apiClient.put<StoredScenario>(`/engine-rest/simulation/scenarios/${id}`,scenario)).data; }
 export async function runStoredScenario(id:string) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/runs`)).data; }
 export async function runCapacitySweep(id:string,input:CapacitySweepRequest) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/capacity-sweeps`,input)).data; }
+export async function runExperiment(id:string,input:ExperimentRequest) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/experiments`,input)).data; }
 export async function getSimulationRun(id:string) { return (await apiClient.get<SimulationRun>(`/engine-rest/simulation/runs/${id}`)).data; }
 export async function listSimulationRuns(id:string) { return (await apiClient.get<SimulationRun[]>(`/engine-rest/simulation/scenarios/${id}/runs`)).data; }
 export async function cancelSimulationRun(id:string) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/runs/${id}/cancel`)).data; }
