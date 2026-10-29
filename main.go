@@ -463,6 +463,7 @@ func main() {
 	timerController := api.NewTimerController(db)
 	incidentCtrl := api.NewIncidentController(db, taskEventDispatcher)
 	analyticsCtrl := api.NewAnalyticsController(readDB)
+	simulationCtrl := api.NewSimulationController(db)
 	eventLogCtrl := api.NewEventLogController(eventLogConsumer, db)
 
 	historicTaskCtrl := api.NewHistoricTaskController(db)
@@ -751,6 +752,24 @@ func main() {
 	// ============================================================
 
 	app.Get("/engine-rest/analytics/process-stats", analyticsCtrl.GetProcessStats)
+
+	// BPMN simulation laboratory. Read/run operations reuse the analytics
+	// permission; scenario and issue-register mutations follow modeler rights.
+	app.Post("/engine-rest/simulation/analyze", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.Analyze)
+	app.Post("/engine-rest/simulation/simulate", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.Simulate)
+	app.Post("/engine-rest/simulation/staffing", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.Staffing)
+	app.Get("/engine-rest/simulation/scenarios", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListScenarios)
+	app.Post("/engine-rest/simulation/scenarios", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.CreateScenario)
+	app.Get("/engine-rest/simulation/runs/:runId", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.GetRun)
+	app.Put("/engine-rest/simulation/issues/:issueId", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.UpdateIssue)
+	app.Delete("/engine-rest/simulation/issues/:issueId", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.DeleteIssue)
+	app.Get("/engine-rest/simulation/scenarios/:id", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.GetScenario)
+	app.Put("/engine-rest/simulation/scenarios/:id", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.UpdateScenario)
+	app.Delete("/engine-rest/simulation/scenarios/:id", permissions(db, "CAN_DELETE_PROCESS"), simulationCtrl.DeleteScenario)
+	app.Post("/engine-rest/simulation/scenarios/:id/runs", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunScenario)
+	app.Get("/engine-rest/simulation/scenarios/:id/runs", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListRuns)
+	app.Get("/engine-rest/simulation/scenarios/:id/issues", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListIssues)
+	app.Post("/engine-rest/simulation/scenarios/:id/issues", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.CreateIssue)
 
 	// ============================================================
 	// EVENT LOG (Phase 0 shadow-mode debug/verification surface — see

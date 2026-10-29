@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@layer components {
+  .input { @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-800; }
+  .table-input { @apply border border-gray-200 rounded px-2 py-1 text-xs bg-white text-gray-800; }
+}
+
 /* bpmn-js requires its own CSS */
 @import "bpmn-js/dist/assets/bpmn-js.css";
 @import "bpmn-js/dist/assets/diagram-js.css";

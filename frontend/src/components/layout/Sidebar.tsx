@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, GitBranch, Play, CheckSquare,
-  AlertTriangle, History, LogOut, Workflow, Users, Shield, BarChart3, PenTool
+  AlertTriangle, History, LogOut, Workflow, Users, Shield, BarChart3, PenTool, FlaskConical
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -14,6 +14,7 @@ const navItems = [
   { to: '/incidents',  icon: AlertTriangle,    label: 'Incidents' },
   { to: '/history',    icon: History,          label: 'History' },
   { to: '/analytics',  icon: BarChart3,        label: 'Analytics' },
+  { to: '/simulation', icon: FlaskConical,     label: 'Simulation lab' },
 ];
 
 const adminNavItems = [

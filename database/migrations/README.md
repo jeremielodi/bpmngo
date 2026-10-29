@@ -60,6 +60,7 @@ des incidents déjà enregistrés.
 | 017 | `017_remove_identity_compatibility.sql` | retire les `uid` dupliqués, les triggers d'identité de rolling upgrade et `executions.gateway_join_id` inutilisé | les racines gardent `BIGINT PK + id UUIDv7 UNIQUE`; les entités chaudes restent BIGINT uniquement |
 | 018 | `018_parent_fk_indexes.sql` | indexe les FK parentes utilisées par `ON DELETE SET NULL/CASCADE` | évite trois scans complets par instance pendant l'archivage |
 | 019 | `019_partition_retention.sql` | détache et supprime les partitions historiques expirées devenues vides | la purge ligne par ligne reste l'autorité pour ne pas perdre les audits non liés |
+| 020 | `020_simulation_lab.sql` | scénarios BPMN, campagnes de simulation et registre de problèmes | laboratoire d'analyse, dimensionnement et redesign |
 
 Pour voir où en est une base :
 

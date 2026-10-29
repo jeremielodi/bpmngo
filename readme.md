@@ -111,6 +111,7 @@ Design decisions and the partitioned write path: [docs/architecture.md](docs/arc
 - [Engine Features](docs/engine-features.md) — everything besides BPMN elements: FEEL, jobs, incidents, DMN, auth, scaling, HA, gRPC
 - [API Reference](docs/api.md) — REST (`/engine-rest`, `/v2`), events, audit trail, every filter
 - [Frontend](docs/frontend.md) — the web app: pages, modeler, running it in Docker or with Vite, its tests
+- [Simulation laboratory](docs/simulation-lab.md) — cycle time and cost analysis, Erlang-C staffing, discrete-event simulation, issues, and as-is/to-be comparison
 - [Java client](docs/java-client.md) — a remote Java application over REST, the Camunda 7 External Task Client or the Camunda 8 Java client, with tested examples
 - [Architecture](docs/architecture.md) — design decisions, partitioned write path
 - [Environment Variables](docs/configuration.md) — every setting
