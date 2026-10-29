@@ -1,6 +1,7 @@
 package simulation
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -25,6 +26,7 @@ type simEvent struct {
 	caseID   int
 	nodeID   string
 	queuedAt float64
+	frames   []syncFrame
 }
 type eventQueue []simEvent
 
@@ -68,11 +70,20 @@ func (q *eventQueue) pop() simEvent {
 	return event
 }
 
-type caseState struct{ started, processing, waiting, cost float64 }
+type syncFrame struct {
+	joinID  string
+	groupID int64
+}
+type joinState struct{ expected, arrived int }
+type caseState struct {
+	started, processing, waiting, cost float64
+	joins                              map[int64]*joinState
+}
 type queuedWork struct {
 	caseID   int
 	nodeID   string
 	queuedAt float64
+	frames   []syncFrame
 }
 type resourceState struct {
 	resource                       Resource
@@ -89,6 +100,14 @@ type elementState struct {
 
 // Simulate runs independent, deterministic-by-seed discrete-event replications.
 func Simulate(s Scenario) (SimulationResult, error) {
+	return simulateContext(context.Background(), s, nil)
+}
+
+func SimulateWithContext(ctx context.Context, s Scenario, progress func(int)) (SimulationResult, error) {
+	return simulateContext(ctx, s, progress)
+}
+
+func simulateContext(ctx context.Context, s Scenario, progress func(int)) (SimulationResult, error) {
 	c, err := compileScenario(s)
 	if err != nil {
 		return SimulationResult{}, err
@@ -105,11 +124,19 @@ func Simulate(s Scenario) (SimulationResult, error) {
 	}
 	runs := make([]RunMetrics, 0, s.Replications)
 	for i := 0; i < s.Replications; i++ {
-		m, e := runOnce(c, rand.New(rand.NewSource(s.Seed+int64(i))))
+		select {
+		case <-ctx.Done():
+			return SimulationResult{}, ctx.Err()
+		default:
+		}
+		m, e := runOnce(ctx, c, rand.New(rand.NewSource(s.Seed+int64(i))))
 		if e != nil {
 			return SimulationResult{}, e
 		}
 		runs = append(runs, m)
+		if progress != nil {
+			progress((i + 1) * 100 / s.Replications)
+		}
 	}
 	metrics := averageRuns(runs)
 	result := SimulationResult{ScenarioName: s.Name, GeneratedAt: time.Now().UTC(), Replications: s.Replications, Metrics: metrics, Analytic: analytic}
@@ -138,14 +165,22 @@ func ValidateRunnable(s Scenario) error {
 	return nil
 }
 
-func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
+func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 	duration := c.scenario.DurationHours * 60
 	q := &eventQueue{}
 	var sequence int64
+	var nextGroupID int64
 	push := func(e simEvent) { sequence++; e.seq = sequence; q.push(e) }
 	arrival := 0.0
 	count := 0
 	for (duration <= 0 || arrival <= duration) && (c.scenario.MaxArrivals <= 0 || count < c.scenario.MaxArrivals) {
+		if count&1023 == 0 {
+			select {
+			case <-ctx.Done():
+				return RunMetrics{}, ctx.Err()
+			default:
+			}
+		}
 		push(simEvent{at: arrival, kind: eventArrive, caseID: count, nodeID: c.startID})
 		count++
 		arrival += rng.ExpFloat64() / (c.scenario.ArrivalRatePerHour / 60)
@@ -162,7 +197,7 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 		r.queueArea += float64(len(r.queue)) * (at - r.lastAt)
 		r.lastAt = at
 	}
-	var enter func(int, string, float64) error
+	var enter func(int, string, float64, []syncFrame) error
 	var release func(*resourceState, float64) error
 	startWork := func(r *resourceState, w queuedWork, at float64) error {
 		p := c.scenario.Activities[w.nodeID]
@@ -179,7 +214,7 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 		el := elements[w.nodeID]
 		el.queue += at - w.queuedAt
 		el.service += service
-		push(simEvent{at: at + service, kind: eventServiceDone, caseID: w.caseID, nodeID: w.nodeID})
+		push(simEvent{at: at + service, kind: eventServiceDone, caseID: w.caseID, nodeID: w.nodeID, frames: w.frames})
 		return nil
 	}
 	release = func(r *resourceState, at float64) error {
@@ -192,12 +227,28 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 		}
 		return nil
 	}
-	enter = func(caseID int, nodeID string, at float64) error {
+	enter = func(caseID int, nodeID string, at float64, frames []syncFrame) error {
 		node := c.graph.Nodes[nodeID]
 		if node == nil {
 			return fmt.Errorf("unknown node %q", nodeID)
 		}
+		if len(node.Incoming) > 1 && len(frames) > 0 && frames[len(frames)-1].joinID == nodeID {
+			frame := frames[len(frames)-1]
+			state := cases[caseID].joins[frame.groupID]
+			if state == nil {
+				return fmt.Errorf("missing synchronization group %d at gateway %q", frame.groupID, nodeID)
+			}
+			state.arrived++
+			if state.arrived < state.expected {
+				return nil
+			}
+			delete(cases[caseID].joins, frame.groupID)
+			frames = frames[:len(frames)-1]
+		}
 		if node.IsEndEvent() || len(node.Outgoing) == 0 {
+			if len(frames) > 0 {
+				return fmt.Errorf("token reached end before structured join %q", frames[len(frames)-1].joinID)
+			}
 			st := cases[caseID]
 			cycles = append(cycles, at-st.started)
 			delete(cases, caseID)
@@ -212,13 +263,13 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 			if wait > 0 {
 				cases[caseID].waiting += wait
 				elements[nodeID].queue += wait
-				push(simEvent{at: at + wait, kind: eventEnter, caseID: caseID, nodeID: nodeID, queuedAt: -1})
+				push(simEvent{at: at + wait, kind: eventEnter, caseID: caseID, nodeID: nodeID, queuedAt: -1, frames: frames})
 				return nil
 			}
 			if p.ResourceID != "" {
 				r := resources[p.ResourceID]
 				updateArea(r, at)
-				w := queuedWork{caseID: caseID, nodeID: nodeID, queuedAt: at}
+				w := queuedWork{caseID: caseID, nodeID: nodeID, queuedAt: at, frames: frames}
 				if r.busy < r.resource.Capacity {
 					return startWork(r, w, at)
 				}
@@ -234,18 +285,27 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 			}
 			cases[caseID].processing += service
 			elements[nodeID].service += service
-			push(simEvent{at: at + service, kind: eventServiceDone, caseID: caseID, nodeID: nodeID})
+			push(simEvent{at: at + service, kind: eventServiceDone, caseID: caseID, nodeID: nodeID, frames: frames})
 			return nil
 		}
-		return route(c, node, caseID, at, rng, push)
+		return route(c, node, caseID, at, rng, frames, push, &nextGroupID, cases)
 	}
 	var err error
+	processedEvents := 0
 	for len(*q) > 0 {
+		processedEvents++
+		if processedEvents&1023 == 0 {
+			select {
+			case <-ctx.Done():
+				return RunMetrics{}, ctx.Err()
+			default:
+			}
+		}
 		e := q.pop()
 		finalAt = math.Max(finalAt, e.at)
 		switch e.kind {
 		case eventArrive:
-			cases[e.caseID] = &caseState{started: e.at}
+			cases[e.caseID] = &caseState{started: e.at, joins: map[int64]*joinState{}}
 			push(simEvent{at: e.at, kind: eventEnter, caseID: e.caseID, nodeID: e.nodeID})
 		case eventEnter:
 			if _, ok := elements[e.nodeID]; !ok {
@@ -257,7 +317,7 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 				if p.ResourceID != "" {
 					r := resources[p.ResourceID]
 					updateArea(r, e.at)
-					w := queuedWork{caseID: e.caseID, nodeID: e.nodeID, queuedAt: e.at}
+					w := queuedWork{caseID: e.caseID, nodeID: e.nodeID, queuedAt: e.at, frames: e.frames}
 					if r.busy < r.resource.Capacity {
 						err = startWork(r, w, e.at)
 					} else {
@@ -273,11 +333,11 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 					} else {
 						cases[e.caseID].processing += service
 						elements[e.nodeID].service += service
-						push(simEvent{at: e.at + service, kind: eventServiceDone, caseID: e.caseID, nodeID: e.nodeID})
+						push(simEvent{at: e.at + service, kind: eventServiceDone, caseID: e.caseID, nodeID: e.nodeID, frames: e.frames})
 					}
 				}
 			} else {
-				err = enter(e.caseID, e.nodeID, e.at)
+				err = enter(e.caseID, e.nodeID, e.at, e.frames)
 			}
 		case eventServiceDone:
 			p := c.scenario.Activities[e.nodeID]
@@ -286,7 +346,7 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 				err = release(resources[p.ResourceID], e.at)
 			}
 			if err == nil {
-				err = route(c, c.graph.Nodes[e.nodeID], e.caseID, e.at, rng, push)
+				err = route(c, c.graph.Nodes[e.nodeID], e.caseID, e.at, rng, e.frames, push, &nextGroupID, cases)
 			}
 		}
 		if err != nil {
@@ -355,9 +415,39 @@ func runOnce(c *compiledScenario, rng *rand.Rand) (RunMetrics, error) {
 	return m, nil
 }
 
-func route(c *compiledScenario, node *engine.Node, caseID int, at float64, rng *rand.Rand, push func(simEvent)) error {
+func route(c *compiledScenario, node *engine.Node, caseID int, at float64, rng *rand.Rand, frames []syncFrame, push func(simEvent), nextGroupID *int64, cases map[int]*caseState) error {
 	n := c.graph.Nodes[node.ID]
 	if len(n.Outgoing) == 0 {
+		return nil
+	}
+	if len(n.Outgoing) > 1 && (n.Type == engine.ParallelGatewayType || n.Type == engine.InclusiveGatewayType) {
+		selected := make([]engine.Flow, 0, len(n.Outgoing))
+		if n.Type == engine.ParallelGatewayType {
+			selected = append(selected, n.Outgoing...)
+		} else {
+			best := n.Outgoing[0]
+			bestProbability := -1.0
+			for _, flow := range n.Outgoing {
+				probability := c.scenario.Flows[flow.ID].Probability
+				if probability > bestProbability {
+					best, bestProbability = flow, probability
+				}
+				if rng.Float64() < probability {
+					selected = append(selected, flow)
+				}
+			}
+			if len(selected) == 0 {
+				selected = append(selected, best)
+			}
+		}
+		*nextGroupID = *nextGroupID + 1
+		groupID := *nextGroupID
+		joinID := c.gatewayPairs[n.ID]
+		cases[caseID].joins[groupID] = &joinState{expected: len(selected)}
+		for _, flow := range selected {
+			branchFrames := append(append([]syncFrame(nil), frames...), syncFrame{joinID: joinID, groupID: groupID})
+			push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: flow.TargetRef, frames: branchFrames})
+		}
 		return nil
 	}
 	u := rng.Float64()
@@ -370,7 +460,7 @@ func route(c *compiledScenario, node *engine.Node, caseID int, at float64, rng *
 			break
 		}
 	}
-	push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: chosen.TargetRef})
+	push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: chosen.TargetRef, frames: frames})
 	return nil
 }
 

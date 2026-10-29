@@ -14,6 +14,11 @@ transactional runtime.
 - seeded discrete-event simulation with Poisson arrivals, FIFO resource
   queues, finite resource capacity, and fixed, normal, exponential, uniform,
   or triangular duration distributions;
+- structured parallel and inclusive fork/join gateways, including nested
+  forks and inclusive branches selected independently;
+- asynchronous, resumable campaigns with progress, cancellation, and a
+  configurable PostgreSQL-backed worker pool;
+- automatic resource-capacity sweeps with target-based recommendations;
 - mean, median, p90 and p95 cycle time, throughput, cost, resource utilization,
   queues, and 95% confidence intervals across replications;
 - an evidence-based issue register, redesign heuristics, and as-is/to-be
@@ -28,13 +33,17 @@ as-is, or replaced by importing a `.bpmn` file.
 
 1. Open **Simulation lab** and import a BPMN file or load the Helpdesk template.
 2. Associate activity IDs with duration distributions, explicit waits, and
-   resources. Set gateway flow probabilities so each split totals `1`.
+   resources. Exclusive gateway probabilities total `1`; inclusive gateway
+   probabilities are independent; parallel gateways need none.
 3. Run **Analyze** for deterministic expected values.
 4. Use **Staffing** to calculate the minimum server count for a queueing target.
-5. Use **Save & run** for a persisted discrete-event campaign.
-6. Mark the result as the as-is baseline, duplicate it as a to-be scenario,
+5. Use **Save & run async** for a persisted campaign. Follow progress, leave
+   the page, resume tracking later, or cancel it from **Campaigns**.
+6. Run a capacity sweep to compare a resource over a range and select the
+   smallest capacity meeting the mean/p95 cycle-time targets.
+7. Mark the result as the as-is baseline, duplicate it as a to-be scenario,
    change capacity or process parameters, and compare the new result.
-7. Track detected and manually observed problems in **Issues**. Use **Modeler**
+8. Track detected and manually observed problems in **Issues**. Use **Modeler**
    to draw the selected to-be process.
 
 ## API
@@ -49,15 +58,17 @@ All endpoints require authentication. Analysis permissions use
 | `POST /engine-rest/simulation/staffing` | Calculate an Erlang-C staffing curve |
 | `GET/POST /engine-rest/simulation/scenarios` | List or create scenarios |
 | `GET/PUT/DELETE /engine-rest/simulation/scenarios/:id` | Read, update, or delete a scenario |
-| `POST /engine-rest/simulation/scenarios/:id/runs` | Run and persist a campaign |
+| `POST /engine-rest/simulation/scenarios/:id/runs` | Queue a persisted simulation |
+| `POST /engine-rest/simulation/scenarios/:id/capacity-sweeps` | Queue an automatic capacity comparison |
 | `GET /engine-rest/simulation/scenarios/:id/runs` | List prior campaigns |
 | `GET /engine-rest/simulation/runs/:runId` | Read a campaign and its result |
+| `POST /engine-rest/simulation/runs/:runId/cancel` | Cancel queued/running work |
 | `GET/POST /engine-rest/simulation/scenarios/:id/issues` | List or add issues |
 | `PUT/DELETE /engine-rest/simulation/issues/:issueId` | Update or remove an issue |
 
-Install `database/migrations/020_simulation_lab.sql` before deploying this
-version to an existing database. New databases receive the tables from the
-baseline schema.
+Install migrations `020` and `021` before deploying this version to an
+existing database. New databases receive the tables from the baseline schema.
+`SIMULATION_WORKERS` controls concurrency (default `2`, maximum `16`).
 
 ## Modeling assumptions
 
@@ -65,9 +76,9 @@ baseline schema.
 - Erlang-C models a stationary Poisson arrival process, exponential service,
   one FIFO queue, identical servers, and no abandonment.
 - The simulation drains all cases admitted during the configured arrival
-  horizon. It models one routed token per case; parallel token synchronization,
-  business calendars, priorities, preemption, and correlated arrivals are not
-  inferred automatically. Represent known external delays explicitly, and
-  state these assumptions in the analysis report.
+  horizon. Parallel/inclusive gateways must be structured: every selected
+  branch must reach a matching gateway of the same type. Business calendars,
+  priorities, preemption, and correlated arrivals are not inferred
+  automatically. Represent known external delays explicitly.
 - Recommendations are hypotheses to test in a separate to-be scenario, not
   automatic prescriptions.

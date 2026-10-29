@@ -1,15 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, BarChart3, Calculator, FlaskConical, Play, Save, Upload } from 'lucide-react';
 import {
-  analyzeScenario, calculateStaffing, createIssue, createScenario, listIssues, listScenarios, runStoredScenario, updateIssue,
-  updateScenario, type AnalyticResult, type Scenario, type SimulationResult, type StaffingResult,
+  analyzeScenario, calculateStaffing, cancelSimulationRun, createIssue, createScenario, getSimulationRun, listIssues, listScenarios,
+  listSimulationRuns, runCapacitySweep, runStoredScenario, updateIssue, updateScenario, type AnalyticResult, type CapacitySweepRequest,
+  type CapacitySweepResult, type Scenario, type SimulationResult, type SimulationRun, type StaffingResult,
 } from '../api/simulation';
 import { helpdeskScenario } from '../data/helpdeskSimulation';
 import { Card, CardHeader, Table, Thead, Th, Tr, Td } from '../components/ui';
 
-type Tab = 'setup'|'results'|'staffing'|'issues';
+type Tab = 'setup'|'results'|'staffing'|'campaigns'|'issues';
 const copyTemplate = () => structuredClone(helpdeskScenario);
 const numeric = (value:string) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const durationMean = (d?: {type:string;value?:number;mean?:number;min?:number;max?:number;mode?:number}) => {
@@ -29,9 +30,25 @@ export default function SimulationLab() {
   const [staffingInput,setStaffingInput] = useState({arrivalRatePerHour:1,serviceTimeHours:2,targetWaitingHours:2,maxServers:20});
   const [staffing,setStaffing] = useState<StaffingResult>();
   const [baseline,setBaseline] = useState<SimulationResult>();
+  const [activeRunId,setActiveRunId] = useState('');
+  const [sweepResult,setSweepResult] = useState<CapacitySweepResult>();
+  const [sweepInput,setSweepInput] = useState<CapacitySweepRequest>({resourceId:'level2',minimumCapacity:1,maximumCapacity:8,step:1,targetMeanCycleMinutes:240});
   const {data:stored=[]} = useQuery({queryKey:['simulation-scenarios'],queryFn:listScenarios,retry:false});
+  const {data:runs=[]} = useQuery({queryKey:['simulation-runs',scenarioId],queryFn:()=>listSimulationRuns(scenarioId),enabled:!!scenarioId,refetchInterval:scenarioId?2000:false});
+  const {data:activeRun} = useQuery({queryKey:['simulation-run',activeRunId],queryFn:()=>getSimulationRun(activeRunId),enabled:!!activeRunId,refetchInterval:1000});
   const activityRows = useMemo(()=>Object.entries(scenario.activities),[scenario.activities]);
   const flowRows = useMemo(()=>Object.entries(scenario.flows),[scenario.flows]);
+
+  useEffect(()=>{
+    if(!activeRun || !['completed','failed','cancelled'].includes(activeRun.status))return;
+    if(activeRun.status==='completed' && activeRun.result){
+      if(activeRun.runType==='capacity_sweep')setSweepResult(activeRun.result as CapacitySweepResult);
+      else setResult(activeRun.result as SimulationResult);
+    } else if(activeRun.status==='failed')setError(activeRun.errorMessage??'Simulation failed');
+    setActiveRunId('');
+    void queryClient.invalidateQueries({queryKey:['simulation-runs',scenarioId]});
+    void queryClient.invalidateQueries({queryKey:['simulation-issues',scenarioId]});
+  },[activeRun,queryClient,scenarioId]);
 
   const execute = async (action:string, fn:()=>Promise<void>) => {
     setBusy(action);setError('');try{await fn()}catch(e:any){setError(e?.response?.data?.message ?? e?.message ?? 'Operation failed')}finally{setBusy('')}
@@ -59,7 +76,7 @@ export default function SimulationLab() {
   };
   const loadStored = (id:string) => {
     const row=stored.find(item=>item.id===id);if(!row)return;
-    setScenarioId(id);setScenario({...row.configuration,name:row.name,bpmnXml:row.bpmnXml});setAnalytic(undefined);setResult(undefined);
+    setScenarioId(id);setScenario({...row.configuration,name:row.name,bpmnXml:row.bpmnXml});setAnalytic(undefined);setResult(undefined);setSweepResult(undefined);
   };
 
   return <div className="p-6 space-y-5">
@@ -72,8 +89,9 @@ export default function SimulationLab() {
         <button onClick={applyExercise3} className="px-3 py-2 text-sm border rounded-lg bg-white">Exercise 3 preset</button>
       </div>
     </div>
-    <div className="flex border-b border-gray-200">{(['setup','results','staffing','issues'] as Tab[]).map(value=><button key={value} onClick={()=>setTab(value)} className={`px-4 py-2 text-sm capitalize border-b-2 ${tab===value?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>{value}</button>)}</div>
+    <div className="flex border-b border-gray-200">{(['setup','results','staffing','campaigns','issues'] as Tab[]).map(value=><button key={value} onClick={()=>setTab(value)} className={`px-4 py-2 text-sm capitalize border-b-2 ${tab===value?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>{value}</button>)}</div>
     {error&&<div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">{error}</div>}
+    {activeRun&&<div className="rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm px-4 py-3 flex items-center justify-between"><span>{activeRun.runType==='capacity_sweep'?'Capacity sweep':'Simulation'}: {activeRun.status} — {activeRun.progress}%</span><button onClick={async()=>{await cancelSimulationRun(activeRun.id);setActiveRunId('')}} className="text-xs font-medium">Cancel</button></div>}
 
     {tab==='setup'&&<div className="space-y-5">
       <Card><CardHeader title="Experiment" subtitle="Times are expressed in minutes; arrival rate is cases per hour."/><div className="p-6 pt-2 grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -86,13 +104,35 @@ export default function SimulationLab() {
       <Card><CardHeader title="BPMN source" subtitle="Import any BPMN 2.0 XML file; element IDs connect the model to parameters."/><div className="p-6 pt-2 space-y-3"><label className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm cursor-pointer bg-white"><Upload className="w-4 h-4"/>Import .bpmn<input type="file" accept=".bpmn,.xml" className="hidden" onChange={async e=>{const f=e.target.files?.[0];if(f)patchScenario({bpmnXml:await f.text()})}}/></label><textarea value={scenario.bpmnXml} onChange={e=>patchScenario({bpmnXml:e.target.value})} className="w-full h-40 font-mono text-xs border border-gray-200 rounded-lg p-3"/></div></Card>
       <Card><CardHeader title="Resources" subtitle="Capacity controls queues; hourly cost determines cost per execution."/><Table><Thead><tr><Th>ID</Th><Th>Name</Th><Th>Capacity</Th><Th>Cost / hour</Th><Th></Th></tr></Thead><tbody>{scenario.resources.map((r,index)=><Tr key={r.id}><Td>{r.id}</Td><Td><input value={r.name} onChange={e=>patchScenario({resources:scenario.resources.map((x,i)=>i===index?{...x,name:e.target.value}:x)})} className="table-input"/></Td><Td><input type="number" value={r.capacity} onChange={e=>patchScenario({resources:scenario.resources.map((x,i)=>i===index?{...x,capacity:numeric(e.target.value)}:x)})} className="table-input w-20"/></Td><Td><input type="number" value={r.costPerHour} onChange={e=>patchScenario({resources:scenario.resources.map((x,i)=>i===index?{...x,costPerHour:numeric(e.target.value)}:x)})} className="table-input w-24"/></Td><Td><button onClick={()=>patchScenario({resources:scenario.resources.filter((_,i)=>i!==index)})} className="text-xs text-red-600">Remove</button></Td></Tr>)}</tbody></Table><div className="p-4 border-t"><button onClick={()=>{const id=window.prompt('Resource ID');if(id&&!scenario.resources.some(r=>r.id===id))patchScenario({resources:[...scenario.resources,{id,name:id,capacity:1,costPerHour:0}]})}} className="text-sm text-blue-600">+ Add resource</button></div></Card>
       <Card><CardHeader title="Activity parameters" subtitle="Explicit wait models delays such as handoffs or client response; resource queues are calculated separately."/><div className="overflow-x-auto"><Table><Thead><tr><Th>BPMN element ID</Th><Th>Distribution</Th><Th>Processing mean</Th><Th>Std dev</Th><Th>Explicit wait</Th><Th>Resource</Th><Th>Value added</Th><Th></Th></tr></Thead><tbody>{activityRows.map(([id,a])=><Tr key={id}><Td><code className="text-xs">{id}</code></Td><Td><select value={a.processingTime.type} onChange={e=>patchActivity(id,{processingTime:{type:e.target.value,value:durationMean(a.processingTime),mean:durationMean(a.processingTime),standardDeviation:a.processingTime.standardDeviation??0}})} className="table-input"><option value="fixed">Fixed</option><option value="normal">Normal</option><option value="exponential">Exponential</option><option value="uniform">Uniform</option><option value="triangular">Triangular</option></select></Td><Td><input type="number" value={durationMean(a.processingTime)} onChange={e=>setDistributionMean(id,'processingTime',numeric(e.target.value))} className="table-input w-24"/></Td><Td><input type="number" disabled={a.processingTime.type!=='normal'} value={a.processingTime.standardDeviation??0} onChange={e=>patchActivity(id,{processingTime:{...a.processingTime,standardDeviation:numeric(e.target.value)}})} className="table-input w-20 disabled:bg-gray-100"/></Td><Td><input type="number" value={durationMean(a.waitingTime)} onChange={e=>setDistributionMean(id,'waitingTime',numeric(e.target.value))} className="table-input w-24"/></Td><Td><select value={a.resourceId??''} onChange={e=>patchActivity(id,{resourceId:e.target.value})} className="table-input"><option value="">None</option>{scenario.resources.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></Td><Td><input type="checkbox" checked={a.valueAdded} onChange={e=>patchActivity(id,{valueAdded:e.target.checked})}/></Td><Td><button onClick={()=>setScenario(current=>{const activities={...current.activities};delete activities[id];return {...current,activities}})} className="text-xs text-red-600">Remove</button></Td></Tr>)}</tbody></Table></div><div className="p-4 border-t"><button onClick={()=>{const id=window.prompt('BPMN activity element ID');if(id&&!scenario.activities[id])patchScenario({activities:{...scenario.activities,[id]:{processingTime:{type:'fixed',value:0},waitingTime:{type:'fixed',value:0},valueAdded:true}}})}} className="text-sm text-blue-600">+ Add activity</button></div></Card>
-      <Card><CardHeader title="Branch probabilities" subtitle="Every gateway's outgoing probabilities must total 100%."/><div className="p-6 pt-2 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">{flowRows.map(([id,p])=><div key={id} className="flex gap-1 items-end"><Field label={id}><input type="number" step="0.01" min="0" max="1" value={p.probability} onChange={e=>patchScenario({flows:{...scenario.flows,[id]:{probability:numeric(e.target.value)}}})} className="input"/></Field><button onClick={()=>setScenario(current=>{const flows={...current.flows};delete flows[id];return {...current,flows}})} className="px-2 py-2 text-xs text-red-600">×</button></div>)}</div><div className="px-6 pb-4"><button onClick={()=>{const id=window.prompt('BPMN sequence-flow ID');if(id&&!scenario.flows[id])patchScenario({flows:{...scenario.flows,[id]:{probability:0}}})}} className="text-sm text-blue-600">+ Add flow probability</button></div></Card>
-      <div className="flex justify-end gap-2"><button disabled={!!busy} onClick={()=>execute('analyze',async()=>{setAnalytic(await analyzeScenario(scenario));setTab('results')})} className="px-4 py-2 border rounded-lg text-sm bg-white"><BarChart3 className="inline w-4 h-4 mr-2"/>Analyze</button><button disabled={!!busy} onClick={()=>execute('save',async()=>{await save()})} className="px-4 py-2 border rounded-lg text-sm bg-white"><Save className="inline w-4 h-4 mr-2"/>Save</button><button disabled={!!busy} onClick={()=>execute('run',async()=>{const id=await save();const run=await runStoredScenario(id);if(run.result)setResult(run.result);setTab('results')})} className="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white"><Play className="inline w-4 h-4 mr-2"/>{busy==='run'?'Running…':'Save & run'}</button></div>
+      <Card><CardHeader title="Branch probabilities" subtitle="Exclusive flows total 100%; inclusive probabilities are independent; parallel flows need no probability."/><div className="p-6 pt-2 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">{flowRows.map(([id,p])=><div key={id} className="flex gap-1 items-end"><Field label={id}><input type="number" step="0.01" min="0" max="1" value={p.probability} onChange={e=>patchScenario({flows:{...scenario.flows,[id]:{probability:numeric(e.target.value)}}})} className="input"/></Field><button onClick={()=>setScenario(current=>{const flows={...current.flows};delete flows[id];return {...current,flows}})} className="px-2 py-2 text-xs text-red-600">×</button></div>)}</div><div className="px-6 pb-4"><button onClick={()=>{const id=window.prompt('BPMN sequence-flow ID');if(id&&!scenario.flows[id])patchScenario({flows:{...scenario.flows,[id]:{probability:0}}})}} className="text-sm text-blue-600">+ Add flow probability</button></div></Card>
+      <div className="flex justify-end gap-2"><button disabled={!!busy} onClick={()=>execute('analyze',async()=>{setAnalytic(await analyzeScenario(scenario));setTab('results')})} className="px-4 py-2 border rounded-lg text-sm bg-white"><BarChart3 className="inline w-4 h-4 mr-2"/>Analyze</button><button disabled={!!busy} onClick={()=>execute('save',async()=>{await save()})} className="px-4 py-2 border rounded-lg text-sm bg-white"><Save className="inline w-4 h-4 mr-2"/>Save</button><button disabled={!!busy||!!activeRunId} onClick={()=>execute('run',async()=>{const id=await save();const run=await runStoredScenario(id);setActiveRunId(run.id);setTab('campaigns')})} className="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white"><Play className="inline w-4 h-4 mr-2"/>{busy==='run'?'Queuing…':'Save & run async'}</button></div>
     </div>}
 
     {tab==='results'&&<><Results analytic={result?.analytic??analytic} result={result} baseline={baseline}/>{result&&<div className="flex justify-end gap-2"><button onClick={()=>setBaseline(result)} className="px-3 py-2 text-sm border rounded-lg bg-white">Use as as-is baseline</button><button onClick={()=>{setScenario(current=>({...structuredClone(current),name:`${current.name} — to-be`}));setScenarioId('');setResult(undefined);setTab('setup')}} className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg">Duplicate as to-be</button></div>}</>}
     {tab==='staffing'&&<div className="grid lg:grid-cols-3 gap-5"><Card className="lg:col-span-1"><CardHeader title="Erlang-C staffing" subtitle="M/M/c estimate for a shared work queue."/><div className="p-6 pt-2 space-y-4"><NumberField label="Arrival rate / hour" value={staffingInput.arrivalRatePerHour} onChange={v=>setStaffingInput({...staffingInput,arrivalRatePerHour:v})}/><NumberField label="Mean service time (hours)" value={staffingInput.serviceTimeHours} onChange={v=>setStaffingInput({...staffingInput,serviceTimeHours:v})}/><NumberField label="Target mean wait (hours)" value={staffingInput.targetWaitingHours} onChange={v=>setStaffingInput({...staffingInput,targetWaitingHours:v})}/><NumberField label="Maximum servers" value={staffingInput.maxServers} onChange={v=>setStaffingInput({...staffingInput,maxServers:v})}/><button onClick={()=>execute('staffing',async()=>setStaffing(await calculateStaffing(staffingInput)))} className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm"><Calculator className="inline w-4 h-4 mr-2"/>Calculate minimum</button></div></Card><Card className="lg:col-span-2"><CardHeader title={staffing?`Minimum: ${staffing.minimumServers} servers`:'Staffing curve'} subtitle="Unstable configurations have utilization ≥ 100%."/>{staffing&&<Table><Thead><tr><Th>Servers</Th><Th>Utilization</Th><Th>P(wait)</Th><Th>Mean wait</Th><Th>Target</Th></tr></Thead><tbody>{staffing.points.map(p=><Tr key={p.servers}><Td>{p.servers}</Td><Td>{(p.utilization*100).toFixed(1)}%</Td><Td>{p.stable?`${(p.probabilityOfWait*100).toFixed(1)}%`:'—'}</Td><Td>{p.stable?`${p.meanWaitingHours.toFixed(2)} h`:'Unstable'}</Td><Td>{p.meetsTarget?'✓':'—'}</Td></Tr>)}</tbody></Table>}</Card></div>}
+    {tab==='campaigns'&&<Campaigns resources={scenario.resources} input={sweepInput} setInput={setSweepInput} runs={runs} result={sweepResult} disabled={!!activeRunId||!!busy} onStart={()=>execute('sweep',async()=>{const id=await save();const run=await runCapacitySweep(id,sweepInput);setActiveRunId(run.id)})} onOpen={run=>{if(run.runType==='capacity_sweep')setSweepResult(run.result as CapacitySweepResult);else{setResult(run.result as SimulationResult);setTab('results')}}} onTrack={run=>setActiveRunId(run.id)} onCancel={async run=>{await cancelSimulationRun(run.id);await queryClient.invalidateQueries({queryKey:['simulation-runs',scenarioId]})}}/>}
     {tab==='issues'&&<Issues result={result} scenarioId={scenarioId}/>}
+  </div>;
+}
+
+function Campaigns({resources,input,setInput,runs,result,disabled,onStart,onOpen,onTrack,onCancel}:{
+  resources:Scenario['resources'];input:CapacitySweepRequest;setInput:(value:CapacitySweepRequest)=>void;runs:SimulationRun[];
+  result?:CapacitySweepResult;disabled:boolean;onStart:()=>void;onOpen:(run:SimulationRun)=>void;onTrack:(run:SimulationRun)=>void;onCancel:(run:SimulationRun)=>void;
+}) {
+  return <div className="space-y-5">
+    <div className="grid lg:grid-cols-3 gap-5">
+      <Card><CardHeader title="Capacity sweep" subtitle="Run the same seeded experiment for every capacity."/><div className="p-6 pt-2 space-y-4">
+        <Field label="Resource"><select value={input.resourceId} onChange={e=>setInput({...input,resourceId:e.target.value})} className="input">{resources.map(resource=><option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></Field>
+        <NumberField label="Minimum capacity" value={input.minimumCapacity} onChange={value=>setInput({...input,minimumCapacity:value})}/>
+        <NumberField label="Maximum capacity" value={input.maximumCapacity} onChange={value=>setInput({...input,maximumCapacity:value})}/>
+        <NumberField label="Step" value={input.step} onChange={value=>setInput({...input,step:value})}/>
+        <NumberField label="Target mean cycle (minutes)" value={input.targetMeanCycleMinutes??0} onChange={value=>setInput({...input,targetMeanCycleMinutes:value})}/>
+        <NumberField label="Target p95 cycle (minutes)" value={input.targetP95CycleMinutes??0} onChange={value=>setInput({...input,targetP95CycleMinutes:value})}/>
+        <button disabled={disabled||!input.resourceId} onClick={onStart} className="w-full px-4 py-2 rounded-lg bg-blue-600 disabled:bg-blue-300 text-white text-sm">Start asynchronous sweep</button>
+      </div></Card>
+      <Card className="lg:col-span-2"><CardHeader title={result?.recommendedCapacity?`Recommended capacity: ${result.recommendedCapacity}`:'Capacity comparison'} subtitle="The first capacity meeting all non-zero targets is recommended."/>{result?<Table><Thead><tr><Th>Capacity</Th><Th>Mean cycle</Th><Th>p95</Th><Th>Throughput</Th><Th>Utilization</Th><Th>Mean cost</Th><Th>Target</Th></tr></Thead><tbody>{result.points.map(point=><Tr key={point.capacity}><Td>{point.capacity}</Td><Td>{point.meanCycleMinutes.toFixed(1)} min</Td><Td>{point.p95CycleMinutes.toFixed(1)} min</Td><Td>{point.throughputPerHour.toFixed(2)}/h</Td><Td>{(point.utilization*100).toFixed(1)}%</Td><Td>€{point.meanCost.toFixed(2)}</Td><Td>{point.meetsTarget?'✓':'—'}</Td></Tr>)}</tbody></Table>:<p className="p-8 text-sm text-gray-500 text-center">Launch a sweep or open a completed campaign.</p>}</Card>
+    </div>
+    <Card><CardHeader title="Campaign history" subtitle="Queued and running campaigns survive page navigation and application restarts."/>{runs.length===0?<p className="p-8 text-sm text-gray-500 text-center">No campaign for this scenario.</p>:<Table><Thead><tr><Th>Type</Th><Th>Status</Th><Th>Progress</Th><Th>Started</Th><Th></Th></tr></Thead><tbody>{runs.map(run=><Tr key={run.id}><Td>{run.runType==='capacity_sweep'?'Capacity sweep':'Simulation'}</Td><Td><span className="capitalize">{run.status}</span></Td><Td>{run.progress}%</Td><Td>{new Date(run.startedAt).toLocaleString()}</Td><Td><div className="flex gap-2">{run.status==='completed'&&run.result&&<button onClick={()=>onOpen(run)} className="text-xs text-blue-600">Open</button>}{(run.status==='queued'||run.status==='running')&&<><button onClick={()=>onTrack(run)} className="text-xs text-blue-600">Track</button><button onClick={()=>onCancel(run)} className="text-xs text-red-600">Cancel</button></>}</div></Td></Tr>)}</tbody></Table>}</Card>
   </div>;
 }
 

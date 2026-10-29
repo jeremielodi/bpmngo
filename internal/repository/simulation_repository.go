@@ -44,33 +44,77 @@ func (r *SimulationRepository) DeleteScenario(id uuid.UUID, tenantID string) err
 	return err
 }
 
-func (r *SimulationRepository) CreateRun(scenarioID, userID uuid.UUID) (*models.SimulationRun, error) {
+func (r *SimulationRepository) CreateRun(scenarioID, userID uuid.UUID, runType string, request json.RawMessage) (*models.SimulationRun, error) {
 	var row models.SimulationRun
-	err := r.db.Get(&row, `INSERT INTO simulation_runs(scenario_id,status,created_by) VALUES($1,'running',$2)
-		RETURNING id,scenario_id,status,result,error_message,created_by,started_at,completed_at`, scenarioID, nullableUUID(userID))
+	err := r.db.Get(&row, `INSERT INTO simulation_runs(scenario_id,status,created_by,run_type,request) VALUES($1,'queued',$2,$3,$4)
+		RETURNING id,scenario_id,status,run_type,request,progress,result,error_message,created_by,started_at,completed_at`, scenarioID, nullableUUID(userID), runType, nullableJSON(request))
 	return &row, err
 }
 
-func (r *SimulationRepository) CompleteRun(id uuid.UUID, result json.RawMessage) error {
-	_, err := r.db.Exec(`UPDATE simulation_runs SET status='completed',result=$2,completed_at=NOW() WHERE id=$1`, id, result)
+func (r *SimulationRepository) RequeueStaleRuns() error {
+	_, err := r.db.Exec(`UPDATE simulation_runs SET status='queued',progress=0,error_message=NULL,worker_id=NULL,heartbeat_at=NULL
+		WHERE status='running' AND completed_at IS NULL AND (heartbeat_at IS NULL OR heartbeat_at < NOW()-INTERVAL '30 seconds')`)
 	return err
 }
 
+func (r *SimulationRepository) ClaimQueuedRun(workerID string) (*models.SimulationRun, error) {
+	var row models.SimulationRun
+	err := r.db.Get(&row, `WITH candidate AS (
+		SELECT id FROM simulation_runs WHERE status='queued' ORDER BY started_at,id FOR UPDATE SKIP LOCKED LIMIT 1
+	) UPDATE simulation_runs r SET status='running',progress=0,started_at=NOW(),worker_id=$1,heartbeat_at=NOW()
+	FROM candidate WHERE r.id=candidate.id
+	RETURNING r.id,r.scenario_id,r.status,r.run_type,r.request,r.progress,r.result,r.error_message,r.created_by,r.started_at,r.completed_at`, workerID)
+	return &row, err
+}
+
+func (r *SimulationRepository) UpdateRunProgress(id uuid.UUID, progress int) error {
+	_, err := r.db.Exec(`UPDATE simulation_runs SET progress=$2,heartbeat_at=NOW() WHERE id=$1 AND status='running'`, id, progress)
+	return err
+}
+
+func (r *SimulationRepository) HeartbeatRun(id uuid.UUID) error {
+	_, err := r.db.Exec(`UPDATE simulation_runs SET heartbeat_at=NOW() WHERE id=$1 AND status='running'`, id)
+	return err
+}
+
+func (r *SimulationRepository) RunStatus(id uuid.UUID) (string, error) {
+	var status string
+	err := r.db.Get(&status, `SELECT status FROM simulation_runs WHERE id=$1`, id)
+	return status, err
+}
+
+func (r *SimulationRepository) CompleteRun(id uuid.UUID, result json.RawMessage) (bool, error) {
+	queryResult, err := r.db.Exec(`UPDATE simulation_runs SET status='completed',progress=100,result=$2,completed_at=NOW() WHERE id=$1 AND status='running'`, id, result)
+	if err != nil {
+		return false, err
+	}
+	rows, err := queryResult.RowsAffected()
+	return rows == 1, err
+}
+
 func (r *SimulationRepository) FailRun(id uuid.UUID, message string) error {
-	_, err := r.db.Exec(`UPDATE simulation_runs SET status='failed',error_message=$2,completed_at=NOW() WHERE id=$1`, id, message)
+	_, err := r.db.Exec(`UPDATE simulation_runs SET status='failed',error_message=$2,completed_at=NOW() WHERE id=$1 AND status IN ('queued','running')`, id, message)
 	return err
 }
 
 func (r *SimulationRepository) GetRun(id uuid.UUID, tenantID string) (*models.SimulationRun, error) {
 	var row models.SimulationRun
-	err := r.db.Get(&row, `SELECT r.id,r.scenario_id,r.status,r.result,r.error_message,r.created_by,r.started_at,r.completed_at FROM simulation_runs r JOIN simulation_scenarios s ON s.id=r.scenario_id WHERE r.id=$1 AND ($2='' OR s.tenant_id=$2)`, id, tenantID)
+	err := r.db.Get(&row, `SELECT r.id,r.scenario_id,r.status,r.run_type,r.request,r.progress,r.result,r.error_message,r.created_by,r.started_at,r.completed_at FROM simulation_runs r JOIN simulation_scenarios s ON s.id=r.scenario_id WHERE r.id=$1 AND ($2='' OR s.tenant_id=$2)`, id, tenantID)
 	return &row, err
 }
 
 func (r *SimulationRepository) ListRuns(scenarioID uuid.UUID, tenantID string) ([]models.SimulationRun, error) {
 	rows := []models.SimulationRun{}
-	err := r.db.Select(&rows, `SELECT r.id,r.scenario_id,r.status,r.result,r.error_message,r.created_by,r.started_at,r.completed_at FROM simulation_runs r JOIN simulation_scenarios s ON s.id=r.scenario_id WHERE r.scenario_id=$1 AND ($2='' OR s.tenant_id=$2) ORDER BY r.started_at DESC`, scenarioID, tenantID)
+	err := r.db.Select(&rows, `SELECT r.id,r.scenario_id,r.status,r.run_type,r.request,r.progress,r.result,r.error_message,r.created_by,r.started_at,r.completed_at FROM simulation_runs r JOIN simulation_scenarios s ON s.id=r.scenario_id WHERE r.scenario_id=$1 AND ($2='' OR s.tenant_id=$2) ORDER BY r.started_at DESC`, scenarioID, tenantID)
 	return rows, err
+}
+
+func (r *SimulationRepository) CancelRun(id uuid.UUID, tenantID string) (*models.SimulationRun, error) {
+	var row models.SimulationRun
+	err := r.db.Get(&row, `UPDATE simulation_runs r SET status='cancelled',completed_at=NOW()
+		FROM simulation_scenarios s WHERE r.id=$1 AND s.id=r.scenario_id AND ($2='' OR s.tenant_id=$2) AND r.status IN ('queued','running')
+		RETURNING r.id,r.scenario_id,r.status,r.run_type,r.request,r.progress,r.result,r.error_message,r.created_by,r.started_at,r.completed_at`, id, tenantID)
+	return &row, err
 }
 
 func (r *SimulationRepository) ReplaceDetectedIssues(scenarioID, runID uuid.UUID, issues []simulation.Issue) error {
@@ -133,6 +177,13 @@ func nullableUUID(id uuid.UUID) any {
 
 func nullableText(value string) any {
 	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func nullableJSON(value json.RawMessage) any {
+	if len(value) == 0 {
 		return nil
 	}
 	return value

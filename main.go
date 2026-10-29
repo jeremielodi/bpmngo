@@ -464,6 +464,9 @@ func main() {
 	incidentCtrl := api.NewIncidentController(db, taskEventDispatcher)
 	analyticsCtrl := api.NewAnalyticsController(readDB)
 	simulationCtrl := api.NewSimulationController(db)
+	if err := simulationCtrl.StartWorkers(context.Background(), simulationWorkerCount(util)); err != nil {
+		log.Fatalln("simulation workers: ", err)
+	}
 	eventLogCtrl := api.NewEventLogController(eventLogConsumer, db)
 
 	historicTaskCtrl := api.NewHistoricTaskController(db)
@@ -761,12 +764,14 @@ func main() {
 	app.Get("/engine-rest/simulation/scenarios", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListScenarios)
 	app.Post("/engine-rest/simulation/scenarios", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.CreateScenario)
 	app.Get("/engine-rest/simulation/runs/:runId", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.GetRun)
+	app.Post("/engine-rest/simulation/runs/:runId/cancel", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.CancelRun)
 	app.Put("/engine-rest/simulation/issues/:issueId", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.UpdateIssue)
 	app.Delete("/engine-rest/simulation/issues/:issueId", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.DeleteIssue)
 	app.Get("/engine-rest/simulation/scenarios/:id", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.GetScenario)
 	app.Put("/engine-rest/simulation/scenarios/:id", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.UpdateScenario)
 	app.Delete("/engine-rest/simulation/scenarios/:id", permissions(db, "CAN_DELETE_PROCESS"), simulationCtrl.DeleteScenario)
 	app.Post("/engine-rest/simulation/scenarios/:id/runs", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunScenario)
+	app.Post("/engine-rest/simulation/scenarios/:id/capacity-sweeps", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.RunCapacitySweep)
 	app.Get("/engine-rest/simulation/scenarios/:id/runs", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListRuns)
 	app.Get("/engine-rest/simulation/scenarios/:id/issues", permissions(db, "CAN_VIEW_METRICS"), simulationCtrl.ListIssues)
 	app.Post("/engine-rest/simulation/scenarios/:id/issues", permissions(db, "CAN_CREATE_PROCESS"), simulationCtrl.CreateIssue)
@@ -974,4 +979,16 @@ func commandTimeout(util common.Util) time.Duration {
 		return d
 	}
 	return 30 * time.Second
+}
+
+func simulationWorkerCount(util common.Util) int {
+	value := strings.TrimSpace(util.DotEnvVariable("SIMULATION_WORKERS"))
+	if value == "" {
+		return 2
+	}
+	count, err := strconv.Atoi(value)
+	if err != nil || count < 1 || count > 16 {
+		log.Fatalf("SIMULATION_WORKERS must be between 1 and 16, got %q", value)
+	}
+	return count
 }

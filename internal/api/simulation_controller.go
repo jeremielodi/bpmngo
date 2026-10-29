@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -22,6 +23,10 @@ type SimulationController struct {
 func NewSimulationController(db *sqlx.DB) *SimulationController {
 	repo := repository.NewSimulationRepository(db)
 	return &SimulationController{repository: repo, service: service.NewSimulationService(repo)}
+}
+
+func (ctrl *SimulationController) StartWorkers(ctx context.Context, count int) error {
+	return ctrl.service.StartWorkers(ctx, count)
 }
 
 func (ctrl *SimulationController) CreateScenario(c *fiber.Ctx) error {
@@ -124,11 +129,27 @@ func (ctrl *SimulationController) RunScenario(c *fiber.Ctx) error {
 	if err != nil {
 		return badRequest(c, err)
 	}
-	run, err := ctrl.service.Run(id, currentUserID(c), common.GetTenantId(c))
+	run, err := ctrl.service.EnqueueSimulation(id, currentUserID(c), common.GetTenantId(c))
 	if err != nil {
 		return repositoryError(c, err)
 	}
-	return c.Status(fiber.StatusCreated).JSON(run)
+	return c.Status(fiber.StatusAccepted).JSON(run)
+}
+
+func (ctrl *SimulationController) RunCapacitySweep(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return badRequest(c, err)
+	}
+	var request simulation.CapacitySweepRequest
+	if err = c.BodyParser(&request); err != nil {
+		return badRequest(c, err)
+	}
+	run, err := ctrl.service.EnqueueCapacitySweep(id, currentUserID(c), common.GetTenantId(c), request)
+	if err != nil {
+		return mutationError(c, err)
+	}
+	return c.Status(fiber.StatusAccepted).JSON(run)
 }
 
 func (ctrl *SimulationController) ListRuns(c *fiber.Ctx) error {
@@ -149,6 +170,18 @@ func (ctrl *SimulationController) GetRun(c *fiber.Ctx) error {
 		return badRequest(c, err)
 	}
 	run, err := ctrl.repository.GetRun(id, common.GetTenantId(c))
+	if err != nil {
+		return repositoryError(c, err)
+	}
+	return c.JSON(run)
+}
+
+func (ctrl *SimulationController) CancelRun(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("runId"))
+	if err != nil {
+		return badRequest(c, err)
+	}
+	run, err := ctrl.repository.CancelRun(id, common.GetTenantId(c))
 	if err != nil {
 		return repositoryError(c, err)
 	}

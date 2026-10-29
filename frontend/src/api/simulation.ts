@@ -18,7 +18,9 @@ export type SimulationResult = {
   issues: Issue[]; recommendedDesign: Array<{ heuristic:string;title:string;justification:string;addressesIssues:string[] }>;
 };
 export type StoredScenario = { id:string;name:string;bpmnXml:string;configuration:Omit<Scenario,'name'|'bpmnXml'>;createdAt:string;updatedAt:string };
-export type SimulationRun = { id:string;scenarioId:string;status:string;result?:SimulationResult;errorMessage?:string;startedAt:string;completedAt?:string };
+export type CapacitySweepRequest = { resourceId:string;minimumCapacity:number;maximumCapacity:number;step:number;targetMeanCycleMinutes?:number;targetP95CycleMinutes?:number };
+export type CapacitySweepResult = { scenarioName:string;resourceId:string;recommendedCapacity?:number;points:Array<{capacity:number;meanCycleMinutes:number;p95CycleMinutes:number;throughputPerHour:number;meanCost:number;utilization:number;meanQueueLength:number;maximumQueueSize:number;meetsTarget:boolean}> };
+export type SimulationRun = { id:string;scenarioId:string;status:'queued'|'running'|'completed'|'failed'|'cancelled';runType:'simulation'|'capacity_sweep';request?:CapacitySweepRequest;progress:number;result?:SimulationResult|CapacitySweepResult;errorMessage?:string;startedAt:string;completedAt?:string };
 export type StaffingResult = { minimumServers:number;points:Array<{servers:number;utilization:number;probabilityOfWait:number;meanWaitingHours:number;meanSystemHours:number;meetsTarget:boolean;stable:boolean}> };
 
 export async function analyzeScenario(scenario: Scenario) { return (await apiClient.post<AnalyticResult>('/engine-rest/simulation/analyze', scenario)).data; }
@@ -28,6 +30,10 @@ export async function listScenarios() { return (await apiClient.get<StoredScenar
 export async function createScenario(scenario:Scenario) { return (await apiClient.post<StoredScenario>('/engine-rest/simulation/scenarios',scenario)).data; }
 export async function updateScenario(id:string,scenario:Scenario) { return (await apiClient.put<StoredScenario>(`/engine-rest/simulation/scenarios/${id}`,scenario)).data; }
 export async function runStoredScenario(id:string) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/runs`)).data; }
+export async function runCapacitySweep(id:string,input:CapacitySweepRequest) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/scenarios/${id}/capacity-sweeps`,input)).data; }
+export async function getSimulationRun(id:string) { return (await apiClient.get<SimulationRun>(`/engine-rest/simulation/runs/${id}`)).data; }
+export async function listSimulationRuns(id:string) { return (await apiClient.get<SimulationRun[]>(`/engine-rest/simulation/scenarios/${id}/runs`)).data; }
+export async function cancelSimulationRun(id:string) { return (await apiClient.post<SimulationRun>(`/engine-rest/simulation/runs/${id}/cancel`)).data; }
 export async function listIssues(id:string) { return (await apiClient.get<Issue[]>(`/engine-rest/simulation/scenarios/${id}/issues`)).data; }
 export async function createIssue(id:string,issue:Partial<Issue>) { return (await apiClient.post<Issue>(`/engine-rest/simulation/scenarios/${id}/issues`,issue)).data; }
 export async function updateIssue(issue:Issue) { return (await apiClient.put<Issue>(`/engine-rest/simulation/issues/${issue.id}`,issue)).data; }

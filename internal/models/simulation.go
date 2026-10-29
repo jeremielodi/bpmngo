@@ -22,6 +22,9 @@ type SimulationRun struct {
 	ID           uuid.UUID        `db:"id" json:"id"`
 	ScenarioID   uuid.UUID        `db:"scenario_id" json:"scenarioId"`
 	Status       string           `db:"status" json:"status"`
+	RunType      string           `db:"run_type" json:"runType"`
+	Request      *json.RawMessage `db:"request" json:"request,omitempty"`
+	Progress     int              `db:"progress" json:"progress"`
 	Result       *json.RawMessage `db:"result" json:"result,omitempty"`
 	ErrorMessage *string          `db:"error_message" json:"errorMessage,omitempty"`
 	CreatedBy    *uuid.UUID       `db:"created_by" json:"createdBy,omitempty"`

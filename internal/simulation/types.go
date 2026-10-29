@@ -156,3 +156,31 @@ type RedesignRecommendation struct {
 	Justification   string   `json:"justification"`
 	AddressesIssues []string `json:"addressesIssues"`
 }
+
+type CapacitySweepRequest struct {
+	ResourceID             string  `json:"resourceId"`
+	MinimumCapacity        int     `json:"minimumCapacity"`
+	MaximumCapacity        int     `json:"maximumCapacity"`
+	Step                   int     `json:"step"`
+	TargetMeanCycleMinutes float64 `json:"targetMeanCycleMinutes,omitempty"`
+	TargetP95CycleMinutes  float64 `json:"targetP95CycleMinutes,omitempty"`
+}
+
+type CapacitySweepPoint struct {
+	Capacity          int     `json:"capacity"`
+	MeanCycleMinutes  float64 `json:"meanCycleMinutes"`
+	P95CycleMinutes   float64 `json:"p95CycleMinutes"`
+	ThroughputPerHour float64 `json:"throughputPerHour"`
+	MeanCost          float64 `json:"meanCost"`
+	Utilization       float64 `json:"utilization"`
+	MeanQueueLength   float64 `json:"meanQueueLength"`
+	MaximumQueueSize  int     `json:"maximumQueueSize"`
+	MeetsTarget       bool    `json:"meetsTarget"`
+}
+
+type CapacitySweepResult struct {
+	ScenarioName        string               `json:"scenarioName"`
+	ResourceID          string               `json:"resourceId"`
+	RecommendedCapacity int                  `json:"recommendedCapacity,omitempty"`
+	Points              []CapacitySweepPoint `json:"points"`
+}

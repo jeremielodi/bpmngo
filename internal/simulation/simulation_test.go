@@ -1,6 +1,7 @@
 package simulation
 
 import (
+	"context"
 	"math"
 	"testing"
 )
@@ -20,6 +21,30 @@ const testBPMN = `<?xml version="1.0" encoding="UTF-8"?>
     <sequenceFlow id="unknown_flow" sourceRef="known" targetRef="solve"/>
     <sequenceFlow id="send_end" sourceRef="send" targetRef="end"/>
     <sequenceFlow id="solve_end" sourceRef="solve" targetRef="end"/>
+  </process>
+</definitions>`
+
+const parallelBPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="test">
+  <process id="parallel" isExecutable="true">
+    <startEvent id="start"/><parallelGateway id="fork"/>
+    <task id="a" name="A"/><task id="b" name="B"/><parallelGateway id="join"/><endEvent id="end"/>
+    <sequenceFlow id="s" sourceRef="start" targetRef="fork"/>
+    <sequenceFlow id="fa" sourceRef="fork" targetRef="a"/><sequenceFlow id="fb" sourceRef="fork" targetRef="b"/>
+    <sequenceFlow id="aj" sourceRef="a" targetRef="join"/><sequenceFlow id="bj" sourceRef="b" targetRef="join"/>
+    <sequenceFlow id="e" sourceRef="join" targetRef="end"/>
+  </process>
+</definitions>`
+
+const inclusiveBPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="test">
+  <process id="inclusive" isExecutable="true">
+    <startEvent id="start"/><inclusiveGateway id="fork"/>
+    <task id="a" name="A"/><task id="b" name="B"/><inclusiveGateway id="join"/><endEvent id="end"/>
+    <sequenceFlow id="s" sourceRef="start" targetRef="fork"/>
+    <sequenceFlow id="fa" sourceRef="fork" targetRef="a"/><sequenceFlow id="fb" sourceRef="fork" targetRef="b"/>
+    <sequenceFlow id="aj" sourceRef="a" targetRef="join"/><sequenceFlow id="bj" sourceRef="b" targetRef="join"/>
+    <sequenceFlow id="e" sourceRef="join" targetRef="end"/>
   </process>
 </definitions>`
 
@@ -92,6 +117,75 @@ func TestEventQueueOrdersByTimeThenInsertion(t *testing.T) {
 		if got := queue.pop().seq; got != want {
 			t.Fatalf("pop %d sequence = %d, want %d", index, got, want)
 		}
+	}
+}
+
+func TestParallelGatewaySynchronizesOnCriticalBranch(t *testing.T) {
+	scenario := Scenario{
+		Name: "parallel", BPMNXML: parallelBPMN, ArrivalRatePerHour: 1, MaxArrivals: 1, Replications: 1, Seed: 1,
+		Activities: map[string]ActivityParameters{
+			"a": {ProcessingTime: Distribution{Type: "fixed", Value: 10}, ValueAdded: true},
+			"b": {ProcessingTime: Distribution{Type: "fixed", Value: 20}, ValueAdded: true},
+		}, Flows: map[string]FlowParameters{},
+	}
+	analytic, err := Analyze(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, analytic.ProcessingMinutes, 30, 0)
+	assertNear(t, analytic.CycleTimeMinutes, 20, .0001)
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, result.Metrics.MeanCycleMinutes, 20, 0)
+	assertNear(t, result.Metrics.MeanProcessing, 30, 0)
+}
+
+func TestInclusiveGatewayWaitsOnlyForSelectedBranches(t *testing.T) {
+	scenario := Scenario{
+		Name: "inclusive", BPMNXML: inclusiveBPMN, ArrivalRatePerHour: 1, MaxArrivals: 1, Replications: 1, Seed: 1,
+		Activities: map[string]ActivityParameters{
+			"a": {ProcessingTime: Distribution{Type: "fixed", Value: 10}, ValueAdded: true},
+			"b": {ProcessingTime: Distribution{Type: "fixed", Value: 20}, ValueAdded: true},
+		}, Flows: map[string]FlowParameters{"fa": {Probability: 1}, "fb": {Probability: 0}},
+	}
+	analytic, err := Analyze(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, analytic.CycleTimeMinutes, 10, .0001)
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, result.Metrics.MeanCycleMinutes, 10, 0)
+	if result.Metrics.Completed != 1 {
+		t.Fatalf("completed = %d, want 1", result.Metrics.Completed)
+	}
+}
+
+func TestCapacitySweepComparesEveryCapacity(t *testing.T) {
+	scenario := testScenario()
+	scenario.DurationHours = 24
+	scenario.Replications = 2
+	result, err := SweepCapacity(context.Background(), scenario, CapacitySweepRequest{
+		ResourceID: "l2", MinimumCapacity: 1, MaximumCapacity: 3, Step: 1, TargetMeanCycleMinutes: 10000,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Points) != 3 {
+		t.Fatalf("points = %d, want 3", len(result.Points))
+	}
+	if result.RecommendedCapacity != 1 {
+		t.Fatalf("recommended = %d, want 1", result.RecommendedCapacity)
+	}
+	if result.Points[0].Capacity != 1 || result.Points[2].Capacity != 3 {
+		t.Fatalf("unexpected capacities: %#v", result.Points)
+	}
+	if result.Points[0].Utilization <= result.Points[2].Utilization {
+		t.Fatalf("utilization should fall with capacity: %#v", result.Points)
 	}
 }
 

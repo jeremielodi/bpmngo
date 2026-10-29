@@ -1139,7 +1139,12 @@ CREATE INDEX IF NOT EXISTS idx_simulation_scenarios_tenant ON public.simulation_
 CREATE TABLE IF NOT EXISTS public.simulation_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     scenario_id UUID NOT NULL REFERENCES public.simulation_scenarios(id) ON DELETE CASCADE,
-    status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+    status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
+    run_type TEXT NOT NULL DEFAULT 'simulation' CHECK (run_type IN ('simulation', 'capacity_sweep')),
+    request JSONB,
+    progress INTEGER NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+    worker_id TEXT,
+    heartbeat_at TIMESTAMPTZ,
     result JSONB,
     error_message TEXT,
     created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
@@ -1147,6 +1152,8 @@ CREATE TABLE IF NOT EXISTS public.simulation_runs (
     completed_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_simulation_runs_scenario_started ON public.simulation_runs(scenario_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_simulation_runs_queue ON public.simulation_runs(status, started_at) WHERE status = 'queued';
+CREATE INDEX IF NOT EXISTS idx_simulation_runs_lease ON public.simulation_runs(heartbeat_at) WHERE status = 'running';
 
 CREATE TABLE IF NOT EXISTS public.simulation_issues (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1227,6 +1234,10 @@ ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
 VALUES ('020', 'laboratoire de simulation BPMN, campagnes et registre de problèmes')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('021', 'campagnes de capacité et exécution asynchrone des simulations')
 ON CONFLICT (version) DO NOTHING;
 
 -- Finalise la transition hybride construite ci-dessus. `\ir` est résolu

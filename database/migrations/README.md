@@ -61,6 +61,7 @@ des incidents déjà enregistrés.
 | 018 | `018_parent_fk_indexes.sql` | indexe les FK parentes utilisées par `ON DELETE SET NULL/CASCADE` | évite trois scans complets par instance pendant l'archivage |
 | 019 | `019_partition_retention.sql` | détache et supprime les partitions historiques expirées devenues vides | la purge ligne par ligne reste l'autorité pour ne pas perdre les audits non liés |
 | 020 | `020_simulation_lab.sql` | scénarios BPMN, campagnes de simulation et registre de problèmes | laboratoire d'analyse, dimensionnement et redesign |
+| 021 | `021_simulation_async_sweeps.sql` | file asynchrone des simulations, progression, annulation et campagnes de capacité | nécessite 020 |
 
 Pour voir où en est une base :
 
