@@ -13,6 +13,7 @@ type compiledScenario struct {
 	graph             *engine.ProcessGraph
 	startID           string
 	resources         map[string]Resource
+	calendars         map[string]*calendarPlan
 	gatewayPairs      map[string]string
 	joinNormalization map[string]float64
 }
@@ -52,16 +53,38 @@ func compileScenario(s Scenario) (*compiledScenario, error) {
 		if _, duplicate := resources[resource.ID]; duplicate {
 			return nil, fmt.Errorf("duplicate resource %q", resource.ID)
 		}
+		seenSkills := map[string]bool{}
+		for _, skill := range resource.Skills {
+			if skill == "" || seenSkills[skill] {
+				return nil, fmt.Errorf("resource %q has an empty or duplicate skill", resource.ID)
+			}
+			seenSkills[skill] = true
+		}
 		resources[resource.ID] = resource
+	}
+	calendars, err := compileCalendars(s, resources)
+	if err != nil {
+		return nil, err
 	}
 	for id, activity := range s.Activities {
 		if graph.Nodes[id] == nil {
 			return nil, fmt.Errorf("activity parameters reference unknown element %q", id)
 		}
-		if activity.ResourceID != "" {
-			if _, ok := resources[activity.ResourceID]; !ok {
-				return nil, fmt.Errorf("activity %q references unknown resource %q", id, activity.ResourceID)
+		for _, resourceID := range append([]string{activity.ResourceID}, activity.ResourceIDs...) {
+			if resourceID == "" {
+				continue
 			}
+			if _, ok := resources[resourceID]; !ok {
+				return nil, fmt.Errorf("activity %q references unknown resource %q", id, resourceID)
+			}
+		}
+		switch activity.RoutingRule {
+		case "", "fixed", "least_queue", "round_robin":
+		default:
+			return nil, fmt.Errorf("activity %q has unsupported routing rule %q", id, activity.RoutingRule)
+		}
+		if len(activity.RequiredSkills) > 0 && len(eligibleResourceIDs(resources, activity)) == 0 {
+			return nil, fmt.Errorf("activity %q has no resource matching skills %v", id, activity.RequiredSkills)
 		}
 		if _, err := activity.ProcessingTime.Expected(); err != nil {
 			return nil, fmt.Errorf("activity %q processing time: %w", id, err)
@@ -118,7 +141,52 @@ func compileScenario(s Scenario) (*compiledScenario, error) {
 		}
 	}
 	sort.Strings(starts)
-	return &compiledScenario{scenario: s, graph: graph, startID: starts[0], resources: resources, gatewayPairs: pairs, joinNormalization: joinNormalization}, nil
+	return &compiledScenario{scenario: s, graph: graph, startID: starts[0], resources: resources, calendars: calendars, gatewayPairs: pairs, joinNormalization: joinNormalization}, nil
+}
+
+func eligibleResourceIDs(resources map[string]Resource, activity ActivityParameters) []string {
+	candidates := make([]string, 0, len(activity.ResourceIDs)+1)
+	seen := map[string]bool{}
+	if activity.ResourceID != "" {
+		candidates = append(candidates, activity.ResourceID)
+		seen[activity.ResourceID] = true
+	}
+	for _, id := range activity.ResourceIDs {
+		if id != "" && !seen[id] {
+			candidates = append(candidates, id)
+			seen[id] = true
+		}
+	}
+	if len(candidates) == 0 && len(activity.RequiredSkills) > 0 {
+		for id := range resources {
+			candidates = append(candidates, id)
+		}
+		sort.Strings(candidates)
+	}
+	result := candidates[:0]
+	for _, id := range candidates {
+		resource, ok := resources[id]
+		if ok && resourceHasSkills(resource, activity.RequiredSkills) {
+			result = append(result, id)
+		}
+	}
+	return result
+}
+
+func resourceHasSkills(resource Resource, required []string) bool {
+	for _, requirement := range required {
+		found := false
+		for _, skill := range resource.Skills {
+			if skill == requirement {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *compiledScenario) probability(node *engine.Node, flow engine.Flow) float64 {

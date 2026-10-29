@@ -1,11 +1,16 @@
 import { apiClient } from './client';
 
 export type Distribution = { type: 'fixed' | 'normal' | 'exponential' | 'uniform' | 'triangular'; value?: number; mean?: number; standardDeviation?: number; min?: number; max?: number; mode?: number };
-export type SimulationResource = { id: string; name: string; capacity: number; costPerHour: number };
-export type ActivityParameters = { processingTime: Distribution; waitingTime?: Distribution; resourceId?: string; valueAdded: boolean };
+export type CalendarShift = { weekdays?:number[];startMinute:number;endMinute:number;capacity?:number };
+export type CalendarException = { date:string;shifts?:CalendarShift[] };
+export type BusinessCalendar = { id:string;name:string;timezone:string;shifts:CalendarShift[];exceptions?:CalendarException[] };
+export type ArrivalSegment = { startMinute:number;endMinute:number;ratePerHour:number };
+export type ArrivalPattern = { type:'poisson'|'piecewise_poisson'|'scheduled'|'batch_poisson';ratePerHour?:number;segments?:ArrivalSegment[];scheduledMinutes?:number[];batchSize?:number };
+export type SimulationResource = { id: string; name: string; capacity: number; costPerHour: number; calendarId?:string;skills?:string[] };
+export type ActivityParameters = { processingTime: Distribution; waitingTime?: Distribution; resourceId?: string;resourceIds?:string[];requiredSkills?:string[];routingRule?:'fixed'|'least_queue'|'round_robin';priority?:number;valueAdded: boolean };
 export type Scenario = {
   name: string; bpmnXml: string; arrivalRatePerHour: number; durationHours: number;
-  maxArrivals?: number; replications: number; seed: number; resources: SimulationResource[];
+  maxArrivals?: number; replications: number; seed: number;startTime?:string;arrivalPattern?:ArrivalPattern;calendars?:BusinessCalendar[];resources: SimulationResource[];
   activities: Record<string, ActivityParameters>; flows: Record<string, { probability: number }>;
 };
 export type AnalyticResult = { processingMinutes: number; waitingMinutes: number; cycleTimeMinutes: number; valueAddedMinutes: number; cycleTimeEfficiency: number; costPerExecution: number; elements: Array<{ elementId: string; elementName: string; expectedVisits: number; processingMinutes: number; explicitWaitMinutes: number; expectedCost: number }> };

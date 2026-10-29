@@ -13,17 +13,63 @@ type Distribution struct {
 }
 
 type Resource struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Capacity    int     `json:"capacity"`
-	CostPerHour float64 `json:"costPerHour"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Capacity    int      `json:"capacity"`
+	CostPerHour float64  `json:"costPerHour"`
+	CalendarID  string   `json:"calendarId,omitempty"`
+	Skills      []string `json:"skills,omitempty"`
 }
 
 type ActivityParameters struct {
 	ProcessingTime Distribution `json:"processingTime"`
 	WaitingTime    Distribution `json:"waitingTime,omitempty"`
 	ResourceID     string       `json:"resourceId,omitempty"`
+	ResourceIDs    []string     `json:"resourceIds,omitempty"`
+	RequiredSkills []string     `json:"requiredSkills,omitempty"`
+	RoutingRule    string       `json:"routingRule,omitempty"`
+	Priority       int          `json:"priority,omitempty"`
 	ValueAdded     bool         `json:"valueAdded"`
+}
+
+// BusinessCalendar expresses recurring local-time availability. Weekdays use
+// ISO numbering (1=Monday, 7=Sunday). A shift capacity of zero uses the
+// resource's configured capacity. Exceptions replace the recurring shifts for
+// their local date and can therefore model holidays or exceptional coverage.
+type BusinessCalendar struct {
+	ID         string              `json:"id"`
+	Name       string              `json:"name"`
+	Timezone   string              `json:"timezone"`
+	Shifts     []CalendarShift     `json:"shifts"`
+	Exceptions []CalendarException `json:"exceptions,omitempty"`
+}
+
+type CalendarShift struct {
+	Weekdays    []int `json:"weekdays,omitempty"`
+	StartMinute int   `json:"startMinute"`
+	EndMinute   int   `json:"endMinute"`
+	Capacity    int   `json:"capacity,omitempty"`
+}
+
+type CalendarException struct {
+	Date   string          `json:"date"`
+	Shifts []CalendarShift `json:"shifts,omitempty"`
+}
+
+// ArrivalPattern supplements the legacy constant Poisson rate. Supported
+// types are poisson, piecewise_poisson, scheduled, and batch_poisson.
+type ArrivalPattern struct {
+	Type             string           `json:"type"`
+	RatePerHour      float64          `json:"ratePerHour,omitempty"`
+	Segments         []ArrivalSegment `json:"segments,omitempty"`
+	ScheduledMinutes []float64        `json:"scheduledMinutes,omitempty"`
+	BatchSize        int              `json:"batchSize,omitempty"`
+}
+
+type ArrivalSegment struct {
+	StartMinute float64 `json:"startMinute"`
+	EndMinute   float64 `json:"endMinute"`
+	RatePerHour float64 `json:"ratePerHour"`
 }
 
 type FlowParameters struct {
@@ -38,6 +84,9 @@ type Scenario struct {
 	MaxArrivals        int                           `json:"maxArrivals,omitempty"`
 	Replications       int                           `json:"replications"`
 	Seed               int64                         `json:"seed"`
+	StartTime          string                        `json:"startTime,omitempty"`
+	ArrivalPattern     *ArrivalPattern               `json:"arrivalPattern,omitempty"`
+	Calendars          []BusinessCalendar            `json:"calendars,omitempty"`
 	Resources          []Resource                    `json:"resources"`
 	Activities         map[string]ActivityParameters `json:"activities"`
 	Flows              map[string]FlowParameters     `json:"flows"`

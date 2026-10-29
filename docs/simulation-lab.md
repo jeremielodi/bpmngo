@@ -14,6 +14,11 @@ transactional runtime.
 - seeded discrete-event simulation with Poisson arrivals, FIFO resource
   queues, finite resource capacity, and fixed, normal, exponential, uniform,
   or triangular duration distributions;
+- constant, piecewise time-varying, scheduled, and batched arrival patterns;
+- timezone-aware weekly business calendars, capacity shifts, and unavailable
+  exception dates; work pauses outside configured availability;
+- skill-based eligible resource pools, fixed/least-queue/round-robin routing,
+  and priority queues with FIFO ordering inside the same priority;
 - structured parallel and inclusive fork/join gateways, including nested
   forks and inclusive branches selected independently;
 - asynchronous, resumable campaigns with progress, cancellation, and a
@@ -35,8 +40,9 @@ a required workflow or a special execution mode.
 
 1. Open **Simulation studio**, start a scenario, and import any BPMN 2.0 file
    (or load the optional Support operations example).
-2. Review the automatically discovered activities and branches. Associate
-   activities with duration distributions, explicit waits, and resources.
+2. Review the automatically discovered activities and branches. Configure the
+   demand pattern, calendars, shifts, resources, skills, routing priorities,
+   duration distributions, and explicit waits.
    Exclusive gateway probabilities total `1`; inclusive gateway probabilities
    are independent; parallel gateways need none.
 3. Run **Analyze** for deterministic expected values.
@@ -78,8 +84,13 @@ existing database. New databases receive the tables from the baseline schema.
 ## Modeling assumptions
 
 - Duration units are minutes, costs are hourly, and arrival rates are per hour.
+  Weekly calendar weekdays use ISO numbering (`1` Monday through `7` Sunday).
+  Shift and scheduled-arrival offsets are minutes. Calendar exceptions replace
+  recurring coverage for their local date; an exception with no shifts is a
+  holiday. Shift capacity `0` means the resource's configured capacity.
 - Erlang-C models a stationary Poisson arrival process, exponential service,
-  one FIFO queue, identical servers, and no abandonment.
+  one FIFO queue, identical servers, and no abandonment. Simulation queues are
+  priority ordered and remain FIFO among jobs with the same priority.
 - The simulation drains all cases admitted during the configured arrival
   horizon. Parallel/inclusive gateways must be structured: every selected
   branch must reach a matching gateway of the same type. Business calendars,

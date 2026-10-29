@@ -58,7 +58,11 @@ func analyticFromVisits(c *compiledScenario, visits map[string]float64) (Analyti
 		}
 		count := visits[id]
 		cost := 0.0
-		if resource, ok := c.resources[parameters.ResourceID]; ok {
+		resourceID := parameters.ResourceID
+		if candidates := eligibleResourceIDs(c.resources, parameters); len(candidates) > 0 {
+			resourceID = candidates[0]
+		}
+		if resource, ok := c.resources[resourceID]; ok {
 			cost = count * processing / 60 * resource.CostPerHour
 		}
 		valueAdded := 0.0
@@ -68,7 +72,7 @@ func analyticFromVisits(c *compiledScenario, visits map[string]float64) (Analyti
 		element := AnalyticElement{
 			ElementID: id, ElementName: c.graph.Nodes[id].Name, ExpectedVisits: count,
 			ProcessingMinutes: count * processing, ExplicitWaitMinutes: count * waiting,
-			ExpectedCost: cost, ResourceID: parameters.ResourceID, ValueAddedMinutes: valueAdded,
+			ExpectedCost: cost, ResourceID: resourceID, ValueAddedMinutes: valueAdded,
 		}
 		result.Elements = append(result.Elements, element)
 		result.ProcessingMinutes += element.ProcessingMinutes

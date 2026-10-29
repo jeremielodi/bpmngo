@@ -3,6 +3,7 @@ package simulation
 import (
 	"context"
 	"math"
+	"math/rand"
 	"testing"
 )
 
@@ -44,6 +45,25 @@ const inclusiveBPMN = `<?xml version="1.0" encoding="UTF-8"?>
     <sequenceFlow id="s" sourceRef="start" targetRef="fork"/>
     <sequenceFlow id="fa" sourceRef="fork" targetRef="a"/><sequenceFlow id="fb" sourceRef="fork" targetRef="b"/>
     <sequenceFlow id="aj" sourceRef="a" targetRef="join"/><sequenceFlow id="bj" sourceRef="b" targetRef="join"/>
+    <sequenceFlow id="e" sourceRef="join" targetRef="end"/>
+  </process>
+</definitions>`
+
+const singleTaskBPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="test">
+  <process id="single" isExecutable="true">
+    <startEvent id="start"/><task id="work" name="Work"/><endEvent id="end"/>
+    <sequenceFlow id="s" sourceRef="start" targetRef="work"/><sequenceFlow id="e" sourceRef="work" targetRef="end"/>
+  </process>
+</definitions>`
+
+const priorityBPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="test">
+  <process id="priority" isExecutable="true">
+    <startEvent id="start"/><parallelGateway id="fork"/><task id="low" name="Low"/><task id="high" name="High"/><parallelGateway id="join"/><endEvent id="end"/>
+    <sequenceFlow id="s" sourceRef="start" targetRef="fork"/>
+    <sequenceFlow id="first_low" sourceRef="fork" targetRef="low"/><sequenceFlow id="second_high" sourceRef="fork" targetRef="high"/>
+    <sequenceFlow id="lj" sourceRef="low" targetRef="join"/><sequenceFlow id="hj" sourceRef="high" targetRef="join"/>
     <sequenceFlow id="e" sourceRef="join" targetRef="end"/>
   </process>
 </definitions>`
@@ -188,6 +208,109 @@ func TestCapacitySweepComparesEveryCapacity(t *testing.T) {
 		t.Fatalf("utilization should fall with capacity: %#v", result.Points)
 	}
 }
+
+func TestScheduledAndPiecewiseArrivalPatterns(t *testing.T) {
+	scheduled := Scenario{DurationHours: 2, MaxArrivals: 3, ArrivalPattern: &ArrivalPattern{Type: "scheduled", ScheduledMinutes: []float64{90, 5, 30, 100}}}
+	if err := ValidateRunnable(scheduled); err != nil {
+		t.Fatal(err)
+	}
+	arrivals := scheduleArrivals(scheduled, newTestRNG())
+	if len(arrivals) != 3 || arrivals[0] != 5 || arrivals[1] != 30 || arrivals[2] != 90 {
+		t.Fatalf("scheduled arrivals = %#v", arrivals)
+	}
+	piecewise := Scenario{DurationHours: 2, ArrivalPattern: &ArrivalPattern{Type: "piecewise_poisson", Segments: []ArrivalSegment{
+		{StartMinute: 0, EndMinute: 30, RatePerHour: 10}, {StartMinute: 60, EndMinute: 90, RatePerHour: 10},
+	}}}
+	if err := ValidateRunnable(piecewise); err != nil {
+		t.Fatal(err)
+	}
+	for _, arrival := range scheduleArrivals(piecewise, newTestRNG()) {
+		if !((arrival >= 0 && arrival <= 30) || (arrival >= 60 && arrival <= 90)) {
+			t.Fatalf("arrival %.2f falls outside configured segments", arrival)
+		}
+	}
+}
+
+func TestBusinessCalendarPausesWorkOutsideShifts(t *testing.T) {
+	scenario := Scenario{
+		Name: "calendar", BPMNXML: singleTaskBPMN, MaxArrivals: 1, Replications: 1, Seed: 1,
+		ArrivalPattern: &ArrivalPattern{Type: "scheduled", ScheduledMinutes: []float64{0}},
+		Calendars: []BusinessCalendar{{ID: "office", Name: "Office", Timezone: "UTC", Shifts: []CalendarShift{
+			{Weekdays: []int{1, 2}, StartMinute: 0, EndMinute: 60, Capacity: 1},
+		}}},
+		Resources: []Resource{{ID: "people", Name: "People", Capacity: 1, CalendarID: "office"}},
+		Activities: map[string]ActivityParameters{"work": {
+			ProcessingTime: Distribution{Type: "fixed", Value: 120}, ResourceID: "people", ValueAdded: true,
+		}},
+		Flows: map[string]FlowParameters{},
+	}
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, result.Metrics.MeanCycleMinutes, 1500, 0)
+	assertNear(t, result.Metrics.Resources[0].Utilization, 1, .0001)
+}
+
+func TestSkillRoutingAndRoundRobin(t *testing.T) {
+	scenario := Scenario{
+		Name: "skills", BPMNXML: singleTaskBPMN, Replications: 1, Seed: 1,
+		ArrivalPattern: &ArrivalPattern{Type: "scheduled", ScheduledMinutes: []float64{0, 0, 0, 0}}, DurationHours: 1,
+		Resources: []Resource{
+			{ID: "general", Name: "General", Capacity: 4, Skills: []string{"basic"}},
+			{ID: "specialist", Name: "Specialist", Capacity: 4, Skills: []string{"basic", "special"}},
+		},
+		Activities: map[string]ActivityParameters{"work": {
+			ProcessingTime: Distribution{Type: "fixed", Value: 10}, ResourceIDs: []string{"general", "specialist"},
+			RequiredSkills: []string{"special"}, RoutingRule: "round_robin", ValueAdded: true,
+		}},
+		Flows: map[string]FlowParameters{},
+	}
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Metrics.Resources[0].BusyMinutes != 0 || result.Metrics.Resources[1].BusyMinutes != 40 {
+		t.Fatalf("unexpected skill routing: %#v", result.Metrics.Resources)
+	}
+	scenario.Activities["work"] = ActivityParameters{
+		ProcessingTime: Distribution{Type: "fixed", Value: 10}, ResourceIDs: []string{"general", "specialist"}, RoutingRule: "round_robin", ValueAdded: true,
+	}
+	result, err = Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertNear(t, result.Metrics.Resources[0].BusyMinutes, 20, 0)
+	assertNear(t, result.Metrics.Resources[1].BusyMinutes, 20, 0)
+}
+
+func TestPriorityQueueStartsMostImportantWorkFirst(t *testing.T) {
+	scenario := Scenario{
+		Name: "priority", BPMNXML: priorityBPMN, Replications: 1, Seed: 1, DurationHours: 2,
+		ArrivalPattern: &ArrivalPattern{Type: "scheduled", ScheduledMinutes: []float64{0}},
+		Calendars: []BusinessCalendar{{ID: "shift", Timezone: "UTC", Shifts: []CalendarShift{
+			{Weekdays: []int{1}, StartMinute: 60, EndMinute: 180, Capacity: 1},
+		}}},
+		Resources: []Resource{{ID: "team", Name: "Team", Capacity: 1, CalendarID: "shift"}},
+		Activities: map[string]ActivityParameters{
+			"low":  {ProcessingTime: Distribution{Type: "fixed", Value: 10}, ResourceID: "team", Priority: 0, ValueAdded: true},
+			"high": {ProcessingTime: Distribution{Type: "fixed", Value: 10}, ResourceID: "team", Priority: 10, ValueAdded: true},
+		}, Flows: map[string]FlowParameters{},
+	}
+	result, err := Simulate(scenario)
+	if err != nil {
+		t.Fatal(err)
+	}
+	queues := map[string]float64{}
+	for _, element := range result.Metrics.Elements {
+		queues[element.ElementID] = element.MeanQueueMinutes
+	}
+	assertNear(t, queues["high"], 60, 0)
+	assertNear(t, queues["low"], 70, 0)
+	assertNear(t, result.Metrics.MeanCycleMinutes, 80, 0)
+}
+
+func newTestRNG() *rand.Rand { return rand.New(rand.NewSource(42)) }
 
 func assertNear(t *testing.T, got, want, tolerance float64) {
 	t.Helper()
