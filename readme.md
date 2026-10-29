@@ -11,16 +11,16 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 ## Contents
 
-- [Current State](#current-state-v101)
+- [Current State](#current-state-v102)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Documentation](#documentation)
 
 ---
 
-## Current State (v1.0.1)
+## Current State (v1.0.2)
 
-**BpmnGo 1.0.1 is production ready.** What backs this:
+**BpmnGo 1.0.2 is production ready.** What backs this:
 
 - **Tested end to end:** 53 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
 - **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
