@@ -29,6 +29,29 @@ func (ctrl *SimulationController) StartWorkers(ctx context.Context, count int) e
 	return ctrl.service.StartWorkers(ctx, count)
 }
 
+func (ctrl *SimulationController) SaveProject(c *fiber.Ctx) error {
+	id := uuid.Nil
+	if c.Params("id") != "" {
+		var err error
+		id, err = uuid.Parse(c.Params("id"))
+		if err != nil {
+			return badRequest(c, err)
+		}
+	}
+	var input simulation.Scenario
+	if err := c.BodyParser(&input); err != nil {
+		return badRequest(c, err)
+	}
+	row, err := ctrl.service.SaveProject(id, currentUserID(c), common.GetTenantId(c), input)
+	if err != nil {
+		return mutationError(c, err)
+	}
+	if id == uuid.Nil {
+		c.Status(fiber.StatusCreated)
+	}
+	return c.JSON(row)
+}
+
 func (ctrl *SimulationController) CreateScenario(c *fiber.Ctx) error {
 	var input simulation.Scenario
 	if err := c.BodyParser(&input); err != nil {

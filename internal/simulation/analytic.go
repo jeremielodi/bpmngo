@@ -55,13 +55,13 @@ func analyticFromVisits(c *compiledScenario, visits map[string]float64) (Analyti
 			return result, err
 		}
 		count := visits[id]
-		cost := 0.0
+		cost := count * parameters.FixedCost
 		resourceID := parameters.ResourceID
 		if candidates := eligibleResourceIDs(c.resources, parameters); len(candidates) > 0 {
 			resourceID = candidates[0]
 		}
 		if resource, ok := c.resources[resourceID]; ok {
-			cost = count * processing / 60 * resource.CostPerHour
+			cost += count * processing / 60 * resource.CostPerHour
 		}
 		valueAdded := 0.0
 		if parameters.ValueAdded {

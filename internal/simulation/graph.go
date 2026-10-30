@@ -3,9 +3,9 @@ package simulation
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/jeremielodi/bpmngo/internal/engine"
-	"github.com/jeremielodi/bpmngo/internal/parser"
 )
 
 type compiledScenario struct {
@@ -20,23 +20,14 @@ type compiledScenario struct {
 }
 
 func compileScenario(s Scenario) (*compiledScenario, error) {
-	if s.BPMNXML == "" {
-		return nil, fmt.Errorf("bpmnXml is required")
-	}
-	definitions, err := parser.ParseBPMN([]byte(s.BPMNXML))
-	if err != nil {
-		return nil, fmt.Errorf("parse BPMN: %w", err)
-	}
-	if len(definitions.Processes) != 1 {
-		return nil, fmt.Errorf("simulation requires exactly one BPMN process, got %d", len(definitions.Processes))
-	}
-	graph, err := engine.BuildGraphFromProcess(&definitions.Processes[0])
+	s = cloneScenario(s)
+	graph, entryPrefix, err := buildProjectGraph(&s)
 	if err != nil {
 		return nil, fmt.Errorf("build BPMN graph: %w", err)
 	}
 	starts := make([]string, 0, 1)
 	for id, node := range graph.Nodes {
-		if node.ParentScope == "" && len(node.Incoming) == 0 {
+		if node.ParentScope == "" && (entryPrefix == "" || strings.HasPrefix(id, entryPrefix)) {
 			switch node.Type {
 			case engine.StartEventType, engine.MessageStartEventType, engine.SignalStartEventType, engine.StartTimerEventType:
 				starts = append(starts, id)
@@ -68,6 +59,9 @@ func compileScenario(s Scenario) (*compiledScenario, error) {
 		return nil, err
 	}
 	for id, activity := range s.Activities {
+		if activity.FixedCost < 0 {
+			return nil, fmt.Errorf("activity %q fixed cost must be non-negative", id)
+		}
 		if graph.Nodes[id] == nil {
 			return nil, fmt.Errorf("activity parameters reference unknown element %q", id)
 		}

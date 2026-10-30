@@ -7,25 +7,30 @@ export type BusinessCalendar = { id:string;name:string;timezone:string;shifts:Ca
 export type ArrivalSegment = { startMinute:number;endMinute:number;ratePerHour:number };
 export type ArrivalPattern = { type:'poisson'|'piecewise_poisson'|'scheduled'|'batch_poisson';ratePerHour?:number;segments?:ArrivalSegment[];repeatMinutes?:number;scheduledMinutes?:number[];batchSize?:number };
 export type SimulationResource = { id: string; name: string; capacity: number; costPerHour: number; calendarId?:string;skills?:string[] };
-export type ActivityParameters = { processingTime: Distribution; waitingTime?: Distribution; resourceId?: string;resourceIds?:string[];requiredSkills?:string[];routingRule?:'fixed'|'least_queue'|'round_robin';priority?:number;valueAdded: boolean };
+export type ActivityParameters = { fixedCost?:number;processingTime: Distribution; waitingTime?: Distribution; resourceId?: string;resourceIds?:string[];requiredSkills?:string[];routingRule?:'fixed'|'least_queue'|'round_robin';priority?:number;valueAdded: boolean };
 export type Scenario = {
+	models?:ProjectModel[];entryModelId?:string;transfers?:ModelTransfer[];
   name: string; bpmnXml: string; arrivalRatePerHour: number; durationHours: number;
   maxArrivals?: number; replications: number; seed: number;startTime?:string;arrivalPattern?:ArrivalPattern;calendars?:BusinessCalendar[];resources: SimulationResource[];
   activities: Record<string, ActivityParameters>; flows: Record<string, { probability: number }>;
 };
+export type ProjectModel = { id:string;name:string;bpmnXml:string };
+export type ModelTransfer = { id:string;sourceModelId:string;sourceNodeId:string;targetModelId:string;targetNodeId:string;delay:Distribution;cost?:number };
+export type TraceEvent = { caseId:number;at:number;kind:string;elementId:string;flowId?:string;resourceId?:string };
 export type AnalyticResult = { processingMinutes: number; waitingMinutes: number; cycleTimeMinutes: number; valueAddedMinutes: number; cycleTimeEfficiency: number; costPerExecution: number; elements: Array<{ elementId: string; elementName: string; expectedVisits: number; processingMinutes: number; explicitWaitMinutes: number; expectedCost: number }> };
 export type ResourceMetrics = { resourceId: string; name: string; capacity: number; utilization: number; meanQueueLength: number; maximumQueueSize: number; busyMinutes: number };
 export type Issue = { id?: string; code: string; elementId?: string; title: string; evidence: string; category: string; severity: 'low'|'medium'|'high'; metric?: number; suggestion: string; status?: string };
 export type SimulationResult = {
+	 scenarioSnapshot?:Scenario;
   scenarioName: string; replications: number; analytic: AnalyticResult;
-  metrics: { arrived: number; completed: number; throughputPerHour: number; meanCycleMinutes: number; medianCycleMinutes: number; p90CycleMinutes: number; p95CycleMinutes: number; meanProcessingMinutes: number; meanWaitingMinutes: number; cycleTimeEfficiency: number; meanCost: number; resources: ResourceMetrics[]; elements: Array<{ elementId:string;elementName:string;completed:number;meanQueueMinutes:number;meanServiceMinutes:number }> };
+  metrics: { trace?:TraceEvent[];traceTruncated?:boolean;flowCounts?:Array<{flowId:string;count:number}>;arrived: number; completed: number; throughputPerHour: number; meanCycleMinutes: number; medianCycleMinutes: number; p90CycleMinutes: number; p95CycleMinutes: number; meanProcessingMinutes: number; meanWaitingMinutes: number; cycleTimeEfficiency: number; meanCost: number; resources: ResourceMetrics[]; elements: Array<{ elementId:string;elementName:string;completed:number;meanQueueMinutes:number;meanServiceMinutes:number }> };
   cycleTime95: { mean:number;lower:number;upper:number }; cost95: { mean:number;lower:number;upper:number }; throughput95: { mean:number;lower:number;upper:number };
   issues: Issue[]; recommendedDesign: Array<{ heuristic:string;title:string;justification:string;addressesIssues:string[] }>;
 };
 export type StoredScenario = { id:string;name:string;bpmnXml:string;configuration:Omit<Scenario,'name'|'bpmnXml'>;currentVersion:number;createdAt:string;updatedAt:string };
 export type ScenarioVersion = { id:string;scenarioId:string;version:number;name:string;createdAt:string };
 export type ScenarioPackage = { format:'bpmngo-simulation-scenario/v1';exportedAt:string;scenario:Scenario };
-export type CalibrationRequest = { processDefinitionKey:string;startedAfter?:string;startedBefore?:string;minimumSamples?:number;apply?:boolean };
+export type CalibrationRequest = { modelId?:string;processDefinitionKey:string;startedAfter?:string;startedBefore?:string;minimumSamples?:number;apply?:boolean };
 export type ActivityCalibration = { elementId:string;elementName?:string;samples:number;meanProcessingMinutes:number;processingStdDevMinutes:number;meanWaitingMinutes:number;medianTotalMinutes:number;p95TotalMinutes:number;method:string };
 export type CalibrationResult = { processDefinitionKey:string;instanceSamples:number;observationStart?:string;observationEnd?:string;arrivalRatePerHour:number;suggestedArrivals?:ArrivalPattern;activities:Record<string,ActivityCalibration>;warnings?:string[];applied:boolean;scenarioVersion?:number };
 export type CapacitySweepRequest = { resourceId:string;minimumCapacity:number;maximumCapacity:number;step:number;targetMeanCycleMinutes?:number;targetP95CycleMinutes?:number };
@@ -42,6 +47,7 @@ export async function calculateStaffing(input:{arrivalRatePerHour:number;service
 export async function listScenarios() { return (await apiClient.get<StoredScenario[]>('/engine-rest/simulation/scenarios')).data; }
 export async function getStoredScenario(id:string) { return (await apiClient.get<StoredScenario>(`/engine-rest/simulation/scenarios/${id}`)).data; }
 export async function createScenario(scenario:Scenario) { return (await apiClient.post<StoredScenario>('/engine-rest/simulation/scenarios',scenario)).data; }
+export async function saveProject(scenario:Scenario,id?:string) { return id ? (await apiClient.put<StoredScenario>(`/engine-rest/simulation/projects/${id}`,scenario)).data : (await apiClient.post<StoredScenario>('/engine-rest/simulation/projects',scenario)).data; }
 export async function updateScenario(id:string,scenario:Scenario) { return (await apiClient.put<StoredScenario>(`/engine-rest/simulation/scenarios/${id}`,scenario)).data; }
 export async function listScenarioVersions(id:string) { return (await apiClient.get<ScenarioVersion[]>(`/engine-rest/simulation/scenarios/${id}/versions`)).data; }
 export async function restoreScenarioVersion(id:string,version:number) { return (await apiClient.post<StoredScenario>(`/engine-rest/simulation/scenarios/${id}/versions/${version}/restore`)).data; }

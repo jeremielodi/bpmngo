@@ -250,7 +250,9 @@ func (r *SimulationRepository) CalibrateFromHistory(request simulation.Calibrati
 
 func (r *SimulationRepository) CreateRun(scenarioID, userID uuid.UUID, runType string, request json.RawMessage) (*models.SimulationRun, error) {
 	var row models.SimulationRun
-	err := r.db.Get(&row, `INSERT INTO simulation_runs(scenario_id,status,created_by,run_type,request) VALUES($1,'queued',$2,$3,$4)
+	err := r.db.Get(&row, `INSERT INTO simulation_runs(scenario_id,status,created_by,run_type,request)
+		SELECT id,'queued',$2,$3,COALESCE($4::jsonb,'{}'::jsonb) || jsonb_build_object('scenarioVersion',current_version,'scenarioSnapshot',configuration || jsonb_build_object('name',name,'bpmnXml',bpmn_xml))
+		FROM simulation_scenarios WHERE id=$1
 		RETURNING id,scenario_id,status,run_type,request,progress,result,error_message,created_by,started_at,completed_at`, scenarioID, nullableUUID(userID), runType, nullableJSON(request))
 	return &row, err
 }

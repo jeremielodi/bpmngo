@@ -21,6 +21,7 @@ const (
 )
 
 type simEvent struct {
+	flowID     string
 	at         float64
 	seq        int64
 	kind       eventKind
@@ -144,7 +145,7 @@ func simulateContext(ctx context.Context, s Scenario, progress func(int)) (Simul
 		}
 	}
 	metrics := averageRuns(runs)
-	result := SimulationResult{ScenarioName: s.Name, GeneratedAt: time.Now().UTC(), Replications: s.Replications, Metrics: metrics, Analytic: analytic}
+	result := SimulationResult{ScenarioSnapshot: &s, ScenarioName: s.Name, GeneratedAt: time.Now().UTC(), Replications: s.Replications, Metrics: metrics, Analytic: analytic}
 	result.CycleTime95 = confidence(runs, func(m RunMetrics) float64 { return m.MeanCycleMinutes })
 	result.Cost95 = confidence(runs, func(m RunMetrics) float64 { return m.MeanCost })
 	result.Throughput95 = confidence(runs, func(m RunMetrics) float64 { return m.ThroughputPerHour })
@@ -175,6 +176,16 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 	q := &eventQueue{}
 	var sequence int64
 	var nextGroupID int64
+	trace := []TraceEvent{}
+	traceTruncated := false
+	flowCounts := map[string]int{}
+	logEvent := func(caseID int, at float64, kind, nodeID, flowID, resourceID string) {
+		if caseID >= 50 || len(trace) >= 20000 {
+			traceTruncated = true
+			return
+		}
+		trace = append(trace, TraceEvent{CaseID: caseID, At: at, Kind: kind, ElementID: nodeID, FlowID: flowID, ResourceID: resourceID})
+	}
 	push := func(e simEvent) { sequence++; e.seq = sequence; q.push(e) }
 	arrivals := scheduleArrivals(c.scenario, rng)
 	for count, arrival := range arrivals {
@@ -196,6 +207,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 	elements := map[string]*elementState{}
 	cycles := []float64{}
 	finalAt := duration
+	completedCost := 0.0
 	updateArea := func(resourceID string, r *resourceState, at float64) {
 		r.queueArea += float64(len(r.queue)) * (at - r.lastAt)
 		if plan := c.calendars[resourceID]; plan != nil {
@@ -233,6 +245,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 			}
 		}
 		r.busy++
+		logEvent(w.caseID, at, "start", w.nodeID, "", resourceID)
 		r.busyMinutes += service
 		st := cases[w.caseID]
 		st.waiting += at - w.queuedAt
@@ -308,8 +321,10 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 	}
 	dispatch = func(caseID int, nodeID string, at float64, frames []syncFrame) error {
 		p := c.scenario.Activities[nodeID]
+		cases[caseID].cost += p.FixedCost
 		resourceID := selectResource(nodeID, p, at)
 		if resourceID == "" {
+			logEvent(caseID, at, "start", nodeID, "", "")
 			service, err := p.ProcessingTime.Sample(rng)
 			if err != nil {
 				return err
@@ -327,6 +342,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 			}
 		}
 		queueSequence++
+		logEvent(caseID, at, "queue", nodeID, "", resourceID)
 		r.queue = append(r.queue, queuedWork{caseID: caseID, nodeID: nodeID, queuedAt: at, priority: p.Priority, sequence: queueSequence, frames: frames})
 		sort.SliceStable(r.queue, func(i, j int) bool {
 			return r.queue[i].priority > r.queue[j].priority || (r.queue[i].priority == r.queue[j].priority && r.queue[i].sequence < r.queue[j].sequence)
@@ -365,6 +381,8 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 				return fmt.Errorf("token reached end before structured join %q", frames[len(frames)-1].joinID)
 			}
 			st := cases[caseID]
+			logEvent(caseID, at, "end", nodeID, "", "")
+			completedCost += st.cost
 			cycles = append(cycles, at-st.started)
 			delete(cases, caseID)
 			return nil
@@ -376,6 +394,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 				return e
 			}
 			if wait > 0 {
+				logEvent(caseID, at, "wait", nodeID, "", "")
 				cases[caseID].waiting += wait
 				elements[nodeID].queue += wait
 				push(simEvent{at: at + wait, kind: eventEnter, caseID: caseID, nodeID: nodeID, queuedAt: -1, frames: frames})
@@ -400,9 +419,16 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 		finalAt = math.Max(finalAt, e.at)
 		switch e.kind {
 		case eventArrive:
+			logEvent(e.caseID, e.at, "arrival", e.nodeID, "", "")
 			cases[e.caseID] = &caseState{started: e.at, joins: map[int64]*joinState{}}
 			push(simEvent{at: e.at, kind: eventEnter, caseID: e.caseID, nodeID: e.nodeID})
 		case eventEnter:
+			if e.queuedAt >= 0 {
+				logEvent(e.caseID, e.at, "enter", e.nodeID, e.flowID, "")
+				if e.flowID != "" {
+					flowCounts[e.flowID]++
+				}
+			}
 			if _, ok := elements[e.nodeID]; !ok {
 				n := c.graph.Nodes[e.nodeID]
 				elements[e.nodeID] = &elementState{name: n.Name}
@@ -413,6 +439,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 				err = enter(e.caseID, e.nodeID, e.at, e.frames)
 			}
 		case eventServiceDone:
+			logEvent(e.caseID, e.at, "complete", e.nodeID, "", e.resourceID)
 			elements[e.nodeID].completed++
 			if e.resourceID != "" {
 				err = release(e.resourceID, e.at)
@@ -428,7 +455,11 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 			return RunMetrics{}, err
 		}
 	}
-	m := RunMetrics{Arrived: count, Completed: len(cycles)}
+	m := RunMetrics{Arrived: count, Completed: len(cycles), Trace: trace, TraceTruncated: traceTruncated}
+	for id, count := range flowCounts {
+		m.FlowCounts = append(m.FlowCounts, FlowMetrics{FlowID: id, Count: count})
+	}
+	sort.Slice(m.FlowCounts, func(i, j int) bool { return m.FlowCounts[i].FlowID < m.FlowCounts[j].FlowID })
 	sort.Float64s(cycles)
 	if len(cycles) > 0 {
 		for _, v := range cycles {
@@ -481,11 +512,8 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 		m.Elements = append(m.Elements, ElementMetrics{ElementID: id, ElementName: el.name, Completed: el.completed, MeanQueueMinutes: eq, MeanServiceMinute: es})
 	}
 	sort.Slice(m.Elements, func(i, j int) bool { return m.Elements[i].ElementID < m.Elements[j].ElementID })
-	// derive cost from resource busy time per completed case
 	if m.Completed > 0 {
-		for _, r := range resources {
-			m.MeanCost += r.busyMinutes / 60 * r.resource.CostPerHour / float64(m.Completed)
-		}
+		m.MeanCost = completedCost / float64(m.Completed)
 	}
 	return m, nil
 }
@@ -498,7 +526,7 @@ func routeAfterActivity(c *compiledScenario, node *engine.Node, caseID int, at f
 			for _, flow := range event.Outgoing {
 				cumulative += c.scenario.Flows[flow.ID].Probability
 				if draw <= cumulative {
-					push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: flow.TargetRef, frames: frames})
+					push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: flow.TargetRef, flowID: flow.ID, frames: frames})
 					return nil
 				}
 			}
@@ -538,7 +566,7 @@ func route(c *compiledScenario, node *engine.Node, caseID int, at float64, rng *
 		cases[caseID].joins[groupID] = &joinState{expected: len(selected)}
 		for _, flow := range selected {
 			branchFrames := append(append([]syncFrame(nil), frames...), syncFrame{joinID: joinID, groupID: groupID})
-			push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: flow.TargetRef, frames: branchFrames})
+			push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: flow.TargetRef, flowID: flow.ID, frames: branchFrames})
 		}
 		return nil
 	}
@@ -552,7 +580,7 @@ func route(c *compiledScenario, node *engine.Node, caseID int, at float64, rng *
 			break
 		}
 	}
-	push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: chosen.TargetRef, frames: frames})
+	push(simEvent{at: at, kind: eventEnter, caseID: caseID, nodeID: chosen.TargetRef, flowID: chosen.ID, frames: frames})
 	return nil
 }
 
@@ -598,7 +626,9 @@ func averageRuns(r []RunMetrics) RunMetrics {
 	if len(r) == 0 {
 		return RunMetrics{}
 	}
-	m := RunMetrics{}
+	// Trace and path counts represent the first seeded replication exactly;
+	// operational metrics below remain averages across independent replications.
+	m := RunMetrics{Trace: r[0].Trace, TraceTruncated: r[0].TraceTruncated, FlowCounts: r[0].FlowCounts}
 	for _, x := range r {
 		m.Arrived += x.Arrived
 		m.Completed += x.Completed

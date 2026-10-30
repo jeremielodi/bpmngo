@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 // @ts-ignore — bpmn-js doesn't ship ts declarations in all versions
 import BpmnJS from 'bpmn-js/lib/Modeler';
@@ -13,9 +13,11 @@ import {
 import CamundaCloudBehaviorsModule from 'camunda-bpmn-js-behaviors/lib/camunda-cloud';
 // @ts-ignore — no ts declarations for this JSON moddle descriptor
 import ZeebeModdleExtension from 'zeebe-bpmn-moddle/resources/zeebe.json';
-import { FilePlus, FolderOpen, Download, UploadCloud, ArrowLeft } from 'lucide-react';
+import { FilePlus, FolderOpen, Download, UploadCloud, ArrowLeft, Save } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { deployBpmn } from '../api/processes';
+import { getStoredScenario, saveProject } from '../api/simulation';
+import { asProject, upsertProjectModel, withDiagram } from '../utils/simulationProject';
 
 const BLANK_DIAGRAM = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -46,6 +48,8 @@ function extractProcessId(xml: string): string {
 
 export default function ModelerPage() {
   const navigate = useNavigate();
+  const [params]=useSearchParams();
+  const projectId=params.get('project'),modelId=params.get('model');
   const containerRef = useRef<HTMLDivElement>(null);
   const propertiesPanelRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<InstanceType<typeof BpmnJS> | null>(null);
@@ -56,6 +60,8 @@ export default function ModelerPage() {
 
   useEffect(() => {
     if (!containerRef.current || !propertiesPanelRef.current) return;
+    setReady(false);
+    setImportError(null);
 
     const modeler = new BpmnJS({
       container: containerRef.current,
@@ -70,15 +76,30 @@ export default function ModelerPage() {
     });
     modelerRef.current = modeler;
 
-    (modeler.importXML(BLANK_DIAGRAM) as Promise<unknown>)
+    const initial=projectId&&modelId?getStoredScenario(projectId).then(row=>{
+      const model=asProject({...row.configuration,name:row.name,bpmnXml:row.bpmnXml}).models?.find(m=>m.id===modelId);
+      if(!model)throw new Error('Project model not found');return withDiagram(model.bpmnXml);
+    }):Promise.resolve(BLANK_DIAGRAM);
+    let disposed=false;
+    initial.then(xml=>{if(!disposed)return modeler.importXML(xml)})
       .then(() => {
+        if(disposed)return;
         (modeler.get('canvas') as { zoom(a: string, b: string): void }).zoom('fit-viewport', 'auto');
         setReady(true);
       })
-      .catch(() => setImportError('Failed to initialize a blank diagram'));
+      .catch((e:Error) => {if(!disposed){setImportError(e.message);setReady(false)}});
 
-    return () => { modeler.destroy(); };
-  }, []);
+    return () => { disposed=true;modeler.destroy(); };
+  }, [projectId,modelId]);
+
+  const saveProjectMut=useMutation({mutationFn:async()=>{
+    if(!projectId||!modelerRef.current)throw new Error('Open the modeler from a simulation project');
+    const {xml}=await modelerRef.current.saveXML({format:true}) as {xml:string};
+    const row=await getStoredScenario(projectId);
+    const project=asProject({...row.configuration,name:row.name,bpmnXml:row.bpmnXml});
+    const next=upsertProjectModel(project,xml,extractProcessId(xml),modelId??undefined);
+    await saveProject(next,projectId);
+  },onSuccess:()=>navigate(`/simulation?project=${projectId}`)});
 
   const deployMut = useMutation({
     mutationFn: async () => {
@@ -99,7 +120,7 @@ export default function ModelerPage() {
     if (!modelerRef.current) return;
     setImportError(null);
     (modelerRef.current.importXML(BLANK_DIAGRAM) as Promise<unknown>)
-      .then(() => (modelerRef.current!.get('canvas') as { zoom(a: string, b: string): void }).zoom('fit-viewport', 'auto'))
+      .then(() => { (modelerRef.current!.get('canvas') as { zoom(a: string, b: string): void }).zoom('fit-viewport', 'auto'); setReady(true); })
       .catch(() => setImportError('Failed to create a new diagram'));
   };
 
@@ -109,8 +130,8 @@ export default function ModelerPage() {
     if (!file || !modelerRef.current) return;
     setImportError(null);
     file.text().then((xml) => {
-      (modelerRef.current!.importXML(xml) as Promise<unknown>)
-        .then(() => (modelerRef.current!.get('canvas') as { zoom(a: string, b: string): void }).zoom('fit-viewport', 'auto'))
+      (modelerRef.current!.importXML(withDiagram(xml)) as Promise<unknown>)
+        .then(() => { (modelerRef.current!.get('canvas') as { zoom(a: string, b: string): void }).zoom('fit-viewport', 'auto'); setReady(true); })
         .catch(() => setImportError('That file is not a valid BPMN diagram'));
     });
   };
@@ -133,13 +154,13 @@ export default function ModelerPage() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/processes')}
+            onClick={() => navigate(projectId?`/simulation?project=${projectId}`:'/processes')}
             className="text-gray-400 hover:text-gray-700"
             title="Back to definitions"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-base font-semibold text-gray-900">BPMN Modeler</h1>
+          <h1 className="text-base font-semibold text-gray-900">{projectId?'Project BPMN Modeler':'BPMN Modeler'}</h1>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={handleNew}>
@@ -152,18 +173,18 @@ export default function ModelerPage() {
           <Button variant="secondary" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4" /> Export
           </Button>
-          <Button size="sm" onClick={() => deployMut.mutate()} disabled={deployMut.isPending}>
+          {projectId?<Button size="sm" onClick={()=>saveProjectMut.mutate()} disabled={!ready||saveProjectMut.isPending}><Save className="w-4 h-4"/>Save to project</Button>:<Button size="sm" onClick={() => deployMut.mutate()} disabled={deployMut.isPending}>
             {deployMut.isPending ? <Spinner className="w-4 h-4" /> : <UploadCloud className="w-4 h-4" />}
             Deploy
-          </Button>
+          </Button>}
         </div>
       </div>
 
-      {(importError || deployMut.isError || deploySuccess) && (
+      {(importError || saveProjectMut.isError || deployMut.isError || deploySuccess) && (
         <div className={`px-4 py-2 text-sm flex-shrink-0 ${
-          importError || deployMut.isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+          importError || saveProjectMut.isError || deployMut.isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
         }`}>
-          {importError ?? (deployMut.isError ? 'Deploy failed — check the diagram is complete and valid.' : 'Deployed successfully.')}
+          {importError ?? saveProjectMut.error?.message ?? (deployMut.isError ? 'Deploy failed — check the diagram is complete and valid.' : 'Deployed successfully.')}
         </div>
       )}
 

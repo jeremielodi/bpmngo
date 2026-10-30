@@ -1,0 +1,7 @@
+FROM mcr.microsoft.com/playwright:v1.62.1-noble
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY . .
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE=/ms-playwright/chromium-1234/chrome-linux/chrome
+CMD ["npx", "playwright", "test", "simulation-project.spec.ts"]

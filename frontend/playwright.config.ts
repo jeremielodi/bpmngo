@@ -13,6 +13,7 @@ export default defineConfig({
   retries: 0,
   reporter: 'list',
   use: {
+	launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : undefined,
     baseURL: process.env.BASE_URL ?? 'http://localhost:3000',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

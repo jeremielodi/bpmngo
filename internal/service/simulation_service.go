@@ -23,6 +23,20 @@ func NewSimulationService(repository *repository.SimulationRepository) *Simulati
 	return &SimulationService{repository: repository}
 }
 
+func (s *SimulationService) SaveProject(id, userID uuid.UUID, tenantID string, scenario simulation.Scenario) (*models.SimulationScenario, error) {
+	if err := simulation.ValidateProjectDraft(scenario); err != nil {
+		return nil, err
+	}
+	configuration, err := scenarioConfiguration(scenario)
+	if err != nil {
+		return nil, err
+	}
+	if id == uuid.Nil {
+		return s.repository.CreateScenario(scenario.Name, scenario.BPMNXML, configuration, userID, tenantID)
+	}
+	return s.repository.UpdateScenario(id, scenario.Name, scenario.BPMNXML, configuration, userID, tenantID)
+}
+
 func (s *SimulationService) CreateScenario(scenario simulation.Scenario, userID uuid.UUID, tenantID string) (*models.SimulationScenario, error) {
 	if err := simulation.ValidateRunnable(scenario); err != nil {
 		return nil, err
@@ -67,7 +81,7 @@ func (s *SimulationService) ImportScenario(pkg simulation.ScenarioPackage, userI
 	if pkg.Format != "bpmngo-simulation-scenario/v1" {
 		return nil, fmt.Errorf("unsupported scenario package format %q", pkg.Format)
 	}
-	return s.CreateScenario(pkg.Scenario, userID, tenantID)
+	return s.SaveProject(uuid.Nil, userID, tenantID, pkg.Scenario)
 }
 
 func (s *SimulationService) CalibrateScenario(id, userID uuid.UUID, tenantID string, request simulation.CalibrationRequest) (simulation.CalibrationResult, error) {
@@ -91,10 +105,24 @@ func (s *SimulationService) CalibrateScenario(id, userID uuid.UUID, tenantID str
 	if !request.Apply {
 		return result, nil
 	}
+	if len(scenario.Models) > 0 {
+		found := false
+		for _, model := range scenario.Models {
+			if model.ID == request.ModelID {
+				found = true
+			}
+		}
+		if !found {
+			return result, fmt.Errorf("select a project model to calibrate")
+		}
+	}
 	scenario.ArrivalRatePerHour = result.ArrivalRatePerHour
 	scenario.ArrivalPattern = result.SuggestedArrivals
 	appliedActivities := 0
 	for elementID, calibration := range result.Activities {
+		if len(scenario.Models) > 0 {
+			elementID = simulation.ModelElementKey(request.ModelID, elementID)
+		}
 		parameters, exists := scenario.Activities[elementID]
 		if !exists || calibration.Samples < request.MinimumSamples {
 			continue
@@ -147,7 +175,14 @@ func (s *SimulationService) LoadScenario(id uuid.UUID, tenantID string) (simulat
 }
 
 func (s *SimulationService) EnqueueSimulation(id, userID uuid.UUID, tenantID string) (*models.SimulationRun, error) {
-	if _, err := s.LoadScenario(id, tenantID); err != nil {
+	scenario, err := s.LoadScenario(id, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if err := simulation.ValidateRunnable(scenario); err != nil {
+		return nil, err
+	}
+	if _, err := simulation.Analyze(scenario); err != nil {
 		return nil, err
 	}
 	return s.repository.CreateRun(id, userID, "simulation", nil)
@@ -257,6 +292,17 @@ func (s *SimulationService) executeRun(parent context.Context, run *models.Simul
 	scenario, err := s.LoadScenario(run.ScenarioID, "")
 	if err != nil {
 		return err
+	}
+	if run.Request != nil {
+		var snapshot struct {
+			Scenario *simulation.Scenario `json:"scenarioSnapshot"`
+		}
+		if err := json.Unmarshal(*run.Request, &snapshot); err != nil {
+			return err
+		}
+		if snapshot.Scenario != nil {
+			scenario = *snapshot.Scenario
+		}
 	}
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()

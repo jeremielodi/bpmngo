@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from './useAuth';
 import * as authApi from '../api/auth';
+import { AxiosError } from 'axios';
 
 // Regression test for a real bug: GET /users/me returns { user, roles, actions },
 // not a flat user object. AuthProvider must unwrap `.user` on session restore,
@@ -52,5 +53,14 @@ describe('AuthProvider session restore', () => {
       expect(screen.getByText('signed-out')).toBeInTheDocument();
     });
     expect(authApi.getMe).not.toHaveBeenCalled();
+  });
+
+  it('keeps session tokens when restoring the user fails because the network is unavailable', async () => {
+    localStorage.setItem('accessToken','access');localStorage.setItem('refreshToken','refresh');
+    vi.mocked(authApi.getMe).mockRejectedValue(new AxiosError('Offline','ERR_NETWORK'));
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(()=>expect(screen.queryByText('loading')).not.toBeInTheDocument());
+    expect(localStorage.getItem('accessToken')).toBe('access');
+    expect(localStorage.getItem('refreshToken')).toBe('refresh');
   });
 });

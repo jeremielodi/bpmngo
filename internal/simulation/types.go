@@ -22,6 +22,7 @@ type Resource struct {
 }
 
 type ActivityParameters struct {
+	FixedCost      float64      `json:"fixedCost,omitempty"`
 	ProcessingTime Distribution `json:"processingTime"`
 	WaitingTime    Distribution `json:"waitingTime,omitempty"`
 	ResourceID     string       `json:"resourceId,omitempty"`
@@ -78,6 +79,9 @@ type FlowParameters struct {
 }
 
 type Scenario struct {
+	Models             []ProjectModel                `json:"models,omitempty"`
+	EntryModelID       string                        `json:"entryModelId,omitempty"`
+	Transfers          []ModelTransfer               `json:"transfers,omitempty"`
 	Name               string                        `json:"name"`
 	BPMNXML            string                        `json:"bpmnXml"`
 	ArrivalRatePerHour float64                       `json:"arrivalRatePerHour"`
@@ -93,6 +97,38 @@ type Scenario struct {
 	Flows              map[string]FlowParameters     `json:"flows"`
 }
 
+// Model element and flow parameters use modelID::elementID as their key.
+// This permits imported BPMN documents to reuse the same local XML IDs.
+type ProjectModel struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	BPMNXML string `json:"bpmnXml"`
+}
+
+type ModelTransfer struct {
+	ID            string       `json:"id"`
+	SourceModelID string       `json:"sourceModelId"`
+	SourceNodeID  string       `json:"sourceNodeId"`
+	TargetModelID string       `json:"targetModelId"`
+	TargetNodeID  string       `json:"targetNodeId"`
+	Delay         Distribution `json:"delay"`
+	Cost          float64      `json:"cost,omitempty"`
+}
+
+type TraceEvent struct {
+	CaseID     int     `json:"caseId"`
+	At         float64 `json:"at"`
+	Kind       string  `json:"kind"`
+	ElementID  string  `json:"elementId"`
+	FlowID     string  `json:"flowId,omitempty"`
+	ResourceID string  `json:"resourceId,omitempty"`
+}
+
+type FlowMetrics struct {
+	FlowID string `json:"flowId"`
+	Count  int    `json:"count"`
+}
+
 type ScenarioPackage struct {
 	Format     string    `json:"format"`
 	ExportedAt time.Time `json:"exportedAt"`
@@ -100,6 +136,7 @@ type ScenarioPackage struct {
 }
 
 type CalibrationRequest struct {
+	ModelID              string     `json:"modelId,omitempty"`
 	ProcessDefinitionKey string     `json:"processDefinitionKey"`
 	StartedAfter         *time.Time `json:"startedAfter,omitempty"`
 	StartedBefore        *time.Time `json:"startedBefore,omitempty"`
@@ -194,6 +231,9 @@ type ElementMetrics struct {
 }
 
 type RunMetrics struct {
+	Trace               []TraceEvent      `json:"trace,omitempty"`
+	TraceTruncated      bool              `json:"traceTruncated,omitempty"`
+	FlowCounts          []FlowMetrics     `json:"flowCounts,omitempty"`
 	Arrived             int               `json:"arrived"`
 	Completed           int               `json:"completed"`
 	ThroughputPerHour   float64           `json:"throughputPerHour"`
@@ -216,6 +256,7 @@ type ConfidenceInterval struct {
 }
 
 type SimulationResult struct {
+	ScenarioSnapshot  *Scenario                `json:"scenarioSnapshot,omitempty"`
 	ScenarioName      string                   `json:"scenarioName"`
 	GeneratedAt       time.Time                `json:"generatedAt"`
 	Replications      int                      `json:"replications"`

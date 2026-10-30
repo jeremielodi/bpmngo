@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { login as apiLogin, logout as apiLogout, getMe } from '../api/auth';
+import axios from 'axios';
 
 interface AuthUser {
   id: string;
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    if (!token) {
+    if (!token && !localStorage.getItem('refreshToken')) {
       setIsLoading(false);
       return;
     }
@@ -46,9 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoles(toCodes(res.roles, 'label'));
         setActions(toCodes(res.actions, 'code'));
       })
-      .catch(() => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+      .catch(error => {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
       })
       .finally(() => setIsLoading(false));
   }, []);
