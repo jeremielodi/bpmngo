@@ -3,11 +3,14 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/metrics"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 )
@@ -22,13 +25,17 @@ func (r *Runtime) executeEndEvent(ctx context.Context, engineRepo *repository.En
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
+	txStarted, committed := time.Now(), false
+	defer func() {
+		metrics.ObserveEngineTransaction("complete_end_event", txStarted, committed, "operation_error")
+	}()
 
 	// Tokens reaching end events at the same moment take turns, so exactly
 	// one of them sees that nothing else is running.
 	if err := engineRepo.LockProcessInstanceTx(tx, exec.ProcessInstanceID); err != nil {
 		return fmt.Errorf("failed to lock process instance: %w", err)
 	}
-	if err := engineRepo.CompleteExecutionTx(tx, exec.ProcessInstanceID, exec.ID); err != nil {
+	if err := engineRepo.CompleteExecutionByKeyTx(tx, exec.ProcessInstanceKey, exec.ID); err != nil {
 		return fmt.Errorf("failed to complete execution: %w", err)
 	}
 	live, err := engineRepo.HasLiveWorkInInstanceTx(tx, exec.ProcessInstanceID, ignoreNodes)
@@ -39,22 +46,27 @@ func (r *Runtime) executeEndEvent(ctx context.Context, engineRepo *repository.En
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("failed to commit transaction: %w", err)
 		}
+		committed = true
 		r.logExecutionCompleted(exec, exec.CurrentElementID)
 		return nil
 	}
 	if err := engineRepo.CompleteProcessInstanceTx(tx, exec.ProcessInstanceID); err != nil {
 		return fmt.Errorf("failed to complete process instance: %w", err)
 	}
+	if err := repository.NotifyInstanceFinishedTx(tx, exec.ProcessInstanceID); err != nil {
+		return fmt.Errorf("failed to queue instance completion notification: %w", err)
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
-	repository.NotifyInstanceFinished(r.DB, exec.ProcessInstanceID)
+	committed = true
+	repository.WakeInstanceFinishedLocal(exec.ProcessInstanceID)
 	service.LogAuditErr("execution completed", r.auditService.LogExecutionCompleted(exec.ID, exec.ProcessInstanceID, exec.CurrentElementID))
 	finalVars, _ := engineRepo.GetProcessVariables(exec.ProcessInstanceID)
 	service.LogAuditErr("process completed", r.auditService.LogProcessCompleted(exec.ProcessInstanceID, finalVars))
 
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionCompleted(exec.ProcessInstanceID.String(), exec.ID.String(), exec.CurrentElementID)
+		p.ExecutionCompleted(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), exec.CurrentElementID)
 		p.ProcessCompleted(exec.ProcessInstanceID.String())
 	}
 
@@ -62,9 +74,10 @@ func (r *Runtime) executeEndEvent(ctx context.Context, engineRepo *repository.En
 	// execution. Must happen BEFORE archiving below — once archived, this
 	// instance's process_instances row (and thus its parent_instance_id/
 	// parent_execution_id columns) no longer exists.
-	var parentInstanceID, parentExecutionID *uuid.UUID
+	var parentInstanceID *uuid.UUID
+	var parentExecutionID *int64
 	row := r.DB.QueryRow(`
-		SELECT parent_instance_id, parent_execution_id
+		SELECT parent_instance_id, parent_execution_key
 		FROM process_instances WHERE id = $1
 	`, exec.ProcessInstanceID)
 	row.Scan(&parentInstanceID, &parentExecutionID)
@@ -148,7 +161,7 @@ func (r *Runtime) executeEndEvent(ctx context.Context, engineRepo *repository.En
 	if _, err = parentTx.Exec(`
 		UPDATE executions
 		SET current_element_id = $1, status = 'active', is_active = true, updated_at = NOW()
-		WHERE process_instance_id = $2 AND id = $3
+		WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $2) AND engine_key = $3
 	`, nextNodeID, *parentInstanceID, *parentExecutionID); err != nil {
 		return fmt.Errorf("callActivity end: reactivate parent: %w", err)
 	}
@@ -157,7 +170,7 @@ func (r *Runtime) executeEndEvent(ctx context.Context, engineRepo *repository.En
 	}
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(*parentExecutionID, *parentInstanceID, parentExec.CurrentElementID, nextNodeID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(parentInstanceID.String(), parentExecutionID.String(), parentExec.CurrentElementID, nextNodeID)
+		p.ExecutionMoved(parentInstanceID.String(), strconv.FormatInt(*parentExecutionID, 10), parentExec.CurrentElementID, nextNodeID)
 	}
 
 	// Resume parent

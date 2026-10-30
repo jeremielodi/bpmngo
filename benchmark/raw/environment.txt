@@ -1,0 +1,14 @@
+2026-10-29T15:23:00Z
+Darwin Henocks-MBP 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:17:26 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6041 arm64
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+Apple M4 Max
+16
+16
+68719476736
+client=29.7.2 server=29.7.2
+Docker Compose version v5.5.1
+docker_cpus=16 docker_memory=8318709760
+22d88a729d5b71084081978b8336dcdb146d3a28
+22d88a7 Release 1.0.1: try BpmnGo with no configuration

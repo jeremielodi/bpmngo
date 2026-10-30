@@ -19,6 +19,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jeremielodi/bpmngo/internal/feel"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
@@ -75,7 +76,7 @@ func correlationKeyValue(v interface{}) string {
 
 // messageCorrelationKey evaluates a message catch node's correlation key
 // expression against the instance's variables ("" when it has none).
-func (r *Runtime) messageCorrelationKey(q sqlx.Queryer, node *engine.Node, instanceID, execID uuid.UUID) string {
+func (r *Runtime) messageCorrelationKey(q sqlx.Queryer, node *engine.Node, instanceID uuid.UUID, execID int64) string {
 	if strings.TrimSpace(node.MessageCorrelationKey) == "" {
 		return ""
 	}
@@ -96,16 +97,20 @@ func (r *Runtime) messageCorrelationKey(q sqlx.Queryer, node *engine.Node, insta
 // targetNodeID "" means "the catch node's outgoing flow"; otherwise the
 // execution jumps there (event-based gateway branches, boundary and
 // event sub-process triggers).
-func insertMessageSubscriptionTx(tx *sqlx.Tx, instanceID, execID uuid.UUID, messageName, correlationKey, targetNodeID string) error {
+func insertMessageSubscriptionTx(tx *sqlx.Tx, instanceID uuid.UUID, execID int64, messageName, correlationKey, targetNodeID string) error {
 	var target interface{}
 	if targetNodeID != "" {
 		target = targetNodeID
 	}
-	_, err := tx.Exec(`
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
 		INSERT INTO event_subscriptions
-		  (process_instance_id, execution_id, event_type, event_name, correlation_key, target_element_id)
+		  (process_instance_key, execution_key, event_type, event_name, correlation_key, target_element_id)
 		VALUES ($1, $2, 'message', $3, $4, $5)
-	`, instanceID, execID, messageName, correlationKey, target)
+	`, instanceKey, execID, messageName, correlationKey, target)
 	return err
 }
 
@@ -124,7 +129,7 @@ type PublishResult struct {
 // Finding nothing waiting is not an error: with a time to live the message
 // waits, without one it is dropped, as in Camunda 8.
 func PublishMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEventDispatcher, msg PublishedMessage) (PublishResult, error) {
-	res := PublishResult{MessageID: uuid.New()}
+	res := PublishResult{MessageID: ids.NewGlobalID()}
 	if msg.Name == "" {
 		return res, fmt.Errorf("message name is required")
 	}
@@ -147,9 +152,9 @@ func PublishMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEve
 	if msg.TimeToLive > 0 {
 		vars, _ := json.Marshal(nonNil(msg.Variables))
 		if _, err := db.Exec(`
-			INSERT INTO published_messages (id, name, correlation_key, message_id, variables, tenant_id, expires_at)
-			VALUES ($1, $2, $3, NULLIF($4, ''), $5, NULLIF($6, ''), NOW() + make_interval(secs => $7))
-		`, res.MessageID, msg.Name, msg.CorrelationKey, msg.MessageID, vars, msg.TenantID, msg.TimeToLive.Seconds()); err != nil {
+			INSERT INTO published_messages (id, engine_key, name, correlation_key, message_id, variables, tenant_id, expires_at)
+			VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, NULLIF($7, ''), NOW() + make_interval(secs => $8))
+		`, res.MessageID, ids.NewEngineKey(), msg.Name, msg.CorrelationKey, msg.MessageID, vars, msg.TenantID, msg.TimeToLive.Seconds()); err != nil {
 			return res, err
 		}
 		storedID = &res.MessageID
@@ -174,7 +179,7 @@ func nonNil(m map[string]interface{}) map[string]interface{} {
 type openMessageSubscription struct {
 	ID                uuid.UUID `db:"id"`
 	ProcessInstanceID uuid.UUID `db:"process_instance_id"`
-	ExecutionID       uuid.UUID `db:"execution_id"`
+	ExecutionID       int64     `db:"execution_key"`
 	TargetElementID   *string   `db:"target_element_id"`
 	ProcessKey        string    `db:"process_key"`
 }
@@ -220,10 +225,24 @@ func recordCorrelationTx(tx *sqlx.Tx, storedID *uuid.UUID, processKey string, in
 	if storedID == nil {
 		return true, nil
 	}
+	messageKey, err := repository.PublishedMessageEngineKey(tx, *storedID)
+	if err != nil {
+		return false, err
+	}
+	var correlatedInstance *int64
+	if instanceID != uuid.Nil {
+		key, err := repository.ProcessInstanceEngineKey(tx, instanceID)
+		if err != nil {
+			return false, err
+		}
+		correlatedInstance = &key
+	}
 	res, err := tx.Exec(`
-		INSERT INTO published_message_correlations (published_message_id, process_key, process_instance_id)
-		VALUES ($1, $2, $3) ON CONFLICT DO NOTHING
-	`, *storedID, processKey, instanceID)
+		INSERT INTO published_message_correlations
+		  (published_message_key, process_key, process_instance_key)
+		VALUES ($1, $2, $3)
+		ON CONFLICT DO NOTHING
+	`, messageKey, processKey, correlatedInstance)
 	if err != nil {
 		return false, err
 	}
@@ -254,8 +273,8 @@ func correlateSubscription(ctx context.Context, db *sqlx.DB, dispatcher *events.
 	}
 
 	var fromNode string
-	if err := tx.Get(&fromNode, `SELECT current_element_id FROM executions WHERE process_instance_id = $1 AND id = $2`, s.ProcessInstanceID, s.ExecutionID); err != nil {
-		return false, fmt.Errorf("execution %s not found: %w", s.ExecutionID, err)
+	if err := tx.Get(&fromNode, `SELECT current_element_id FROM executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1) AND engine_key = $2`, s.ProcessInstanceID, s.ExecutionID); err != nil {
+		return false, fmt.Errorf("execution %d not found: %w", s.ExecutionID, err)
 	}
 	target := ""
 	if s.TargetElementID != nil && *s.TargetElementID != "" {
@@ -264,12 +283,13 @@ func correlateSubscription(ctx context.Context, db *sqlx.DB, dispatcher *events.
 		// trigger: the other events it was waiting for no longer apply.
 		if _, err := tx.Exec(`
 			UPDATE event_subscriptions SET consumed_at = NOW()
-			WHERE execution_id = $1 AND id <> $2 AND consumed_at IS NULL AND event_type <> 'compensable'
+			WHERE execution_key = $1 AND id <> $2 AND consumed_at IS NULL AND event_type <> 'compensable'
 		`, s.ExecutionID, s.ID); err != nil {
 			return false, err
 		}
 		if _, err := tx.Exec(`
-			DELETE FROM timer_jobs WHERE process_instance_id = $1 AND execution_id = $2 AND is_triggered = false
+			DELETE FROM timer_jobs WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)
+			  AND execution_key = $2 AND is_triggered = false
 		`, s.ProcessInstanceID, s.ExecutionID); err != nil {
 			return false, err
 		}
@@ -308,7 +328,7 @@ func correlateSubscription(ctx context.Context, db *sqlx.DB, dispatcher *events.
 	if p := eventlog.Global(); p != nil {
 		p.MessageCorrelated(s.ProcessInstanceID.String(), name)
 		if target != "" {
-			p.ExecutionMoved(s.ProcessInstanceID.String(), s.ExecutionID.String(), fromNode, target)
+			p.ExecutionMoved(s.ProcessInstanceID.String(), strconv.FormatInt(s.ExecutionID, 10), fromNode, target)
 		}
 	}
 	// Correlated even if running on from there fails (that surfaces as an
@@ -328,6 +348,14 @@ type messageStartTarget struct {
 // correlations) and those with an instance started with the same
 // correlation key still active — as in Camunda 8.
 func startByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEventDispatcher, msg PublishedMessage, storedID *uuid.UUID, done map[string]bool) ([]uuid.UUID, error) {
+	var storedKey *int64
+	if storedID != nil {
+		key, err := repository.PublishedMessageEngineKey(db, *storedID)
+		if err != nil {
+			return nil, err
+		}
+		storedKey = &key
+	}
 	var targets []messageStartTarget
 	if err := db.Select(&targets, `
 		SELECT d.id, d.process_key, n.key AS start_node_id
@@ -337,10 +365,11 @@ func startByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEve
 		  AND n.value ->> 'Type' = 'messageStartEvent'
 		  AND n.value ->> 'messageRef' = $1
 		  AND COALESCE(n.value ->> 'parentScope', '') = ''
-		  AND ($2::uuid IS NULL OR NOT EXISTS (
+		  AND ($2::bigint IS NULL OR NOT EXISTS (
 		        SELECT 1 FROM published_message_correlations c
-		        WHERE c.published_message_id = $2 AND c.process_key = d.process_key))
-	`, msg.Name, storedID); err != nil {
+		        WHERE c.published_message_key = $2
+		          AND c.process_key = d.process_key))
+	`, msg.Name, storedKey); err != nil {
 		return nil, err
 	}
 	var started []uuid.UUID
@@ -361,8 +390,10 @@ func startByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEve
 }
 
 // startOneByMessage starts one instance at a message start event; uuid.Nil
-// when an instance started with the same correlation key is still active
-// or the kept message already went to this process.
+// when the same kept message already went to this process. A correlation
+// key is routing data, not an instance-uniqueness constraint: two distinct
+// messages may start two concurrent instances with the same key. Camunda's
+// messageId/TTL semantics provide publication deduplication separately.
 func startOneByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.TaskEventDispatcher, t messageStartTarget, msg PublishedMessage, storedID *uuid.UUID) (uuid.UUID, error) {
 	def, err := repository.NewProcessRepository(db).FindProcessDefinitionByID(t.DefinitionID)
 	if err != nil {
@@ -377,9 +408,8 @@ func startOneByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 		tenant = &msg.TenantID
 	}
 
-	// One active instance per (process, correlation key): the check and
-	// the marker row are serialized by an advisory lock held until this
-	// transaction ends, across app instances too.
+	// Serialize starts for the same route across app instances. For a kept
+	// message, recordCorrelationTx below is the actual once-per-process claim.
 	tx, err := db.Beginx()
 	if err != nil {
 		return uuid.Nil, err
@@ -388,27 +418,6 @@ func startOneByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 	if msg.CorrelationKey != "" {
 		if _, err := tx.Exec(`SELECT pg_advisory_xact_lock(hashtext('message_start:' || $1 || ':' || $2))`, t.ProcessKey, msg.CorrelationKey); err != nil {
 			return uuid.Nil, err
-		}
-		// Two queries rather than a join: on Citus the subscriptions stay
-		// on the coordinator while the instances are sharded.
-		var started []uuid.UUID
-		if err := tx.Select(&started, `
-			SELECT process_instance_id FROM event_subscriptions
-			WHERE event_type = 'message_start' AND event_name = $1
-			  AND correlation_key = $2 AND consumed_at IS NULL
-		`, t.ProcessKey, msg.CorrelationKey); err != nil {
-			return uuid.Nil, err
-		}
-		active := false
-		if len(started) > 0 {
-			if err := tx.Get(&active, `
-				SELECT EXISTS (SELECT 1 FROM process_instances WHERE id = ANY($1::uuid[]) AND ended_at IS NULL)
-			`, pqUUIDs(started)); err != nil {
-				return uuid.Nil, err
-			}
-		}
-		if active {
-			return uuid.Nil, nil
 		}
 	}
 	// Claimed before starting, so a concurrent sweep can't start it twice;
@@ -420,19 +429,21 @@ func startOneByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if msg.CorrelationKey != "" {
-		if _, err := tx.Exec(`
-			INSERT INTO event_subscriptions (process_instance_id, execution_id, event_type, event_name, correlation_key)
-			VALUES ($1, $2, 'message_start', $3, $4)
-		`, instanceID, execID, t.ProcessKey, msg.CorrelationKey); err != nil {
+	if storedID != nil {
+		messageKey, err := repository.PublishedMessageEngineKey(tx, *storedID)
+		if err != nil {
 			return instanceID, err
 		}
-	}
-	if storedID != nil {
+		instanceKey, err := repository.ProcessInstanceEngineKey(tx, instanceID)
+		if err != nil {
+			return instanceID, err
+		}
 		if _, err := tx.Exec(`
-			UPDATE published_message_correlations SET process_instance_id = $3
-			WHERE published_message_id = $1 AND process_key = $2
-		`, *storedID, t.ProcessKey, instanceID); err != nil {
+			UPDATE published_message_correlations
+			SET process_instance_key = $3
+			WHERE published_message_key = $1
+			  AND process_key = $2
+		`, messageKey, t.ProcessKey, instanceKey); err != nil {
 			return instanceID, err
 		}
 	}
@@ -489,7 +500,20 @@ func (m keptMessage) published() PublishedMessage {
 // instances of processes they haven't gone to yet (a process deployed
 // later, or one whose instance for the same correlation key has ended).
 func sweepPublishedMessages(db *sqlx.DB, dispatcher *events.TaskEventDispatcher) error {
-	if _, err := db.Exec(`DELETE FROM published_messages WHERE expires_at <= $1`, time.Now()); err != nil {
+	// Citus keeps correlations local while published_messages is a reference
+	// table, so it cannot enforce the cross-table cascade. Delete children
+	// explicitly; on plain PostgreSQL this is equivalent to the former FK
+	// cascade.
+	if _, err := db.Exec(`
+		WITH expired AS (
+			SELECT engine_key FROM published_messages WHERE expires_at <= $1
+		), deleted_correlations AS (
+			DELETE FROM published_message_correlations
+			WHERE published_message_key IN (SELECT engine_key FROM expired)
+		)
+		DELETE FROM published_messages
+		WHERE engine_key IN (SELECT engine_key FROM expired)
+	`, time.Now()); err != nil {
 		return err
 	}
 	var live int
@@ -535,7 +559,7 @@ func sweepPublishedMessages(db *sqlx.DB, dispatcher *events.TaskEventDispatcher)
 		  AND n.value ->> 'messageRef' = m.name
 		  AND COALESCE(n.value ->> 'parentScope', '') = ''
 		  AND NOT EXISTS (SELECT 1 FROM published_message_correlations c
-		                  WHERE c.published_message_id = m.id AND c.process_key = d.process_key)
+		                  WHERE c.published_message_key = m.engine_key AND c.process_key = d.process_key)
 		LIMIT 200
 	`); err != nil {
 		return err
@@ -597,9 +621,10 @@ func openMessageSubscriptions(db *sqlx.DB, name, key, onlyProcess string, stored
 		CreatedAt      time.Time `db:"created_at"`
 	}
 	if err := db.Select(&rows, `
-		SELECT id, process_instance_id, execution_id, target_element_id,
+		SELECT s.id, pi.id AS process_instance_id, s.execution_key, s.target_element_id,
 		       COALESCE(correlation_key, '') AS correlation_key, created_at
-		FROM event_subscriptions
+		FROM event_subscriptions s
+		JOIN process_instances pi ON pi.engine_key = s.process_instance_key
 		WHERE event_type = 'message' AND event_name = $1 AND consumed_at IS NULL
 		  AND (COALESCE(correlation_key, '') = $2 OR ($2 <> '' AND COALESCE(correlation_key, '') = ''))
 	`, name, key); err != nil || len(rows) == 0 {
@@ -631,8 +656,8 @@ func openMessageSubscriptions(db *sqlx.DB, name, key, onlyProcess string, stored
 	if key != "" {
 		var matching []uuid.UUID
 		if err := db.Select(&matching, `
-			SELECT process_instance_id FROM variables
-			WHERE process_instance_id = ANY($1::uuid[]) AND data ->> 'correlationKey' = $2`, pqUUIDs(instances), key); err != nil {
+			SELECT pi.id FROM variables v JOIN process_instances pi ON pi.engine_key = v.process_instance_key
+			WHERE pi.id = ANY($1::uuid[]) AND v.data ->> 'correlationKey' = $2`, pqUUIDs(instances), key); err != nil {
 			return nil, err
 		}
 		for _, id := range matching {
@@ -643,7 +668,10 @@ func openMessageSubscriptions(db *sqlx.DB, name, key, onlyProcess string, stored
 	already := map[string]bool{}
 	if storedID != nil {
 		var done []string
-		if err := db.Select(&done, `SELECT process_key FROM published_message_correlations WHERE published_message_id = $1`, *storedID); err != nil {
+		if err := db.Select(&done, `
+			SELECT process_key FROM published_message_correlations
+			WHERE published_message_key = (SELECT engine_key FROM published_messages WHERE id = $1)
+		`, *storedID); err != nil {
 			return nil, err
 		}
 		for _, k := range done {

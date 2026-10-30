@@ -13,6 +13,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
@@ -77,7 +78,7 @@ func (r *Runtime) executeUserTask(ctx context.Context, engineRepo *repository.En
 		}
 	}
 
-	taskID := uuid.New()
+	taskID := ids.NewEngineKey()
 	taskName := node.Name
 	taskDefinitionId := node.ID
 	if err := engineRepo.CreateUserTaskTx(tx, &repository.UserTask{
@@ -107,7 +108,7 @@ func (r *Runtime) executeUserTask(ctx context.Context, engineRepo *repository.En
 	if inputVars := common.EvaluateIOMappings(node.InputMappings, variables); len(inputVars) > 0 {
 		taskRepo := repository.NewTaskRepository(r.DB, r.dispatcher)
 		if _, err := taskRepo.UpdateTaskFormData(exec.ProcessInstanceID, taskID, inputVars); err != nil {
-			log.Printf("Warning: failed to store input-mapped variables on task %s: %v", taskID, err)
+			log.Printf("Warning: failed to store input-mapped variables on task %d: %v", taskID, err)
 		}
 	}
 
@@ -118,7 +119,7 @@ func (r *Runtime) executeUserTask(ctx context.Context, engineRepo *repository.En
 		if assignee != nil {
 			assigneeStr = *assignee
 		}
-		p.TaskCreated(exec.ProcessInstanceID.String(), taskID.String(), exec.ID.String(), taskDefinitionId, assigneeStr)
+		p.TaskCreated(exec.ProcessInstanceID.String(), strconv.FormatInt(taskID, 10), strconv.FormatInt(exec.ID, 10), taskDefinitionId, assigneeStr)
 	}
 
 	if r.dispatcher != nil {
@@ -129,9 +130,9 @@ func (r *Runtime) executeUserTask(ctx context.Context, engineRepo *repository.En
 		event := &events.TaskEvent{
 			ID:                uuid.New().String(),
 			EventType:         events.TaskCreated,
-			TaskID:            taskID.String(),
+			TaskID:            strconv.FormatInt(taskID, 10),
 			ProcessInstanceID: exec.ProcessInstanceID.String(),
-			ExecutionID:       exec.ID.String(),
+			ExecutionID:       strconv.FormatInt(exec.ID, 10),
 			TaskName:          taskName,
 			TaskDefinitionKey: taskDefinitionId,
 			Assignee:          assignee,
@@ -175,7 +176,7 @@ func (r *Runtime) createTimerTx(tx *sqlx.Tx, engineRepo *repository.EngineReposi
 	}
 	payloadBytes, _ := json.Marshal(payload)
 
-	timerID := uuid.New()
+	timerID := ids.NewEngineKey()
 	if err := engineRepo.CreateTimerWithCycleTx(tx, timerID, exec.ProcessInstanceID, &exec.ID, dueAt.In(time.Local), eventType, payloadBytes, 0, t.Repetitions, ""); err != nil {
 		return time.Time{}, err
 	}

@@ -4,10 +4,9 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"time"
-
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/models"
+	"strconv"
+	"time"
 )
 
 // TokenHistoryStep is a single, human-readable point in a process instance's
@@ -18,13 +17,13 @@ import (
 // the only table that keeps one row per transition — so it can reconstruct
 // the full path a token took, including repeat visits to the same node.
 type TokenHistoryStep struct {
-	Timestamp   time.Time  `json:"timestamp"`
-	Action      string     `json:"action"`
-	ElementId   string     `json:"elementId,omitempty"`
-	ElementName string     `json:"elementName,omitempty"`
-	ExecutionId *uuid.UUID `json:"executionId,omitempty"`
-	TaskId      *uuid.UUID `json:"taskId,omitempty"`
-	Detail      string     `json:"detail,omitempty"`
+	Timestamp   time.Time `json:"timestamp"`
+	Action      string    `json:"action"`
+	ElementId   string    `json:"elementId,omitempty"`
+	ElementName string    `json:"elementName,omitempty"`
+	ExecutionId *int64    `json:"executionId,omitempty"`
+	TaskId      *int64    `json:"taskId,omitempty"`
+	Detail      string    `json:"detail,omitempty"`
 }
 
 // BuildTokenHistory turns a process instance's ordered audit_logs rows into
@@ -33,7 +32,7 @@ type TokenHistoryStep struct {
 // revisits the same element produces one step per visit, not one collapsed
 // entry.
 func BuildTokenHistory(logs []models.AuditLog, tasks []models.Task) []TokenHistoryStep {
-	taskByID := make(map[uuid.UUID]models.Task, len(tasks))
+	taskByID := make(map[int64]models.Task, len(tasks))
 	for _, t := range tasks {
 		taskByID[t.ID] = t
 	}
@@ -51,10 +50,8 @@ func BuildTokenHistory(logs []models.AuditLog, tasks []models.Task) []TokenHisto
 			TaskId:    log.TaskID,
 		}
 
-		if execID, ok := stringField(newData, "executionId"); ok {
-			if parsed, err := uuid.Parse(execID); err == nil {
-				step.ExecutionId = &parsed
-			}
+		if execID, ok := int64Field(newData, "executionId"); ok {
+			step.ExecutionId = &execID
 		}
 
 		switch log.Action {
@@ -163,7 +160,7 @@ func BuildTokenHistory(logs []models.AuditLog, tasks []models.Task) []TokenHisto
 	return steps
 }
 
-func applyTaskElement(step *TokenHistoryStep, taskByID map[uuid.UUID]models.Task) {
+func applyTaskElement(step *TokenHistoryStep, taskByID map[int64]models.Task) {
 	if step.TaskId == nil {
 		return
 	}
@@ -185,4 +182,19 @@ func stringField(data map[string]interface{}, key string) (string, bool) {
 	}
 	v, ok := data[key].(string)
 	return v, ok
+}
+
+func int64Field(data map[string]interface{}, key string) (int64, bool) {
+	if data == nil {
+		return 0, false
+	}
+	switch v := data[key].(type) {
+	case float64:
+		return int64(v), true
+	case string:
+		n, err := strconv.ParseInt(v, 10, 64)
+		return n, err == nil
+	default:
+		return 0, false
+	}
 }

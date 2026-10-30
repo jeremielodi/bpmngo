@@ -1,0 +1,7 @@
+services:
+  orchestration:
+    cpuset: "0-1"
+    mem_limit: 1536m
+  connectors:
+    cpuset: "0-1"
+    mem_limit: 512m

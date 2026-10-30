@@ -1,0 +1,789 @@
+{
+  "engine": "bpmngo-improved-rerun-p1",
+  "generated_at": "2026-10-29T16:53:06.603825Z",
+  "iterations": 30,
+  "calls": {
+    "CompleteJob": [
+      {
+        "duration_us": 2590,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2193,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2201,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2081,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1941,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2542,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2713,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2365,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2052,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2184,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2417,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2139,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2056,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4827,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2406,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2340,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2298,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2268,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2040,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2002,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2131,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2238,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2200,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2184,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3957,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2291,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2644,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2156,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2365,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2105,
+        "code": "OK"
+      }
+    ],
+    "CreateProcessInstance": [
+      {
+        "duration_us": 3595,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3984,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3893,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4051,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3206,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4425,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3223,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3333,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3434,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3481,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3479,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3311,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3408,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3121,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3633,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3060,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2879,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3115,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4031,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3048,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3340,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3454,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2894,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3104,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3261,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3192,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2835,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2953,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2726,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2859,
+        "code": "OK"
+      }
+    ],
+    "CreateProcessInstanceWithResult": [
+      {
+        "duration_us": 4130,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3153,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3590,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3487,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3744,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3021,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2555,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4724,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3459,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3192,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2940,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4298,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3133,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4299,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3569,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2788,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2964,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3452,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3192,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3336,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3172,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3603,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3505,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4711,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3682,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3905,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5663,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3246,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3353,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2815,
+        "code": "OK"
+      }
+    ],
+    "DeployResource": [
+      {
+        "duration_us": 4194,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1857,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1968,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1941,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2029,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1727,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2016,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2180,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1794,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1859,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1739,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1564,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1591,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1628,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1985,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1642,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1764,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1556,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1710,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1895,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5752,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2856,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1771,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1762,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1663,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2075,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1962,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4397,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1539,
+        "code": "OK"
+      },
+      {
+        "duration_us": 1712,
+        "code": "OK"
+      }
+    ],
+    "JobDelivery": [
+      {
+        "duration_us": 5817,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4544,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5692,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4669,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5312,
+        "code": "OK"
+      },
+      {
+        "duration_us": 7311,
+        "code": "OK"
+      },
+      {
+        "duration_us": 6196,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5294,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4361,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5549,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4463,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5208,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4223,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5300,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5279,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4895,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4193,
+        "code": "OK"
+      },
+      {
+        "duration_us": 6290,
+        "code": "OK"
+      },
+      {
+        "duration_us": 6015,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4232,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3437,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3624,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5313,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4184,
+        "code": "OK"
+      },
+      {
+        "duration_us": 5539,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4354,
+        "code": "OK"
+      },
+      {
+        "duration_us": 6196,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4322,
+        "code": "OK"
+      },
+      {
+        "duration_us": 3618,
+        "code": "OK"
+      },
+      {
+        "duration_us": 4401,
+        "code": "OK"
+      }
+    ],
+    "Topology": [
+      {
+        "duration_us": 1165,
+        "code": "OK"
+      },
+      {
+        "duration_us": 509,
+        "code": "OK"
+      },
+      {
+        "duration_us": 463,
+        "code": "OK"
+      },
+      {
+        "duration_us": 475,
+        "code": "OK"
+      },
+      {
+        "duration_us": 457,
+        "code": "OK"
+      },
+      {
+        "duration_us": 380,
+        "code": "OK"
+      },
+      {
+        "duration_us": 305,
+        "code": "OK"
+      },
+      {
+        "duration_us": 455,
+        "code": "OK"
+      },
+      {
+        "duration_us": 294,
+        "code": "OK"
+      },
+      {
+        "duration_us": 366,
+        "code": "OK"
+      },
+      {
+        "duration_us": 309,
+        "code": "OK"
+      },
+      {
+        "duration_us": 290,
+        "code": "OK"
+      },
+      {
+        "duration_us": 287,
+        "code": "OK"
+      },
+      {
+        "duration_us": 355,
+        "code": "OK"
+      },
+      {
+        "duration_us": 475,
+        "code": "OK"
+      },
+      {
+        "duration_us": 448,
+        "code": "OK"
+      },
+      {
+        "duration_us": 294,
+        "code": "OK"
+      },
+      {
+        "duration_us": 449,
+        "code": "OK"
+      },
+      {
+        "duration_us": 311,
+        "code": "OK"
+      },
+      {
+        "duration_us": 339,
+        "code": "OK"
+      },
+      {
+        "duration_us": 400,
+        "code": "OK"
+      },
+      {
+        "duration_us": 281,
+        "code": "OK"
+      },
+      {
+        "duration_us": 350,
+        "code": "OK"
+      },
+      {
+        "duration_us": 522,
+        "code": "OK"
+      },
+      {
+        "duration_us": 291,
+        "code": "OK"
+      },
+      {
+        "duration_us": 325,
+        "code": "OK"
+      },
+      {
+        "duration_us": 339,
+        "code": "OK"
+      },
+      {
+        "duration_us": 388,
+        "code": "OK"
+      },
+      {
+        "duration_us": 277,
+        "code": "OK"
+      },
+      {
+        "duration_us": 456,
+        "code": "OK"
+      }
+    ]
+  },
+  "summary": {
+    "CompleteJob": {
+      "count": 30,
+      "errors": 0,
+      "p50_us": 2201,
+      "p95_us": 3957,
+      "p99_us": 4827,
+      "mean_us": 2397.5333333333333
+    },
+    "CreateProcessInstance": {
+      "count": 30,
+      "errors": 0,
+      "p50_us": 3261,
+      "p95_us": 4051,
+      "p99_us": 4425,
+      "mean_us": 3344.266666666667
+    },
+    "CreateProcessInstanceWithResult": {
+      "count": 30,
+      "errors": 0,
+      "p50_us": 3452,
+      "p95_us": 4724,
+      "p99_us": 5663,
+      "mean_us": 3556.0333333333333
+    },
+    "DeployResource": {
+      "count": 30,
+      "errors": 0,
+      "p50_us": 1794,
+      "p95_us": 4397,
+      "p99_us": 5752,
+      "mean_us": 2137.6
+    },
+    "JobDelivery": {
+      "count": 30,
+      "errors": 0,
+      "p50_us": 4895,
+      "p95_us": 6290,
+      "p99_us": 7311,
+      "mean_us": 4994.366666666667
+    },
+    "Topology": {
+      "count": 30,
+      "errors": 0,
+      "p50_us": 355,
+      "p95_us": 522,
+      "p99_us": 1165,
+      "mean_us": 401.8333333333333
+    }
+  }
+}

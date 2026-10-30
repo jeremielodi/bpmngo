@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/dmn"
@@ -98,7 +99,7 @@ func (r *Runtime) executeBusinessRuleTask(ctx context.Context, engineRepo *repos
 	}
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(exec.ID, exec.ProcessInstanceID, node.ID, next, variables))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), exec.ID.String(), node.ID, next)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), node.ID, next)
 	}
 
 	return next, nil

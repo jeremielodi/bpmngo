@@ -1,0 +1,20 @@
+{
+  "engine": "direct-bigint-final-20261029",
+  "generated_at": "2026-10-29T18:35:58.154778Z",
+  "clients": 50,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 10,
+  "seconds": 60.140271875,
+  "completed": 12756,
+  "instances_per_second": 212.1041292682051,
+  "errors": {},
+  "latency": {
+    "count": 12756,
+    "errors": 0,
+    "p50_us": 211746,
+    "p95_us": 465800,
+    "p99_us": 611763,
+    "mean_us": 235443.68289432424
+  }
+}

@@ -556,6 +556,24 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 		target.Incoming = append(target.Incoming, f.SourceRef)
 	}
 
+	// BPMN elements may explicitly list their outgoing sequence-flow refs.
+	// That list defines the evaluation order used by Camunda for exclusive
+	// gateways. Preserve it instead of relying on where sequenceFlow elements
+	// happen to appear in the XML document; append any unlisted flows in their
+	// original document order for permissive compatibility with older models.
+	for _, g := range process.ExclusiveGateways {
+		reorderOutgoing(nodeMap[g.ID], g.Outgoing)
+	}
+	for _, g := range process.InclusiveGateways {
+		reorderOutgoing(nodeMap[g.ID], g.Outgoing)
+	}
+	for _, g := range process.ParallelGateways {
+		reorderOutgoing(nodeMap[g.ID], g.Outgoing)
+	}
+	for _, g := range process.EventBasedGateways {
+		reorderOutgoing(nodeMap[g.ID], g.Outgoing)
+	}
+
 	// ---- Add incoming/outgoing edges for Generic Tasks ----
 	for _, task := range process.Tasks {
 		for _, incoming := range task.Incoming {
@@ -841,6 +859,30 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 	}
 
 	return graph, nil
+}
+
+func reorderOutgoing(node *Node, refs []string) {
+	if node == nil || len(refs) == 0 || len(node.Outgoing) < 2 {
+		return
+	}
+	byID := make(map[string]Flow, len(node.Outgoing))
+	for _, flow := range node.Outgoing {
+		byID[flow.ID] = flow
+	}
+	ordered := make([]Flow, 0, len(node.Outgoing))
+	seen := make(map[string]bool, len(node.Outgoing))
+	for _, ref := range refs {
+		if flow, ok := byID[strings.TrimSpace(ref)]; ok && !seen[flow.ID] {
+			ordered = append(ordered, flow)
+			seen[flow.ID] = true
+		}
+	}
+	for _, flow := range node.Outgoing {
+		if !seen[flow.ID] {
+			ordered = append(ordered, flow)
+		}
+	}
+	node.Outgoing = ordered
 }
 
 // validateParallelGateway ensures the gateway has proper fork/join structure

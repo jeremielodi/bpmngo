@@ -1,0 +1,407 @@
+parent,partition,bounds,total_bytes
+audit_logs,audit_logs_202610,FOR VALUES FROM ('2026-10-01 00:00:00') TO ('2026-11-01 00:00:00'),114688
+audit_logs,audit_logs_202611,FOR VALUES FROM ('2026-11-01 00:00:00') TO ('2026-12-01 00:00:00'),81920
+audit_logs,audit_logs_202612,FOR VALUES FROM ('2026-12-01 00:00:00') TO ('2027-01-01 00:00:00'),81920
+audit_logs,audit_logs_202701,FOR VALUES FROM ('2027-01-01 00:00:00') TO ('2027-02-01 00:00:00'),81920
+audit_logs,audit_logs_202702,FOR VALUES FROM ('2027-02-01 00:00:00') TO ('2027-03-01 00:00:00'),81920
+audit_logs,audit_logs_202703,FOR VALUES FROM ('2027-03-01 00:00:00') TO ('2027-04-01 00:00:00'),81920
+audit_logs,audit_logs_202704,FOR VALUES FROM ('2027-04-01 00:00:00') TO ('2027-05-01 00:00:00'),81920
+audit_logs,audit_logs_202705,FOR VALUES FROM ('2027-05-01 00:00:00') TO ('2027-06-01 00:00:00'),81920
+audit_logs,audit_logs_202706,FOR VALUES FROM ('2027-06-01 00:00:00') TO ('2027-07-01 00:00:00'),81920
+audit_logs,audit_logs_202707,FOR VALUES FROM ('2027-07-01 00:00:00') TO ('2027-08-01 00:00:00'),81920
+audit_logs,audit_logs_202708,FOR VALUES FROM ('2027-08-01 00:00:00') TO ('2027-09-01 00:00:00'),81920
+audit_logs,audit_logs_202709,FOR VALUES FROM ('2027-09-01 00:00:00') TO ('2027-10-01 00:00:00'),81920
+audit_logs,audit_logs_202710,FOR VALUES FROM ('2027-10-01 00:00:00') TO ('2027-11-01 00:00:00'),81920
+audit_logs,audit_logs_default,DEFAULT,81920
+audit_logs_pkey1,audit_logs_202610_pkey,,16384
+audit_logs_pkey1,audit_logs_202611_pkey,,8192
+audit_logs_pkey1,audit_logs_202612_pkey,,8192
+audit_logs_pkey1,audit_logs_202701_pkey,,8192
+audit_logs_pkey1,audit_logs_202702_pkey,,8192
+audit_logs_pkey1,audit_logs_202703_pkey,,8192
+audit_logs_pkey1,audit_logs_202704_pkey,,8192
+audit_logs_pkey1,audit_logs_202705_pkey,,8192
+audit_logs_pkey1,audit_logs_202706_pkey,,8192
+audit_logs_pkey1,audit_logs_202707_pkey,,8192
+audit_logs_pkey1,audit_logs_202708_pkey,,8192
+audit_logs_pkey1,audit_logs_202709_pkey,,8192
+audit_logs_pkey1,audit_logs_202710_pkey,,8192
+audit_logs_pkey1,audit_logs_default_pkey,,8192
+historic_activity_instances,historic_activity_instances_202610,FOR VALUES FROM ('2026-10-01 00:00:00') TO ('2026-11-01 00:00:00'),283312128
+historic_activity_instances,historic_activity_instances_202611,FOR VALUES FROM ('2026-11-01 00:00:00') TO ('2026-12-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202612,FOR VALUES FROM ('2026-12-01 00:00:00') TO ('2027-01-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202701,FOR VALUES FROM ('2027-01-01 00:00:00') TO ('2027-02-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202702,FOR VALUES FROM ('2027-02-01 00:00:00') TO ('2027-03-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202703,FOR VALUES FROM ('2027-03-01 00:00:00') TO ('2027-04-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202704,FOR VALUES FROM ('2027-04-01 00:00:00') TO ('2027-05-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202705,FOR VALUES FROM ('2027-05-01 00:00:00') TO ('2027-06-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202706,FOR VALUES FROM ('2027-06-01 00:00:00') TO ('2027-07-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202707,FOR VALUES FROM ('2027-07-01 00:00:00') TO ('2027-08-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202708,FOR VALUES FROM ('2027-08-01 00:00:00') TO ('2027-09-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202709,FOR VALUES FROM ('2027-09-01 00:00:00') TO ('2027-10-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_202710,FOR VALUES FROM ('2027-10-01 00:00:00') TO ('2027-11-01 00:00:00'),24576
+historic_activity_instances,historic_activity_instances_default,DEFAULT,24576
+historic_activity_instances_pkey1,historic_activity_instances_202610_pkey,,79192064
+historic_activity_instances_pkey1,historic_activity_instances_202611_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202612_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202701_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202702_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202703_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202704_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202705_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202706_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202707_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202708_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202709_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_202710_pkey,,8192
+historic_activity_instances_pkey1,historic_activity_instances_default_pkey,,8192
+historic_incidents,historic_incidents_202610,FOR VALUES FROM ('2026-10-01 00:00:00') TO ('2026-11-01 00:00:00'),81920
+historic_incidents,historic_incidents_202611,FOR VALUES FROM ('2026-11-01 00:00:00') TO ('2026-12-01 00:00:00'),40960
+historic_incidents,historic_incidents_202612,FOR VALUES FROM ('2026-12-01 00:00:00') TO ('2027-01-01 00:00:00'),40960
+historic_incidents,historic_incidents_202701,FOR VALUES FROM ('2027-01-01 00:00:00') TO ('2027-02-01 00:00:00'),40960
+historic_incidents,historic_incidents_202702,FOR VALUES FROM ('2027-02-01 00:00:00') TO ('2027-03-01 00:00:00'),40960
+historic_incidents,historic_incidents_202703,FOR VALUES FROM ('2027-03-01 00:00:00') TO ('2027-04-01 00:00:00'),40960
+historic_incidents,historic_incidents_202704,FOR VALUES FROM ('2027-04-01 00:00:00') TO ('2027-05-01 00:00:00'),40960
+historic_incidents,historic_incidents_202705,FOR VALUES FROM ('2027-05-01 00:00:00') TO ('2027-06-01 00:00:00'),40960
+historic_incidents,historic_incidents_202706,FOR VALUES FROM ('2027-06-01 00:00:00') TO ('2027-07-01 00:00:00'),40960
+historic_incidents,historic_incidents_202707,FOR VALUES FROM ('2027-07-01 00:00:00') TO ('2027-08-01 00:00:00'),40960
+historic_incidents,historic_incidents_202708,FOR VALUES FROM ('2027-08-01 00:00:00') TO ('2027-09-01 00:00:00'),40960
+historic_incidents,historic_incidents_202709,FOR VALUES FROM ('2027-09-01 00:00:00') TO ('2027-10-01 00:00:00'),40960
+historic_incidents,historic_incidents_202710,FOR VALUES FROM ('2027-10-01 00:00:00') TO ('2027-11-01 00:00:00'),40960
+historic_incidents,historic_incidents_default,DEFAULT,40960
+historic_incidents_pkey1,historic_incidents_202610_pkey,,16384
+historic_incidents_pkey1,historic_incidents_202611_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202612_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202701_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202702_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202703_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202704_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202705_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202706_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202707_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202708_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202709_pkey,,8192
+historic_incidents_pkey1,historic_incidents_202710_pkey,,8192
+historic_incidents_pkey1,historic_incidents_default_pkey,,8192
+historic_process_instances,historic_process_instances_202610,FOR VALUES FROM ('2026-10-01 00:00:00') TO ('2026-11-01 00:00:00'),38797312
+historic_process_instances,historic_process_instances_202611,FOR VALUES FROM ('2026-11-01 00:00:00') TO ('2026-12-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202612,FOR VALUES FROM ('2026-12-01 00:00:00') TO ('2027-01-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202701,FOR VALUES FROM ('2027-01-01 00:00:00') TO ('2027-02-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202702,FOR VALUES FROM ('2027-02-01 00:00:00') TO ('2027-03-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202703,FOR VALUES FROM ('2027-03-01 00:00:00') TO ('2027-04-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202704,FOR VALUES FROM ('2027-04-01 00:00:00') TO ('2027-05-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202705,FOR VALUES FROM ('2027-05-01 00:00:00') TO ('2027-06-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202706,FOR VALUES FROM ('2027-06-01 00:00:00') TO ('2027-07-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202707,FOR VALUES FROM ('2027-07-01 00:00:00') TO ('2027-08-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202708,FOR VALUES FROM ('2027-08-01 00:00:00') TO ('2027-09-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202709,FOR VALUES FROM ('2027-09-01 00:00:00') TO ('2027-10-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_202710,FOR VALUES FROM ('2027-10-01 00:00:00') TO ('2027-11-01 00:00:00'),114688
+historic_process_instances,historic_process_instances_default,DEFAULT,114688
+historic_process_instances_pkey1,historic_process_instances_202610_pkey,,5890048
+historic_process_instances_pkey1,historic_process_instances_202611_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202612_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202701_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202702_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202703_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202704_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202705_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202706_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202707_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202708_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202709_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_202710_pkey,,8192
+historic_process_instances_pkey1,historic_process_instances_default_pkey,,8192
+historic_tasks,historic_tasks_202610,FOR VALUES FROM ('2026-10-01 00:00:00') TO ('2026-11-01 00:00:00'),65536
+historic_tasks,historic_tasks_202611,FOR VALUES FROM ('2026-11-01 00:00:00') TO ('2026-12-01 00:00:00'),32768
+historic_tasks,historic_tasks_202612,FOR VALUES FROM ('2026-12-01 00:00:00') TO ('2027-01-01 00:00:00'),32768
+historic_tasks,historic_tasks_202701,FOR VALUES FROM ('2027-01-01 00:00:00') TO ('2027-02-01 00:00:00'),32768
+historic_tasks,historic_tasks_202702,FOR VALUES FROM ('2027-02-01 00:00:00') TO ('2027-03-01 00:00:00'),32768
+historic_tasks,historic_tasks_202703,FOR VALUES FROM ('2027-03-01 00:00:00') TO ('2027-04-01 00:00:00'),32768
+historic_tasks,historic_tasks_202704,FOR VALUES FROM ('2027-04-01 00:00:00') TO ('2027-05-01 00:00:00'),32768
+historic_tasks,historic_tasks_202705,FOR VALUES FROM ('2027-05-01 00:00:00') TO ('2027-06-01 00:00:00'),32768
+historic_tasks,historic_tasks_202706,FOR VALUES FROM ('2027-06-01 00:00:00') TO ('2027-07-01 00:00:00'),32768
+historic_tasks,historic_tasks_202707,FOR VALUES FROM ('2027-07-01 00:00:00') TO ('2027-08-01 00:00:00'),32768
+historic_tasks,historic_tasks_202708,FOR VALUES FROM ('2027-08-01 00:00:00') TO ('2027-09-01 00:00:00'),32768
+historic_tasks,historic_tasks_202709,FOR VALUES FROM ('2027-09-01 00:00:00') TO ('2027-10-01 00:00:00'),32768
+historic_tasks,historic_tasks_202710,FOR VALUES FROM ('2027-10-01 00:00:00') TO ('2027-11-01 00:00:00'),32768
+historic_tasks,historic_tasks_default,DEFAULT,32768
+historic_tasks_pkey1,historic_tasks_202610_pkey,,16384
+historic_tasks_pkey1,historic_tasks_202611_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202612_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202701_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202702_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202703_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202704_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202705_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202706_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202707_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202708_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202709_pkey,,8192
+historic_tasks_pkey1,historic_tasks_202710_pkey,,8192
+historic_tasks_pkey1,historic_tasks_default_pkey,,8192
+historic_variables,historic_variables_202610,FOR VALUES FROM ('2026-10-01 00:00:00') TO ('2026-11-01 00:00:00'),27787264
+historic_variables,historic_variables_202611,FOR VALUES FROM ('2026-11-01 00:00:00') TO ('2026-12-01 00:00:00'),24576
+historic_variables,historic_variables_202612,FOR VALUES FROM ('2026-12-01 00:00:00') TO ('2027-01-01 00:00:00'),24576
+historic_variables,historic_variables_202701,FOR VALUES FROM ('2027-01-01 00:00:00') TO ('2027-02-01 00:00:00'),24576
+historic_variables,historic_variables_202702,FOR VALUES FROM ('2027-02-01 00:00:00') TO ('2027-03-01 00:00:00'),24576
+historic_variables,historic_variables_202703,FOR VALUES FROM ('2027-03-01 00:00:00') TO ('2027-04-01 00:00:00'),24576
+historic_variables,historic_variables_202704,FOR VALUES FROM ('2027-04-01 00:00:00') TO ('2027-05-01 00:00:00'),24576
+historic_variables,historic_variables_202705,FOR VALUES FROM ('2027-05-01 00:00:00') TO ('2027-06-01 00:00:00'),24576
+historic_variables,historic_variables_202706,FOR VALUES FROM ('2027-06-01 00:00:00') TO ('2027-07-01 00:00:00'),24576
+historic_variables,historic_variables_202707,FOR VALUES FROM ('2027-07-01 00:00:00') TO ('2027-08-01 00:00:00'),24576
+historic_variables,historic_variables_202708,FOR VALUES FROM ('2027-08-01 00:00:00') TO ('2027-09-01 00:00:00'),24576
+historic_variables,historic_variables_202709,FOR VALUES FROM ('2027-09-01 00:00:00') TO ('2027-10-01 00:00:00'),24576
+historic_variables,historic_variables_202710,FOR VALUES FROM ('2027-10-01 00:00:00') TO ('2027-11-01 00:00:00'),24576
+historic_variables,historic_variables_default,DEFAULT,24576
+historic_variables_pkey1,historic_variables_202610_pkey,,5832704
+historic_variables_pkey1,historic_variables_202611_pkey,,8192
+historic_variables_pkey1,historic_variables_202612_pkey,,8192
+historic_variables_pkey1,historic_variables_202701_pkey,,8192
+historic_variables_pkey1,historic_variables_202702_pkey,,8192
+historic_variables_pkey1,historic_variables_202703_pkey,,8192
+historic_variables_pkey1,historic_variables_202704_pkey,,8192
+historic_variables_pkey1,historic_variables_202705_pkey,,8192
+historic_variables_pkey1,historic_variables_202706_pkey,,8192
+historic_variables_pkey1,historic_variables_202707_pkey,,8192
+historic_variables_pkey1,historic_variables_202708_pkey,,8192
+historic_variables_pkey1,historic_variables_202709_pkey,,8192
+historic_variables_pkey1,historic_variables_202710_pkey,,8192
+historic_variables_pkey1,historic_variables_default_pkey,,8192
+idx_audit_logs_created_brin,audit_logs_202610_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202611_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202612_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202701_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202702_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202703_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202704_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202705_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202706_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202707_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202708_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202709_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_202710_created_at_idx,,49152
+idx_audit_logs_created_brin,audit_logs_default_created_at_idx,,49152
+idx_audit_logs_instance_key,audit_logs_202610_process_instance_key_idx,,16384
+idx_audit_logs_instance_key,audit_logs_202611_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202612_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202701_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202702_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202703_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202704_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202705_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202706_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202707_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202708_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202709_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_202710_process_instance_key_idx,,8192
+idx_audit_logs_instance_key,audit_logs_default_process_instance_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202610_task_key_idx,,16384
+idx_audit_logs_task_key,audit_logs_202611_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202612_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202701_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202702_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202703_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202704_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202705_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202706_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202707_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202708_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202709_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_202710_task_key_idx,,8192
+idx_audit_logs_task_key,audit_logs_default_task_key_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202610_process_instance_id_idx,,14016512
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202611_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202612_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202701_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202702_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202703_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202704_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202705_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202706_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202707_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202708_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202709_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_202710_process_instance_id_idx,,8192
+idx_historic_activity_instances_process_instance_id,historic_activity_instances_default_process_instance_id_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202610_process_definition_key_idx,,16384
+idx_historic_incidents_process_definition_key,historic_incidents_202611_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202612_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202701_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202702_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202703_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202704_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202705_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202706_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202707_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202708_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202709_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_202710_process_definition_key_idx,,8192
+idx_historic_incidents_process_definition_key,historic_incidents_default_process_definition_key_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202610_process_instance_id_idx,,16384
+idx_historic_incidents_process_instance_id,historic_incidents_202611_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202612_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202701_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202702_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202703_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202704_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202705_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202706_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202707_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202708_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202709_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_202710_process_instance_id_idx,,8192
+idx_historic_incidents_process_instance_id,historic_incidents_default_process_instance_id_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202610_business_key_idx,,819200
+idx_historic_process_instances_business_key,historic_process_instances_202611_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202612_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202701_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202702_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202703_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202704_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202705_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202706_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202707_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202708_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202709_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_202710_business_key_idx,,8192
+idx_historic_process_instances_business_key,historic_process_instances_default_business_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202610_process_definition_key_idx,,843776
+idx_historic_process_instances_definition_key,historic_process_instances_202611_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202612_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202701_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202702_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202703_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202704_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202705_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202706_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202707_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202708_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202709_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_202710_process_definition_key_idx,,8192
+idx_historic_process_instances_definition_key,historic_process_instances_default_process_definition_key_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202610_ended_at_idx,,2629632
+idx_historic_process_instances_ended_at,historic_process_instances_202611_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202612_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202701_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202702_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202703_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202704_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202705_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202706_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202707_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202708_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202709_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_202710_ended_at_idx,,8192
+idx_historic_process_instances_ended_at,historic_process_instances_default_ended_at_idx,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx1,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx2,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx3,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx4,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx5,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx6,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx7,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx8,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_start_idx9,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_20_process_definition_key_starte_idx,,6848512
+idx_historic_process_instances_key_started_at,historic_process_instances_2_process_definition_key_start_idx10,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_2_process_definition_key_start_idx11,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_2_process_definition_key_start_idx12,,8192
+idx_historic_process_instances_key_started_at,historic_process_instances_de_process_definition_key_starte_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202610_started_at_idx,,2629632
+idx_historic_process_instances_started_at,historic_process_instances_202611_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202612_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202701_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202702_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202703_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202704_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202705_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202706_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202707_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202708_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202709_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_202710_started_at_idx,,8192
+idx_historic_process_instances_started_at,historic_process_instances_default_started_at_idx,,8192
+idx_historic_process_instances_started_brin,historic_process_instances_202610_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202611_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202612_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202701_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202702_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202703_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202704_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202705_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202706_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202707_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202708_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202709_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_202710_started_at_idx1,,49152
+idx_historic_process_instances_started_brin,historic_process_instances_default_started_at_idx1,,49152
+idx_historic_process_instances_tenant_id,historic_process_instances_202610_tenant_id_idx,,819200
+idx_historic_process_instances_tenant_id,historic_process_instances_202611_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202612_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202701_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202702_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202703_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202704_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202705_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202706_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202707_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202708_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202709_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_202710_tenant_id_idx,,8192
+idx_historic_process_instances_tenant_id,historic_process_instances_default_tenant_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202610_process_instance_id_idx,,16384
+idx_historic_tasks_process_instance_id,historic_tasks_202611_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202612_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202701_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202702_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202703_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202704_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202705_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202706_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202707_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202708_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202709_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_202710_process_instance_id_idx,,8192
+idx_historic_tasks_process_instance_id,historic_tasks_default_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202610_process_instance_id_idx,,3678208
+idx_historic_variables_process_instance_id,historic_variables_202611_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202612_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202701_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202702_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202703_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202704_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202705_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202706_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202707_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202708_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202709_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_202710_process_instance_id_idx,,8192
+idx_historic_variables_process_instance_id,historic_variables_default_process_instance_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202610_id_idx,,16384
+uq_historic_incidents_legacy_id,historic_incidents_202611_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202612_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202701_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202702_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202703_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202704_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202705_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202706_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202707_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202708_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202709_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_202710_id_idx,,8192
+uq_historic_incidents_legacy_id,historic_incidents_default_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202610_id_idx,,16384
+uq_historic_tasks_legacy_id,historic_tasks_202611_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202612_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202701_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202702_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202703_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202704_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202705_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202706_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202707_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202708_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202709_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_202710_id_idx,,8192
+uq_historic_tasks_legacy_id,historic_tasks_default_id_idx,,8192

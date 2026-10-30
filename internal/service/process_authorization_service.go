@@ -2,10 +2,43 @@
 package service
 
 import (
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
+
+type processAccessCacheKey struct {
+	db         *sqlx.DB
+	userID     uuid.UUID
+	processKey string
+	level      string
+}
+
+type processAccessCacheEntry struct {
+	allowed bool
+	expires time.Time
+}
+
+var processAccessCache = struct {
+	sync.Mutex
+	entries map[processAccessCacheKey]processAccessCacheEntry
+}{entries: map[processAccessCacheKey]processAccessCacheEntry{}}
+
+const processAccessCacheTTL = 5 * time.Second
+
+// InvalidateProcessAuthorization drops cached decisions after an ACL write.
+func InvalidateProcessAuthorization(processKey string) {
+	processAccessCache.Lock()
+	defer processAccessCache.Unlock()
+	for key := range processAccessCache.entries {
+		if key.processKey == processKey {
+			delete(processAccessCache.entries, key)
+		}
+	}
+}
 
 // CanAccessProcess reports whether userID may access processKey at the
 // given level ("VIEW", "START", or "MANAGE"). A process_key with no ACL
@@ -16,6 +49,25 @@ import (
 // global CAN_MANAGE_DEPLOY_PROCESS action (already the "manage all
 // deploy/process stuff" superpower, held by super_admin).
 func CanAccessProcess(db *sqlx.DB, userID uuid.UUID, processKey, level string) (bool, error) {
+	key := processAccessCacheKey{db: db, userID: userID, processKey: processKey, level: level}
+	now := time.Now()
+	processAccessCache.Lock()
+	if cached, ok := processAccessCache.entries[key]; ok && now.Before(cached.expires) {
+		processAccessCache.Unlock()
+		return cached.allowed, nil
+	}
+	processAccessCache.Unlock()
+	remember := func(allowed bool, err error) (bool, error) {
+		if err == nil {
+			processAccessCache.Lock()
+			if len(processAccessCache.entries) >= 10000 {
+				processAccessCache.entries = map[processAccessCacheKey]processAccessCacheEntry{}
+			}
+			processAccessCache.entries[key] = processAccessCacheEntry{allowed: allowed, expires: now.Add(processAccessCacheTTL)}
+			processAccessCache.Unlock()
+		}
+		return allowed, err
+	}
 	permRepo := repository.NewProcessPermissionRepository(db)
 
 	restricted, err := permRepo.IsRestricted(processKey)
@@ -23,7 +75,7 @@ func CanAccessProcess(db *sqlx.DB, userID uuid.UUID, processKey, level string) (
 		return false, err
 	}
 	if !restricted {
-		return true, nil
+		return remember(true, nil)
 	}
 
 	hasGrant, err := permRepo.UserHasProcessPermission(userID, processKey, level)
@@ -31,11 +83,12 @@ func CanAccessProcess(db *sqlx.DB, userID uuid.UUID, processKey, level string) (
 		return false, err
 	}
 	if hasGrant {
-		return true, nil
+		return remember(true, nil)
 	}
 
 	actionRepo := repository.NewActionRepository(db)
-	return actionRepo.UserHasPermission(userID, "CAN_MANAGE_DEPLOY_PROCESS")
+	allowed, err := actionRepo.UserHasPermission(userID, "CAN_MANAGE_DEPLOY_PROCESS")
+	return remember(allowed, err)
 }
 
 // CanAccessProcessInstance is CanAccessProcess for callers that only have a

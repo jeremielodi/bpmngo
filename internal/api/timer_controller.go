@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/models"
@@ -21,9 +23,10 @@ func (c *TimerController) GetTimers(ctx *fiber.Ctx) error {
 
 	timers := []models.TimerJob{}
 	query := `
-		SELECT id, process_instance_id, execution_id, event_type, due_at, payload, 
+		SELECT t.engine_key, pi.id AS process_instance_id, t.execution_key, event_type, due_at, payload,
 		       is_triggered, created_at, triggered_at, cycle_count, total_cycles, repeat_interval
-		FROM public.timer_jobs
+		FROM public.timer_jobs t
+		LEFT JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
 		WHERE 1=1
 	`
 
@@ -34,7 +37,7 @@ func (c *TimerController) GetTimers(ctx *fiber.Ctx) error {
 				"error": "Invalid processInstanceId",
 			})
 		}
-		query += " AND process_instance_id = $1 ORDER BY created_at DESC"
+		query += " AND pi.id = $1 ORDER BY created_at DESC"
 		err = c.db.Select(&timers, query, pid)
 		if err != nil {
 			return ctx.Status(500).JSON(fiber.Map{
@@ -56,7 +59,7 @@ func (c *TimerController) GetTimers(ctx *fiber.Ctx) error {
 
 // GetTimerByID handles GET /timers/:id - returns a specific timer
 func (c *TimerController) GetTimerByID(ctx *fiber.Ctx) error {
-	timerID, err := uuid.Parse(ctx.Params("id"))
+	timerID, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
 		return ctx.Status(400).JSON(fiber.Map{
 			"error": "Invalid timer ID",
@@ -65,10 +68,11 @@ func (c *TimerController) GetTimerByID(ctx *fiber.Ctx) error {
 
 	var timer models.TimerJob
 	query := `
-		SELECT id, process_instance_id, execution_id, event_type, due_at, payload, 
+		SELECT t.engine_key, pi.id AS process_instance_id, t.execution_key, event_type, due_at, payload,
 		       is_triggered, created_at, triggered_at, cycle_count, total_cycles, repeat_interval
-		FROM public.timer_jobs
-		WHERE id = $1
+		FROM public.timer_jobs t
+		LEFT JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
+		WHERE t.engine_key = $1
 	`
 
 	err = c.db.Get(&timer, query, timerID)

@@ -171,6 +171,27 @@ func main() {
 	if err != nil {
 		log.Fatalln("Postgres: ", err)
 	}
+	// Keep twelve future monthly history/audit partitions ready. Migration
+	// 015 installs the function; the existence check keeps rolling upgrades
+	// compatible while an old database is waiting for that migration.
+	var hasPartitionMaintenance bool
+	if err := db.Get(&hasPartitionMaintenance,
+		`SELECT to_regprocedure('public.goflow_ensure_history_partitions(integer)') IS NOT NULL`); err != nil {
+		log.Printf("⚠️ history partition check failed: %v", err)
+	} else if hasPartitionMaintenance {
+		if _, err := db.Exec(`SELECT public.goflow_ensure_history_partitions(12)`); err != nil {
+			log.Printf("⚠️ history partition maintenance failed (DEFAULT partitions remain available): %v", err)
+		}
+		go func() {
+			ticker := time.NewTicker(24 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				if _, err := db.Exec(`SELECT public.goflow_ensure_history_partitions(12)`); err != nil {
+					log.Printf("⚠️ history partition maintenance failed: %v", err)
+				}
+			}
+		}()
+	}
 	// Session-level work (advisory locks held across transactions) reaches
 	// Postgres directly, bypassing PgBouncer when there is one (DB_DIRECT_HOST).
 	directDB, err := database.NewDirectPostgres(util)
@@ -402,7 +423,7 @@ func main() {
 	}()
 
 	taskService := service.NewTaskService(db, taskEventDispatcher)
-	taskService.SetResumeExecutor(func(ctx context.Context, graph *engine.ProcessGraph, execID uuid.UUID) error {
+	taskService.SetResumeExecutor(func(ctx context.Context, graph *engine.ProcessGraph, execID int64) error {
 		rt := runtime.NewRuntime(graph, db, taskEventDispatcher)
 		return rt.ExecuteExecution(ctx, execID)
 	})
@@ -456,7 +477,7 @@ func main() {
 	v2JobCtrl := apiv2.NewJobController(db, taskEventDispatcher)
 	v2UserTaskCtrl := apiv2.NewUserTaskController(db, taskEventDispatcher)
 	v2MessageCtrl := apiv2.NewMessageController(messageCtrl)
-	v2SignalCtrl := apiv2.NewSignalController(signalCtrl)
+	v2SignalCtrl := apiv2.NewSignalController(db, signalCtrl)
 	v2DecisionCtrl := apiv2.NewDecisionController(db)
 	v2FormCtrl := apiv2.NewFormController(db)
 	v2IncidentCtrl := apiv2.NewIncidentController(db)

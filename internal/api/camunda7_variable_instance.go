@@ -75,7 +75,7 @@ func (tc *Camunda7TaskController) findVariables(c *fiber.Ctx, q c7VariableQuery)
 	var args []interface{}
 	if len(instances) > 0 {
 		args = append(args, pq.Array(instances))
-		where = append(where, "v.process_instance_id::text = ANY($"+strconv.Itoa(len(args))+")")
+		where = append(where, "p.id::text = ANY($"+strconv.Itoa(len(args))+")")
 	}
 	if len(q.TenantIDIn) > 0 {
 		args = append(args, pq.Array(q.TenantIDIn))
@@ -92,11 +92,11 @@ func (tc *Camunda7TaskController) findVariables(c *fiber.Ctx, q c7VariableQuery)
 		Data                []byte    `db:"data"`
 	}
 	if err := tc.db.Select(&rows, `
-		SELECT v.process_instance_id, p.process_definition_id, p.tenant_id, v.data
+		SELECT p.id AS process_instance_id, p.process_definition_id, p.tenant_id, v.data
 		FROM public.variables v
-		JOIN public.process_instances p ON p.id = v.process_instance_id
+		JOIN public.process_instances p ON p.engine_key = v.process_instance_key
 		WHERE `+strings.Join(where, " AND ")+`
-		ORDER BY v.process_instance_id`, args...); err != nil {
+		ORDER BY p.id`, args...); err != nil {
 		return nil, err
 	}
 

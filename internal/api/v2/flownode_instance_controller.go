@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
@@ -48,18 +49,74 @@ func flownodeInstanceState(status string, isActive bool) string {
 	}
 }
 
-func executionItem(e repository.Execution) fiber.Map {
+func (fc *FlownodeInstanceController) executionItem(e repository.Execution) fiber.Map {
 	var endDate interface{}
 	if !e.IsActive {
 		endDate = e.UpdatedAt
 	}
-	return fiber.Map{
-		"flowNodeInstanceKey": e.ID,
-		"processInstanceKey":  e.ProcessInstanceID,
-		"elementId":           e.CurrentElementID,
-		"state":               flownodeInstanceState(e.Status, e.IsActive),
-		"startDate":           e.CreatedAt,
-		"endDate":             endDate,
+	item := fiber.Map{
+		"elementInstanceKey":     e.ID,
+		"processInstanceKey":     e.ProcessInstanceID,
+		"rootProcessInstanceKey": e.ProcessInstanceID,
+		"elementId":              e.CurrentElementID,
+		"state":                  flownodeInstanceState(e.Status, e.IsActive),
+		"startDate":              e.CreatedAt,
+		"endDate":                endDate,
+		"hasIncident":            false,
+		"incidentKey":            nil,
+		"tenantId":               "<default>",
+	}
+	fc.enrichElementItem(item, e.ProcessInstanceID, e.CurrentElementID)
+	return item
+}
+
+func (fc *FlownodeInstanceController) enrichElementItem(item fiber.Map, instanceID uuid.UUID, elementID string) {
+	instanceRepo := repository.NewProcessInstanceRepository(fc.db)
+	inst, _ := instanceRepo.FindByID(instanceID)
+	if inst == nil {
+		inst, _ = instanceRepo.FindHistoricByID(instanceID)
+	}
+	if inst == nil {
+		return
+	}
+	item["processDefinitionId"] = inst.ProcessKey
+	item["processDefinitionKey"] = inst.ProcessDefinitionID
+	if inst.TenantID != nil && *inst.TenantID != "" {
+		item["tenantId"] = *inst.TenantID
+	}
+	if graph, err := repository.NewEngineRepository(fc.db, nil).GetProcessGraphByDefinitionID(inst.ProcessDefinitionID); err == nil && graph != nil {
+		if node, ok := graph.Nodes[elementID]; ok {
+			item["elementName"] = node.Name
+			if node.Name == "" {
+				item["elementName"] = node.ID
+			}
+			item["type"] = camundaElementType(node.Type)
+		}
+	}
+}
+
+func camundaElementType(t engine.NodeType) string {
+	switch t {
+	case engine.StartEventType, engine.StartTimerEventType, engine.MessageStartEventType, engine.SignalStartEventType:
+		return "START_EVENT"
+	case engine.EndEventType, engine.TerminateEndEventType, engine.ErrorEndEventType, engine.SignalEndEventType, engine.EscalationEndEventType, engine.CompensationEndEventType:
+		return "END_EVENT"
+	case engine.ServiceTaskType:
+		return "SERVICE_TASK"
+	case engine.UserTaskType:
+		return "USER_TASK"
+	case engine.ExclusiveGatewayType:
+		return "EXCLUSIVE_GATEWAY"
+	case engine.InclusiveGatewayType:
+		return "INCLUSIVE_GATEWAY"
+	case engine.ParallelGatewayType:
+		return "PARALLEL_GATEWAY"
+	case engine.CallActivityType:
+		return "CALL_ACTIVITY"
+	case engine.SubProcessType, engine.EventSubProcessType:
+		return "SUB_PROCESS"
+	default:
+		return string(t)
 	}
 }
 
@@ -84,10 +141,10 @@ func (fc *FlownodeInstanceController) SearchFlownodeInstances(c *fiber.Ctx) erro
 		items := make([]fiber.Map, 0, len(executions))
 		for _, e := range executions {
 			if access.allowed(e.ProcessInstanceID) {
-				items = append(items, executionItem(e))
+				items = append(items, fc.executionItem(e))
 			}
 		}
-		return c.JSON(fiber.Map{"items": items})
+		return c.JSON(elementSearchResponse(items))
 	}
 
 	instanceID, err := resolveInstanceKey(fc.db, req.Filter.ProcessInstanceKey)
@@ -113,14 +170,18 @@ func (fc *FlownodeInstanceController) SearchFlownodeInstances(c *fiber.Ctx) erro
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "INTERNAL_ERROR", "detail": err.Error()})
 		}
-		return c.JSON(fiber.Map{"items": items})
+		return c.JSON(elementSearchResponse(items))
 	}
 
 	items := make([]fiber.Map, 0, len(executions))
 	for _, e := range executions {
-		items = append(items, executionItem(e))
+		items = append(items, fc.executionItem(e))
 	}
-	return c.JSON(fiber.Map{"items": items})
+	return c.JSON(elementSearchResponse(items))
+}
+
+func elementSearchResponse(items []fiber.Map) fiber.Map {
+	return fiber.Map{"items": items, "page": searchPage(items, "elementInstanceKey")}
 }
 
 // historicItems rebuilds an archived instance's element instances from its
@@ -138,8 +199,8 @@ func (fc *FlownodeInstanceController) historicItems(instanceID uuid.UUID) ([]fib
 	}
 
 	items := []fiber.Map{}
-	open := map[uuid.UUID]fiber.Map{}
-	closeAt := func(exec uuid.UUID, at time.Time, state string) {
+	open := map[int64]fiber.Map{}
+	closeAt := func(exec int64, at time.Time, state string) {
 		if item, ok := open[exec]; ok {
 			item["endDate"] = at
 			item["state"] = state
@@ -163,13 +224,18 @@ func (fc *FlownodeInstanceController) historicItems(instanceID uuid.UUID) ([]fib
 		}
 		closeAt(exec, row.OccurredAt, "COMPLETED")
 		item := fiber.Map{
-			"flowNodeInstanceKey": uuid.NewSHA1(instanceID, []byte(strconv.Itoa(len(items)))),
-			"processInstanceKey":  instanceID,
-			"elementId":           element,
-			"state":               "ACTIVE",
-			"startDate":           row.OccurredAt,
-			"endDate":             nil,
+			"elementInstanceKey":     uuid.NewSHA1(instanceID, []byte(strconv.Itoa(len(items)))),
+			"processInstanceKey":     instanceID,
+			"rootProcessInstanceKey": instanceID,
+			"elementId":              element,
+			"state":                  "ACTIVE",
+			"startDate":              row.OccurredAt,
+			"endDate":                nil,
+			"hasIncident":            false,
+			"incidentKey":            nil,
+			"tenantId":               "<default>",
 		}
+		fc.enrichElementItem(item, instanceID, element)
 		items = append(items, item)
 		open[exec] = item
 		if models.AuditAction(row.Action) == models.ActionExecutionCompleted {

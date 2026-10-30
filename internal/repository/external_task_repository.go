@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +13,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/pkg/database"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 type ExternalTaskRepository struct {
@@ -44,95 +45,42 @@ func (r *ExternalTaskRepository) FetchAndLockJobsTx(tx *sqlx.Tx, topics []TopicC
 		// locking it alone here is unaffected by any of this.
 		var jobs []LockedJob
 
-		lockQuery := `
-			SELECT
-				j.id,
-				j.payload,
-				j.retries,
-				j.execution_id,
-				j.process_instance_id,
-				j.status,
-				j.created_at
-			FROM public.jobs j
-			WHERE j.job_type = $1
-			  AND j.status = 'pending'
-			  AND (j.locked_until IS NULL OR j.locked_until < NOW())
-			LIMIT $2
-			FOR UPDATE SKIP LOCKED
-		`
-
 		lockedUntil := time.Now().Add(time.Duration(topic.LockDuration) * time.Millisecond)
 		var err error
 		if distributedClaims.Load() {
 			jobs, err = claimJobsTx(tx, topic.TopicName, workerID, lockedUntil, maxTasks)
 		} else {
-			err = tx.Select(&jobs, lockQuery, topic.TopicName, maxTasks)
+			// Claim and return the jobs in one statement. The previous SELECT
+			// FOR UPDATE followed by UPDATE held row locks while execution and
+			// variable context was being assembled and doubled the hot-path
+			// statements.
+			err = tx.Select(&jobs, `
+				WITH candidates AS (
+					SELECT engine_key
+					FROM public.jobs
+					WHERE job_type = $1
+					  AND status = 'pending'
+					  AND (locked_until IS NULL OR locked_until < NOW())
+					ORDER BY created_at, engine_key
+					LIMIT $2
+					FOR UPDATE SKIP LOCKED
+				)
+				UPDATE public.jobs j
+				SET status = 'locked', locked_by = $3, locked_until = $4
+				FROM candidates c
+				WHERE j.engine_key = c.engine_key
+				RETURNING j.engine_key, j.payload, j.retries, j.execution_key,
+				          j.process_instance_key,
+				          (SELECT id FROM public.process_instances
+				           WHERE engine_key = j.process_instance_key) AS process_instance_id,
+				          j.status, j.created_at
+			`, topic.TopicName, maxTasks, workerID, lockedUntil)
 		}
 		if err != nil {
 			return nil, err
 		}
 
 		if len(jobs) > 0 {
-			// Fetch current_element_id for the now-locked jobs' executions
-			// as a separate, unlocked query — a plain multi-shard SELECT
-			// against a distributed table is fine, only FOR UPDATE isn't.
-			elemPlaceholders := make([]string, len(jobs))
-			elemArgs := make([]interface{}, len(jobs))
-			for i, job := range jobs {
-				elemPlaceholders[i] = fmt.Sprintf("$%d", i+1)
-				elemArgs[i] = job.ExecutionID
-			}
-			var elements []struct {
-				ID               uuid.UUID `db:"id"`
-				CurrentElementID string    `db:"current_element_id"`
-			}
-			elemQuery := fmt.Sprintf(`
-				SELECT id, current_element_id FROM public.executions WHERE id IN (%s)
-			`, strings.Join(elemPlaceholders, ", "))
-			if err := tx.Select(&elements, elemQuery, elemArgs...); err != nil {
-				return nil, err
-			}
-			elemByID := make(map[uuid.UUID]string, len(elements))
-			for _, e := range elements {
-				elemByID[e.ID] = e.CurrentElementID
-			}
-			for i := range jobs {
-				jobs[i].CurrentElementID = elemByID[jobs[i].ExecutionID]
-				// The variables the activity sees now, not when the job was
-				// created: a retry sees what FailJob or SetVariables set.
-				if vars, err := VariablesForExecution(tx, jobs[i].ProcessInstanceID, jobs[i].ExecutionID); err == nil {
-					if payload, err := json.Marshal(vars); err == nil {
-						jobs[i].Payload = payload
-					}
-				}
-			}
-			if distributedClaims.Load() {
-				// Already locked, one by one, by claimJobsTx.
-				result = append(result, TopicJobs{TopicName: topic.TopicName, Jobs: jobs})
-				continue
-			}
-
-			// Build IN clause with proper placeholders
-			placeholders := make([]string, len(jobs))
-			args := make([]interface{}, 0, len(jobs)+2)
-			args = append(args, workerID, lockedUntil)
-
-			for i, job := range jobs {
-				placeholders[i] = fmt.Sprintf("$%d", i+3)
-				args = append(args, job.ID)
-			}
-
-			updateQuery := fmt.Sprintf(`
-				UPDATE public.jobs
-				SET status = 'locked', locked_by = $1, locked_until = $2
-				WHERE id IN (%s)
-			`, strings.Join(placeholders, ", "))
-
-			_, err = tx.Exec(updateQuery, args...)
-			if err != nil {
-				return nil, err
-			}
-
 			result = append(result, TopicJobs{
 				TopicName: topic.TopicName,
 				Jobs:      jobs,
@@ -143,16 +91,161 @@ func (r *ExternalTaskRepository) FetchAndLockJobsTx(tx *sqlx.Tx, topics []TopicC
 	return result, nil
 }
 
+// HydrateLockedJobs loads all read-only job context after the short claim
+// transaction has committed. Four batch reads replace the former per-job
+// variable/scope lookups while no connection remains idle in a transaction.
+func (r *ExternalTaskRepository) HydrateLockedJobs(topicJobs []TopicJobs) error {
+	var jobs []*LockedJob
+	instanceSet := map[int64]struct{}{}
+	for ti := range topicJobs {
+		for ji := range topicJobs[ti].Jobs {
+			job := &topicJobs[ti].Jobs[ji]
+			jobs = append(jobs, job)
+			instanceSet[job.ProcessInstanceKey] = struct{}{}
+		}
+	}
+	if len(jobs) == 0 {
+		return nil
+	}
+	instanceKeys := make([]int64, 0, len(instanceSet))
+	for key := range instanceSet {
+		instanceKeys = append(instanceKeys, key)
+	}
+
+	type executionRow struct {
+		InstanceKey    int64   `db:"process_instance_key"`
+		ID             int64   `db:"engine_key"`
+		ParentID       *int64  `db:"parent_execution_key"`
+		PathID         *string `db:"path_id"`
+		CurrentElement string  `db:"current_element_id"`
+	}
+	var executions []executionRow
+	if err := r.db.Select(&executions, `
+		SELECT process_instance_key, engine_key, parent_execution_key, path_id, current_element_id
+		FROM public.executions WHERE process_instance_key = ANY($1::bigint[])
+	`, pq.Array(instanceKeys)); err != nil {
+		return err
+	}
+	type variableRow struct {
+		InstanceKey int64  `db:"process_instance_key"`
+		Data        []byte `db:"data"`
+	}
+	var roots []variableRow
+	if err := r.db.Select(&roots, `SELECT process_instance_key, data FROM public.variables WHERE process_instance_key = ANY($1::bigint[])`, pq.Array(instanceKeys)); err != nil {
+		return err
+	}
+	type scopeRow struct {
+		InstanceKey int64  `db:"process_instance_key"`
+		ScopeKey    int64  `db:"scope_key"`
+		Data        []byte `db:"data"`
+	}
+	var scopeRows []scopeRow
+	if err := r.db.Select(&scopeRows, `SELECT process_instance_key, scope_key, data FROM public.scope_variables WHERE process_instance_key = ANY($1::bigint[])`, pq.Array(instanceKeys)); err != nil {
+		return err
+	}
+	type instanceRow struct {
+		ProcessInstanceKey   int64     `db:"process_instance_key"`
+		ProcessInstanceID    uuid.UUID `db:"process_instance_id"`
+		ProcessDefinitionID  uuid.UUID `db:"process_definition_id"`
+		ProcessDefinitionKey int64     `db:"process_definition_key"`
+		ProcessKey           string    `db:"process_key"`
+		Version              int       `db:"version"`
+		TenantID             *string   `db:"tenant_id"`
+	}
+	var instances []instanceRow
+	if err := r.db.Select(&instances, `
+		SELECT pi.engine_key AS process_instance_key, pi.id AS process_instance_id,
+		       pi.process_definition_id, pd.engine_key AS process_definition_key,
+		       pd.process_key, pd.version, pi.tenant_id
+		FROM public.process_instances pi
+		JOIN public.process_definitions pd ON pd.id = pi.process_definition_id
+		WHERE pi.engine_key = ANY($1::bigint[])
+	`, pq.Array(instanceKeys)); err != nil {
+		return err
+	}
+
+	parents := map[int64]map[int64]*int64{}
+	executionByID := map[int64]executionRow{}
+	for _, e := range executions {
+		if parents[e.InstanceKey] == nil {
+			parents[e.InstanceKey] = map[int64]*int64{}
+		}
+		parents[e.InstanceKey][e.ID] = e.ParentID
+		executionByID[e.ID] = e
+	}
+	rootVars := map[int64]map[string]interface{}{}
+	for _, row := range roots {
+		vars := map[string]interface{}{}
+		if err := json.Unmarshal(row.Data, &vars); err != nil {
+			return err
+		}
+		rootVars[row.InstanceKey] = vars
+	}
+	scopes := map[int64]map[int64]map[string]interface{}{}
+	for _, row := range scopeRows {
+		vars := map[string]interface{}{}
+		if err := json.Unmarshal(row.Data, &vars); err != nil {
+			return err
+		}
+		if scopes[row.InstanceKey] == nil {
+			scopes[row.InstanceKey] = map[int64]map[string]interface{}{}
+		}
+		scopes[row.InstanceKey][row.ScopeKey] = vars
+	}
+	instanceByKey := map[int64]instanceRow{}
+	for _, row := range instances {
+		instanceByKey[row.ProcessInstanceKey] = row
+	}
+
+	for _, job := range jobs {
+		exec := executionByID[job.ExecutionID]
+		job.CurrentElementID = exec.CurrentElement
+		ctx := instanceByKey[job.ProcessInstanceKey]
+		job.ProcessInstanceID = ctx.ProcessInstanceID
+		job.ProcessDefinitionID = ctx.ProcessDefinitionID
+		job.ProcessDefinitionKey = ctx.ProcessDefinitionKey
+		job.ProcessKey = ctx.ProcessKey
+		job.ProcessVersion = ctx.Version
+		job.TenantID = ctx.TenantID
+
+		visible := make(map[string]interface{}, len(rootVars[job.ProcessInstanceKey]))
+		for name, value := range rootVars[job.ProcessInstanceKey] {
+			visible[name] = value
+		}
+		scopeID := job.ExecutionID
+		if attached, ok := ParseBoundaryTriggerPathID(exec.PathID); ok {
+			scopeID = attached
+		}
+		chain := make([]int64, 0, 4)
+		seen := map[int64]bool{}
+		for id := &scopeID; id != nil && !seen[*id]; id = parents[job.ProcessInstanceKey][*id] {
+			seen[*id] = true
+			chain = append(chain, *id)
+		}
+		for i := len(chain) - 1; i >= 0; i-- {
+			for name, value := range scopes[job.ProcessInstanceKey][chain[i]] {
+				visible[name] = value
+			}
+		}
+		payload, err := json.Marshal(visible)
+		if err != nil {
+			return fmt.Errorf("job %s variables: %w", strconv.FormatInt(job.ID, 10), err)
+		}
+		job.Payload = payload
+	}
+	return nil
+}
+
 // GetJobWithExecution retrieves a job with its execution context
-func (r *ExternalTaskRepository) GetJobWithExecutionTx(tx *sqlx.Tx, jobID uuid.UUID) (*JobWithExecution, error) {
+func (r *ExternalTaskRepository) GetJobWithExecutionTx(tx *sqlx.Tx, jobID int64) (*JobWithExecution, error) {
 	var result JobWithExecution
 
 	// The job row stays locked until tx ends: two completions (or a
 	// completion and a failure) of one job can't both see it 'locked'. The
 	// instance comes first so the locking query targets one instance —
 	// the only kind of FOR UPDATE Citus accepts on a distributed table.
-	var instanceID uuid.UUID
-	if err := tx.Get(&instanceID, `SELECT process_instance_id FROM public.jobs WHERE id = $1`, jobID); err != nil {
+	var instanceKey int64
+	if err := tx.Get(&instanceKey, `SELECT process_instance_key FROM public.jobs WHERE engine_key = $1`, jobID); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -160,24 +253,29 @@ func (r *ExternalTaskRepository) GetJobWithExecutionTx(tx *sqlx.Tx, jobID uuid.U
 	}
 	query := `
 		SELECT
-			j.execution_id,
-			j.process_instance_id,
+			j.execution_key,
+			j.process_instance_key,
+			pi.id AS process_instance_id,
+			pd.parsed_graph,
 			e.current_element_id,
 			j.status,
 			j.retries
 		FROM public.jobs j
-		JOIN public.executions e ON e.process_instance_id = j.process_instance_id AND e.id = j.execution_id
-		WHERE j.process_instance_id = $1 AND j.id = $2
+		JOIN public.executions e ON e.process_instance_key = j.process_instance_key AND e.engine_key = j.execution_key
+		JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key
+		JOIN public.process_definitions pd ON pd.id = pi.process_definition_id
+		WHERE j.process_instance_key = $1 AND j.engine_key = $2
 		FOR UPDATE OF j
 	`
 
-	err := tx.QueryRowx(query, instanceID, jobID).StructScan(&result)
+	err := tx.QueryRowx(query, instanceKey, jobID).StructScan(&result)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
+	RememberProcessInstanceKey(result.ProcessInstanceID, result.ProcessInstanceKey)
 
 	return &result, nil
 }
@@ -186,19 +284,28 @@ func (r *ExternalTaskRepository) GetJobWithExecutionTx(tx *sqlx.Tx, jobID uuid.U
 // sends each to the one shard holding the job.
 
 // CompleteJobTx marks a job as completed.
-func (r *ExternalTaskRepository) CompleteJobTx(tx *sqlx.Tx, processInstanceID, jobID uuid.UUID) error {
+func (r *ExternalTaskRepository) CompleteJobTx(tx *sqlx.Tx, processInstanceID uuid.UUID, jobID int64) error {
+	instanceKey, err := processInstanceEngineKey(tx, processInstanceID)
+	if err != nil {
+		return err
+	}
+	return r.CompleteJobByKeyTx(tx, instanceKey, jobID)
+}
+
+func (r *ExternalTaskRepository) CompleteJobByKeyTx(tx *sqlx.Tx, instanceKey, jobID int64) error {
 	_, err := tx.Exec(`
 		UPDATE public.jobs SET status = 'completed', completed_at = NOW()
-		WHERE process_instance_id = $1 AND id = $2`, processInstanceID, jobID)
+		WHERE process_instance_key = $1 AND engine_key = $2`, instanceKey, jobID)
 	return err
 }
 
 // FailJobPermanentlyTx marks a job as failed with no more retries.
-func (r *ExternalTaskRepository) FailJobPermanentlyTx(tx *sqlx.Tx, processInstanceID, jobID uuid.UUID, errorMessage string, errorCode string) error {
+func (r *ExternalTaskRepository) FailJobPermanentlyTx(tx *sqlx.Tx, processInstanceID uuid.UUID, jobID int64, errorMessage string, errorCode string) error {
 	_, err := tx.Exec(`
 		UPDATE public.jobs
 		SET status = 'failed', error_message = $1, error_code = $2, updated_at = NOW()
-		WHERE process_instance_id = $3 AND id = $4
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $3)
+		  AND engine_key = $4
 	`, errorMessage, errorCode, processInstanceID, jobID)
 	return err
 }
@@ -206,7 +313,7 @@ func (r *ExternalTaskRepository) FailJobPermanentlyTx(tx *sqlx.Tx, processInstan
 // ResetJobForRetryTx puts a job back to pending with its remaining retries.
 // With a backoff, locked_until holds it back until then: a pending job is
 // claimable only once locked_until is NULL or past.
-func (r *ExternalTaskRepository) ResetJobForRetryTx(tx *sqlx.Tx, processInstanceID, jobID uuid.UUID, retries int, errorMessage string, backoff time.Duration) error {
+func (r *ExternalTaskRepository) ResetJobForRetryTx(tx *sqlx.Tx, processInstanceID uuid.UUID, jobID int64, retries int, errorMessage string, backoff time.Duration) error {
 	var notBefore *time.Time
 	if backoff > 0 {
 		t := time.Now().Add(backoff)
@@ -215,7 +322,8 @@ func (r *ExternalTaskRepository) ResetJobForRetryTx(tx *sqlx.Tx, processInstance
 	_, err := tx.Exec(`
 		UPDATE public.jobs
 		SET retries = $1, status = 'pending', locked_by = NULL, locked_until = $5, error_message = $2
-		WHERE process_instance_id = $3 AND id = $4
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $3)
+		  AND engine_key = $4
 	`, retries, errorMessage, processInstanceID, jobID, notBefore)
 	return err
 }
@@ -251,23 +359,32 @@ func (r *ExternalTaskRepository) GetProcessDefinitionGraphTx(tx *sqlx.Tx, instan
 // than the DataBaseAdapter.Update helper (which only supports a single
 // WHERE condition) — process_instance_id is needed alongside id for
 // single-shard Citus routing.
-func (r *ExternalTaskRepository) CompleteExecutionTx(tx *sqlx.Tx, processInstanceID, execID uuid.UUID) error {
+func (r *ExternalTaskRepository) CompleteExecutionTx(tx *sqlx.Tx, processInstanceID uuid.UUID, execID int64) error {
 	_, err := tx.Exec(`
 		UPDATE public.executions
 		SET status = 'completed', is_active = false, updated_at = NOW()
-		WHERE process_instance_id = $1 AND id = $2
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+		  AND engine_key = $2
 	`, processInstanceID, execID)
 	return err
 }
 
 // UpdateExecutionCurrentNode updates the current node of an execution. Same
 // direct-SQL reasoning as CompleteExecutionTx above.
-func (r *ExternalTaskRepository) UpdateExecutionCurrentNodeTx(tx *sqlx.Tx, processInstanceID, execID uuid.UUID, nextNodeID string) error {
+func (r *ExternalTaskRepository) UpdateExecutionCurrentNodeTx(tx *sqlx.Tx, processInstanceID uuid.UUID, execID int64, nextNodeID string) error {
+	instanceKey, err := processInstanceEngineKey(tx, processInstanceID)
+	if err != nil {
+		return err
+	}
+	return r.UpdateExecutionCurrentNodeByKeyTx(tx, instanceKey, execID, nextNodeID)
+}
+
+func (r *ExternalTaskRepository) UpdateExecutionCurrentNodeByKeyTx(tx *sqlx.Tx, instanceKey, execID int64, nextNodeID string) error {
 	_, err := tx.Exec(`
 		UPDATE public.executions
 		SET current_element_id = $1, status = 'active', updated_at = NOW()
-		WHERE process_instance_id = $2 AND id = $3
-	`, nextNodeID, processInstanceID, execID)
+		WHERE process_instance_key = $2 AND engine_key = $3
+	`, nextNodeID, instanceKey, execID)
 	return err
 }
 
@@ -288,15 +405,19 @@ func (r *ExternalTaskRepository) GetServiceTaskNode(graph *engine.ProcessGraph, 
 // CreateJob creates a new external task job
 func (r *ExternalTaskRepository) CreateJob(job *models.Job) (sql.Result, error) {
 	adapter := database.NewDabaseAdapter(r.db)
+	instanceKey, err := processInstanceEngineKey(r.db, job.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
 
 	return adapter.Insert("public.jobs", []database.QueryParameter{
-		{Key: "id", Value: job.ID},
+		{Key: "engine_key", Value: job.ID},
 		{Key: "job_type", Value: job.JobType},
 		{Key: "status", Value: job.Status},
 		{Key: "payload", Value: job.Payload},
 		{Key: "retries", Value: job.Retries},
-		{Key: "execution_id", Value: job.ExecutionID},
-		{Key: "process_instance_id", Value: job.ProcessInstanceID},
+		{Key: "execution_key", Value: job.ExecutionID},
+		{Key: "process_instance_key", Value: instanceKey},
 		{Key: "created_at", Value: time.Now()},
 	})
 }
@@ -314,9 +435,11 @@ func (r *ExternalTaskRepository) GetPendingJobsByType(jobType string, limit int)
 	var jobs []models.Job
 
 	query := `
-		SELECT id, job_type, status, payload, retries, execution_id, process_instance_id, created_at
-		FROM public.jobs
-		WHERE job_type = $1 AND status = 'pending'
+		SELECT j.engine_key, j.job_type, j.status, j.payload, j.retries, j.execution_key,
+		       pi.id AS process_instance_id, j.created_at
+		FROM public.jobs j
+		JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key
+		WHERE j.job_type = $1 AND j.status = 'pending'
 		LIMIT $2
 	`
 
@@ -338,23 +461,31 @@ type TopicJobs struct {
 
 // JobWithExecution represents a job joined with its execution context
 type JobWithExecution struct {
-	ExecutionID       uuid.UUID `db:"execution_id"`
-	ProcessInstanceID uuid.UUID `db:"process_instance_id"`
-	CurrentElementID  string    `db:"current_element_id"`
-	Status            string    `db:"status"`
-	Retries           int       `db:"retries"`
+	ExecutionID        int64     `db:"execution_key"`
+	ProcessInstanceKey int64     `db:"process_instance_key"`
+	ProcessInstanceID  uuid.UUID `db:"process_instance_id"`
+	GraphJSON          []byte    `db:"parsed_graph"`
+	CurrentElementID   string    `db:"current_element_id"`
+	Status             string    `db:"status"`
+	Retries            int       `db:"retries"`
 }
 
 // LockedJob represents a job with its execution context
 type LockedJob struct {
-	ID                uuid.UUID       `db:"id"`
-	Payload           json.RawMessage `db:"payload"`
-	Retries           int             `db:"retries"`
-	ExecutionID       uuid.UUID       `db:"execution_id"`
-	ProcessInstanceID uuid.UUID       `db:"process_instance_id"`
-	CurrentElementID  string          `db:"current_element_id"`
-	Status            string          `db:"status"`
-	CreatedAt         time.Time       `db:"created_at"`
+	ID                   int64           `db:"engine_key"`
+	Payload              json.RawMessage `db:"payload"`
+	Retries              int             `db:"retries"`
+	ExecutionID          int64           `db:"execution_key"`
+	ProcessInstanceKey   int64           `db:"process_instance_key"`
+	ProcessInstanceID    uuid.UUID       `db:"process_instance_id"`
+	ProcessDefinitionID  uuid.UUID
+	ProcessDefinitionKey int64
+	ProcessKey           string
+	ProcessVersion       int
+	TenantID             *string
+	CurrentElementID     string    `db:"current_element_id"`
+	Status               string    `db:"status"`
+	CreatedAt            time.Time `db:"created_at"`
 }
 
 // Custom errors
@@ -366,36 +497,32 @@ var (
 var ErrJobNotLockedBy = errors.New("external task is not locked by this worker")
 
 // ExtendLock moves a locked job's lock expiry, if workerID holds it.
-func (r *ExternalTaskRepository) ExtendLock(jobID uuid.UUID, workerID string, until time.Time) error {
+func (r *ExternalTaskRepository) ExtendLock(jobID int64, workerID string, until time.Time) error {
 	return r.lockUpdate(jobID, workerID, `UPDATE public.jobs SET locked_until = $1
-		WHERE process_instance_id = $2 AND id = $3 AND status = 'locked' AND locked_by = $4`, until)
+		WHERE engine_key = $2 AND status = 'locked' AND locked_by = $3`, until)
 }
 
 // Unlock gives a locked job back, to be fetched again.
-func (r *ExternalTaskRepository) Unlock(jobID uuid.UUID) error {
+func (r *ExternalTaskRepository) Unlock(jobID int64) error {
 	return r.lockUpdate(jobID, "", `UPDATE public.jobs SET status = 'pending', locked_by = NULL, locked_until = NULL
-		WHERE process_instance_id = $1 AND id = $2 AND status = 'locked'`)
+		WHERE engine_key = $1 AND status = 'locked'`)
 }
 
 // LockOwner returns the worker holding a job ("" when it isn't locked),
 // and ErrJobNotFound semantics as sql.ErrNoRows.
-func (r *ExternalTaskRepository) LockOwner(jobID uuid.UUID) (string, error) {
+func (r *ExternalTaskRepository) LockOwner(jobID int64) (string, error) {
 	var owner sql.NullString
-	err := r.db.Get(&owner, `SELECT CASE WHEN status = 'locked' THEN locked_by END FROM public.jobs WHERE id = $1`, jobID)
+	err := r.db.Get(&owner, `SELECT CASE WHEN status = 'locked' THEN locked_by END FROM public.jobs WHERE engine_key = $1`, jobID)
 	return owner.String, err
 }
 
-func (r *ExternalTaskRepository) lockUpdate(jobID uuid.UUID, workerID, query string, until ...time.Time) error {
-	var instanceID uuid.UUID
-	if err := r.db.Get(&instanceID, `SELECT process_instance_id FROM public.jobs WHERE id = $1`, jobID); err != nil {
-		return err
-	}
+func (r *ExternalTaskRepository) lockUpdate(jobID int64, workerID, query string, until ...time.Time) error {
 	var res sql.Result
 	var err error
 	if len(until) > 0 {
-		res, err = r.db.Exec(query, until[0], instanceID, jobID, workerID)
+		res, err = r.db.Exec(query, until[0], jobID, workerID)
 	} else {
-		res, err = r.db.Exec(query, instanceID, jobID)
+		res, err = r.db.Exec(query, jobID)
 	}
 	if err != nil {
 		return err

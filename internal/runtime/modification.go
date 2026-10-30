@@ -3,10 +3,12 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 )
@@ -25,11 +27,11 @@ type MoveInstruction struct {
 // ModifyInstance applies a batch of token moves to a running process
 // instance and resumes execution from each newly created token. Returns the
 // IDs of the newly created executions.
-func (r *Runtime) ModifyInstance(ctx context.Context, instanceID uuid.UUID, moves []MoveInstruction) ([]uuid.UUID, error) {
+func (r *Runtime) ModifyInstance(ctx context.Context, instanceID uuid.UUID, moves []MoveInstruction) ([]int64, error) {
 	engineRepo := repository.NewEngineRepository(r.DB, r.dispatcher)
 	instanceRepo := repository.NewProcessInstanceRepository(r.DB)
 
-	var newExecutionIDs []uuid.UUID
+	var newExecutionIDs []int64
 
 	for _, move := range moves {
 		if _, ok := r.Graph.Nodes[move.TargetElementID]; !ok {
@@ -71,7 +73,7 @@ func (r *Runtime) ModifyInstance(ctx context.Context, instanceID uuid.UUID, move
 				return newExecutionIDs, fmt.Errorf("failed to cancel the source element's work: %w", err)
 			}
 
-			newExecID := uuid.New()
+			newExecID := ids.NewEngineKey()
 			if err := instanceRepo.CreateExecutionTx(tx, newExecID, instanceID, move.TargetElementID, time.Now()); err != nil {
 				tx.Rollback()
 				return newExecutionIDs, fmt.Errorf("failed to create execution at target element: %w", err)
@@ -85,7 +87,7 @@ func (r *Runtime) ModifyInstance(ctx context.Context, instanceID uuid.UUID, move
 			}
 			service.LogAuditErr("execution created", r.auditService.LogExecutionCreated(newExecID, instanceID, nil, move.TargetElementID))
 			if p := eventlog.Global(); p != nil {
-				p.ExecutionCreated(instanceID.String(), newExecID.String(), "", move.TargetElementID)
+				p.ExecutionCreated(instanceID.String(), strconv.FormatInt(newExecID, 10), "", move.TargetElementID)
 			}
 
 			newExecutionIDs = append(newExecutionIDs, newExecID)
@@ -94,7 +96,7 @@ func (r *Runtime) ModifyInstance(ctx context.Context, instanceID uuid.UUID, move
 
 	for _, execID := range newExecutionIDs {
 		if err := r.ExecuteExecution(ctx, execID); err != nil {
-			return newExecutionIDs, fmt.Errorf("failed to resume execution %s: %w", execID, err)
+			return newExecutionIDs, fmt.Errorf("failed to resume execution %d: %w", execID, err)
 		}
 	}
 

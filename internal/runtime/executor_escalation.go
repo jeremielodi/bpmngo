@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 )
@@ -48,7 +50,7 @@ func (r *Runtime) propagateEscalationToCaller(ctx context.Context, instanceID uu
 	engineRepo := repository.NewEngineRepository(r.DB, r.dispatcher)
 	callExec, err := engineRepo.GetExecutionByID(caller.ExecID)
 	if err != nil || callExec == nil {
-		return false, fmt.Errorf("call activity execution %s: %v", caller.ExecID, err)
+		return false, fmt.Errorf("call activity execution %d: %v", caller.ExecID, err)
 	}
 	parentRT := NewRuntime(caller.Graph, r.DB, r.dispatcher)
 	return parentRT.catchEscalation(ctx, engineRepo, caller.Graph, callExec, caller.Node.ID, catcher, scope, code)
@@ -100,8 +102,8 @@ func (r *Runtime) catchEscalation(ctx context.Context, engineRepo *repository.En
 		if err != nil {
 			return false, fmt.Errorf("escalation %q: %w", code, err)
 		}
-		tokenID := uuid.New()
-		pathID := tokenID.String()
+		tokenID := ids.NewEngineKey()
+		pathID := strconv.FormatInt(tokenID, 10)
 		if err := engineRepo.CreateExecutionTx(tx, &repository.Execution{
 			ID:                tokenID,
 			ProcessInstanceID: instanceID,
@@ -126,7 +128,7 @@ func (r *Runtime) catchEscalation(ctx context.Context, engineRepo *repository.En
 	if err != nil {
 		return false, fmt.Errorf("escalation %q: %w", code, err)
 	}
-	scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, instanceID, scopeID, uuid.Nil)
+	scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, instanceID, scopeID, 0)
 	if err != nil {
 		return false, fmt.Errorf("escalation %q: %w", code, err)
 	}
@@ -146,7 +148,7 @@ func (r *Runtime) catchEscalation(ctx context.Context, engineRepo *repository.En
 	r.logCancelled(instanceID, append(tasks, scopeTasks...), append(jobs, scopeJobs...), "escalation "+code+" thrown by "+throwerID)
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(scopeID, instanceID, fromNode, catcher.ID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(instanceID.String(), scopeID.String(), fromNode, catcher.ID)
+		p.ExecutionMoved(instanceID.String(), strconv.FormatInt(scopeID, 10), fromNode, catcher.ID)
 	}
 	if err := r.ExecuteExecution(ctx, scopeID); err != nil {
 		return false, err

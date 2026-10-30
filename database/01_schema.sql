@@ -110,8 +110,12 @@ TABLESPACE pg_default;
 -- One deployment can contain one or multiple BPMN files
 -- Similar to Camunda deployments
 -- =========================================================
+CREATE SEQUENCE IF NOT EXISTS public.engine_keys_legacy_seq AS BIGINT START 1;
+
 CREATE TABLE deployments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique deployment identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
+    uid UUID NOT NULL UNIQUE,
     name TEXT NOT NULL, -- Human-readable deployment name
     deployed_by UUID NULL REFERENCES users(id), -- User who deployed (nullable)
     status deployment_status NOT NULL DEFAULT 'active', -- Current deployment status
@@ -128,10 +132,13 @@ CREATE TABLE deployments (
 -- Parse once during deployment and persist metadata.
 -- =========================================================
 CREATE TABLE process_definitions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique process definition identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
+    uid UUID NOT NULL UNIQUE,
     deployment_id UUID NOT NULL -- References the deployment containing this definition
         REFERENCES deployments(id)
         ON DELETE CASCADE,
+    deployment_key BIGINT NOT NULL REFERENCES deployments(engine_key) ON DELETE CASCADE,
     process_key TEXT NOT NULL, -- Unique technical key for the process
     tenant_id TEXT NULL, -- Multi-tenancy identifier
     process_name TEXT NULL, -- Human-readable process name
@@ -160,9 +167,12 @@ ON process_definitions(deployment_id);
 -- Runtime instance of a process definition
 -- =========================================================
 CREATE TABLE process_instances (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique process instance identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
+    uid UUID NOT NULL UNIQUE,
     process_definition_id UUID NOT NULL -- References the process definition being executed
         REFERENCES process_definitions(id),
+    process_definition_key BIGINT NOT NULL REFERENCES process_definitions(engine_key),
     status process_instance_status NOT NULL DEFAULT 'running', -- Current lifecycle state
     started_by UUID NULL -- User who started this instance
         REFERENCES users(id),
@@ -217,10 +227,12 @@ CREATE TABLE gateway_state (
 -- parent_execution_id/gateway_join_id/tasks.execution_id/jobs.execution_id/
 -- etc.'s FKs were dropped, so this is safe.
 CREATE TABLE executions (
-    id UUID NOT NULL DEFAULT gen_random_uuid(), -- Unique execution token identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
     process_instance_id UUID NOT NULL -- Parent process instance
         REFERENCES process_instances(id)
         ON DELETE CASCADE,
+    process_instance_key BIGINT NOT NULL REFERENCES process_instances(engine_key) ON DELETE CASCADE,
     current_element_id TEXT NOT NULL, -- BPMN node ID currently being executed
     -- parent_execution_id and gateway_join_id have no FK (Citus phase 2):
     -- both would reference executions(id)/gateway_state(id) by a column
@@ -228,14 +240,14 @@ CREATE TABLE executions (
     -- colocated even though both tables share the same colocation group —
     -- see architecture/citus-distributed-storage-design.md.
     parent_execution_id UUID NULL, -- Supports future parallel gateways (hierarchy)
+    parent_execution_key BIGINT NULL REFERENCES executions(engine_key) ON DELETE SET NULL,
     status execution_status NOT NULL DEFAULT 'active', -- Current execution state
     is_active BOOLEAN NOT NULL DEFAULT true, -- Whether this token is still active
     path_id TEXT,
     gateway_join_id UUID,
     branch_variables JSONB,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(), -- When execution started
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(), -- Last state change timestamp
-    PRIMARY KEY (process_instance_id, id)
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW() -- Last state change timestamp
 );
 
 CREATE INDEX idx_executions_process_instance_id
@@ -339,11 +351,14 @@ WHERE is_active = true;
 -- above for why): nothing referenced tasks(id) alone once
 -- audit_logs.task_id's FK was dropped, so this is safe.
 CREATE TABLE tasks (
-    id UUID NOT NULL DEFAULT gen_random_uuid(), -- Unique task identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
     process_instance_id UUID NOT NULL -- Parent process instance
         REFERENCES process_instances(id)
         ON DELETE CASCADE,
+    process_instance_key BIGINT NOT NULL REFERENCES process_instances(engine_key) ON DELETE CASCADE,
     execution_id UUID NULL, -- Associated execution token
+    execution_key BIGINT NULL REFERENCES executions(engine_key) ON DELETE SET NULL,
     -- No FK on execution_id (Citus phase 2): tasks and executions are
     -- colocated, but this FK isn't on process_instance_id so Citus can't
     -- verify it — see architecture/citus-distributed-storage-design.md.
@@ -357,8 +372,7 @@ CREATE TABLE tasks (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(), -- When task was created
     updated_at  TIMESTAMP NOT NULL DEFAULT NULL,
     claimed_at TIMESTAMP NULL, -- When user claimed the task
-    completed_at TIMESTAMP NULL, -- When task was completed
-    PRIMARY KEY (process_instance_id, id)
+    completed_at TIMESTAMP NULL -- When task was completed
 );
 
 CREATE INDEX idx_tasks_process_instance_id
@@ -384,13 +398,14 @@ ON tasks(status);
 -- constraint below already includes process_instance_id, so it needs no
 -- change.
 CREATE TABLE variables (
-    id UUID NOT NULL DEFAULT gen_random_uuid(), -- Unique variable set identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
     process_instance_id UUID NOT NULL -- Which process instance owns these variables
         REFERENCES process_instances(id)
         ON DELETE CASCADE,
+    process_instance_key BIGINT NOT NULL REFERENCES process_instances(engine_key) ON DELETE CASCADE,
     data JSONB NOT NULL, -- JSON object containing all process variables
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(), -- Last variable modification
-    PRIMARY KEY (process_instance_id, id)
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW() -- Last variable modification
 );
 
 CREATE INDEX idx_variables_process_instance_id
@@ -419,9 +434,12 @@ USING GIN(data);
 -- distributed one. Rows are explicitly cleaned up by
 -- CleanupOrphanExecutionStateTx before a process_instances delete.
 CREATE TABLE jobs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique job identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
     process_instance_id UUID NOT NULL, -- Parent process instance
+    process_instance_key BIGINT NOT NULL REFERENCES process_instances(engine_key) ON DELETE CASCADE,
     execution_id UUID NULL, -- Associated execution token
+    execution_key BIGINT NULL REFERENCES executions(engine_key) ON DELETE SET NULL,
     job_type TEXT NOT NULL, -- Type of service task (e.g., "http", "email")
     retries INTEGER NOT NULL DEFAULT 3, -- Number of remaining retry attempts
     status TEXT NOT NULL DEFAULT 'pending', -- Job state (pending/processing/completed/failed)
@@ -454,9 +472,12 @@ WHERE status = 'pending';
 -- process_instance_id/execution_id have no FK (Citus phase 2) — same
 -- reasoning as jobs above.
 CREATE TABLE timer_jobs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Unique timer identifier
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
     process_instance_id UUID NOT NULL, -- Parent process instance
+    process_instance_key BIGINT NOT NULL REFERENCES process_instances(engine_key) ON DELETE CASCADE,
     execution_id UUID NULL, -- Associated execution token
+    execution_key BIGINT NULL REFERENCES executions(engine_key) ON DELETE SET NULL,
     event_type TEXT NOT NULL, -- Type of timer (e.g., "intermediate", "boundary")
     due_at TIMESTAMP NOT NULL, -- When this timer should trigger
     payload JSONB NULL, -- Timer configuration (duration, cycle, etc.)
@@ -514,11 +535,14 @@ ON audit_logs(task_id);
 -- above for why): nothing referenced incidents(id) alone (historic_incidents
 -- reuses the same id value but has no FK to the live table).
 CREATE TABLE incidents (
-    id UUID NOT NULL DEFAULT gen_random_uuid(),
+    id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
     process_instance_id UUID NOT NULL
         REFERENCES process_instances(id)
         ON DELETE CASCADE,
+    process_instance_key BIGINT NOT NULL REFERENCES process_instances(engine_key) ON DELETE CASCADE,
     job_id UUID NULL,
+    job_key BIGINT NULL REFERENCES jobs(engine_key) ON DELETE SET NULL,
     -- No FK on job_id (Citus phase 2): incidents becomes distributed while
     -- jobs stays local — see architecture/citus-distributed-storage-design.md.
     -- process_instance_id's cascade FK above still fully cleans up incidents.
@@ -530,7 +554,7 @@ CREATE TABLE incidents (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     resolved_at TIMESTAMP NULL,
     execution_id UUID NULL,              -- execution to resume on resolution (migration 003)
-    PRIMARY KEY (process_instance_id, id)
+    execution_key BIGINT NULL REFERENCES executions(engine_key) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_incidents_process_instance_id
@@ -654,7 +678,9 @@ COMMENT ON TABLE audit_logs IS 'Tracks all important workflow actions';
 -- =========================================================
 ALTER TABLE process_instances
   ADD COLUMN IF NOT EXISTS parent_instance_id UUID NULL,
-  ADD COLUMN IF NOT EXISTS parent_execution_id UUID NULL;
+  ADD COLUMN IF NOT EXISTS parent_execution_id UUID NULL,
+  ADD COLUMN IF NOT EXISTS parent_process_instance_key BIGINT NULL REFERENCES process_instances(engine_key) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS parent_execution_key BIGINT NULL REFERENCES executions(engine_key) ON DELETE SET NULL;
 -- Note: no FK on parent_execution_id to avoid circular reference with executions.
 -- parent_instance_id also has no FK (Citus phase 2, see
 -- architecture/citus-distributed-storage-design.md) — a call activity's
@@ -944,7 +970,9 @@ CREATE INDEX IF NOT EXISTS idx_process_permissions_grantee
 ON process_permissions(grantee_type, grantee_id);
 
 CREATE TABLE IF NOT EXISTS public.published_messages (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id              UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- rolling-upgrade UUID shadow
+    engine_key      BIGINT PRIMARY KEY DEFAULT nextval('public.engine_keys_legacy_seq'),
+    uid             UUID NOT NULL UNIQUE,
     name            TEXT NOT NULL,
     correlation_key TEXT NOT NULL DEFAULT '',
     message_id      TEXT NULL,          -- identifiant fourni par l'émetteur, pour la déduplication
@@ -962,11 +990,83 @@ ON public.published_messages (name, message_id) WHERE message_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.published_message_correlations (
     published_message_id UUID NOT NULL REFERENCES public.published_messages(id) ON DELETE CASCADE,
+    published_message_key BIGINT NOT NULL REFERENCES public.published_messages(engine_key) ON DELETE CASCADE,
     process_key         TEXT NOT NULL,      -- un message se corrèle au plus une fois par processus
     process_instance_id UUID NOT NULL,
+    process_instance_key BIGINT NULL REFERENCES public.process_instances(engine_key) ON DELETE CASCADE,
     correlated_at       TIMESTAMP NOT NULL DEFAULT NOW(),
     PRIMARY KEY (published_message_id, process_key)
 );
+
+-- Rolling-upgrade compatibility: a writer from before migration 009 only
+-- supplies the legacy UUID `id`. Keep the root UUID identity identical.
+CREATE OR REPLACE FUNCTION public.fill_hybrid_root_identity()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.engine_key IS NULL THEN
+        NEW.engine_key := nextval('public.engine_keys_legacy_seq');
+    END IF;
+    IF NEW.uid IS NULL THEN
+        NEW.uid := NEW.id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_deployments_hybrid_identity BEFORE INSERT ON public.deployments
+FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_root_identity();
+CREATE TRIGGER trg_process_definitions_hybrid_identity BEFORE INSERT ON public.process_definitions
+FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_root_identity();
+CREATE TRIGGER trg_process_instances_hybrid_identity BEFORE INSERT ON public.process_instances
+FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_root_identity();
+CREATE TRIGGER trg_published_messages_hybrid_identity BEFORE INSERT ON public.published_messages
+FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_root_identity();
+
+CREATE OR REPLACE FUNCTION public.fill_hybrid_relationship_keys()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  CASE TG_TABLE_NAME
+    WHEN 'process_definitions' THEN
+      SELECT engine_key INTO NEW.deployment_key FROM public.deployments WHERE id = NEW.deployment_id;
+    WHEN 'process_instances' THEN
+      SELECT engine_key INTO NEW.process_definition_key FROM public.process_definitions WHERE id = NEW.process_definition_id;
+      SELECT engine_key INTO NEW.parent_process_instance_key FROM public.process_instances WHERE id = NEW.parent_instance_id;
+      SELECT engine_key INTO NEW.parent_execution_key FROM public.executions WHERE id = NEW.parent_execution_id;
+    WHEN 'executions' THEN
+      SELECT engine_key INTO NEW.process_instance_key FROM public.process_instances WHERE id = NEW.process_instance_id;
+      SELECT engine_key INTO NEW.parent_execution_key FROM public.executions WHERE id = NEW.parent_execution_id;
+    WHEN 'jobs' THEN
+      SELECT engine_key INTO NEW.process_instance_key FROM public.process_instances WHERE id = NEW.process_instance_id;
+      SELECT engine_key INTO NEW.execution_key FROM public.executions WHERE id = NEW.execution_id;
+    WHEN 'tasks' THEN
+      SELECT engine_key INTO NEW.process_instance_key FROM public.process_instances WHERE id = NEW.process_instance_id;
+      SELECT engine_key INTO NEW.execution_key FROM public.executions WHERE id = NEW.execution_id;
+    WHEN 'timer_jobs' THEN
+      SELECT engine_key INTO NEW.process_instance_key FROM public.process_instances WHERE id = NEW.process_instance_id;
+      SELECT engine_key INTO NEW.execution_key FROM public.executions WHERE id = NEW.execution_id;
+    WHEN 'incidents' THEN
+      SELECT engine_key INTO NEW.process_instance_key FROM public.process_instances WHERE id = NEW.process_instance_id;
+      SELECT engine_key INTO NEW.job_key FROM public.jobs WHERE id = NEW.job_id;
+      SELECT engine_key INTO NEW.execution_key FROM public.executions WHERE id = NEW.execution_id;
+    WHEN 'variables' THEN
+      SELECT engine_key INTO NEW.process_instance_key FROM public.process_instances WHERE id = NEW.process_instance_id;
+    WHEN 'published_message_correlations' THEN
+      SELECT engine_key INTO NEW.published_message_key FROM public.published_messages WHERE id = NEW.published_message_id;
+      SELECT engine_key INTO NEW.process_instance_key FROM public.process_instances WHERE id = NEW.process_instance_id;
+  END CASE;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_process_definitions_hybrid_relationships BEFORE INSERT OR UPDATE OF deployment_id ON public.process_definitions FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_process_instances_hybrid_relationships BEFORE INSERT OR UPDATE OF process_definition_id, parent_instance_id, parent_execution_id ON public.process_instances FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_executions_hybrid_relationships BEFORE INSERT OR UPDATE OF process_instance_id, parent_execution_id ON public.executions FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_jobs_hybrid_relationships BEFORE INSERT OR UPDATE OF process_instance_id, execution_id ON public.jobs FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_tasks_hybrid_relationships BEFORE INSERT OR UPDATE OF process_instance_id, execution_id ON public.tasks FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_timer_jobs_hybrid_relationships BEFORE INSERT OR UPDATE OF process_instance_id, execution_id ON public.timer_jobs FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_incidents_hybrid_relationships BEFORE INSERT OR UPDATE OF process_instance_id, job_id, execution_id ON public.incidents FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_variables_hybrid_relationships BEFORE INSERT OR UPDATE OF process_instance_id ON public.variables FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
+CREATE TRIGGER trg_published_message_correlations_hybrid_relationships BEFORE INSERT OR UPDATE OF published_message_id, process_instance_id ON public.published_message_correlations FOR EACH ROW EXECUTE FUNCTION public.fill_hybrid_relationship_keys();
 
 -- Variables locales aux portées (migration 002).
 CREATE TABLE IF NOT EXISTS public.scope_variables (
@@ -1008,6 +1108,17 @@ CREATE INDEX IF NOT EXISTS idx_event_subscriptions_execution_id ON public.event_
 CREATE INDEX IF NOT EXISTS idx_event_subprocesses_process_instance_id ON public.event_subprocesses (process_instance_id);
 CREATE INDEX IF NOT EXISTS idx_multi_instance_children_child ON public.multi_instance_children (child_execution_id);
 CREATE INDEX IF NOT EXISTS idx_published_messages_expires_at ON public.published_messages (expires_at);
+CREATE INDEX IF NOT EXISTS idx_process_definitions_deployment_key ON public.process_definitions(deployment_key);
+CREATE INDEX IF NOT EXISTS idx_process_instances_definition_key ON public.process_instances(process_definition_key);
+CREATE INDEX IF NOT EXISTS idx_executions_instance_key ON public.executions(process_instance_key);
+CREATE INDEX IF NOT EXISTS idx_jobs_instance_key ON public.jobs(process_instance_key);
+CREATE INDEX IF NOT EXISTS idx_jobs_execution_key ON public.jobs(execution_key);
+CREATE INDEX IF NOT EXISTS idx_tasks_instance_key ON public.tasks(process_instance_key);
+CREATE INDEX IF NOT EXISTS idx_tasks_execution_key ON public.tasks(execution_key);
+CREATE INDEX IF NOT EXISTS idx_timer_jobs_instance_key ON public.timer_jobs(process_instance_key);
+CREATE INDEX IF NOT EXISTS idx_timer_jobs_execution_key ON public.timer_jobs(execution_key);
+CREATE INDEX IF NOT EXISTS idx_incidents_instance_key ON public.incidents(process_instance_key);
+CREATE INDEX IF NOT EXISTS idx_variables_instance_key ON public.variables(process_instance_key);
 
 
 -- Suivi des migrations (voir database/migrations/README.md). Une base neuve
@@ -1053,3 +1164,31 @@ ON CONFLICT (version) DO NOTHING;
 INSERT INTO public.schema_migrations (version, description)
 VALUES ('008', 'index sur executions.id, incidents.id et incidents.job_id')
 ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('009', 'phase 1 identifiants hybrides BIGINT et UUIDv7')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('010', 'promotion des engine_key BIGINT en clés primaires')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('011', 'clés étrangères BIGINT et double écriture UUID/BIGINT')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('012', 'corrélation message-start: FK BIGINT nullable pendant la réservation')
+ON CONFLICT (version) DO NOTHING;
+
+-- Finalise la transition hybride construite ci-dessus. `\ir` est résolu
+-- relativement à ce fichier par psql, y compris via l'image PostgreSQL.
+-- Une base neuve se termine donc directement sans colonnes UUID de
+-- compatibilité ni triggers de double écriture sur les entités chaudes.
+\ir migrations/013_direct_bigint_hot_relationships.sql
+\ir migrations/014_postgresql_runtime_tuning.sql
+\ir migrations/015_monthly_history_partitions.sql
+\ir migrations/016_gateway_state_bigint.sql
+\ir migrations/017_remove_identity_compatibility.sql
+\ir migrations/018_parent_fk_indexes.sql
+\ir migrations/019_partition_retention.sql

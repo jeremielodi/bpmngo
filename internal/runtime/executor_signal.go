@@ -17,18 +17,23 @@ func (r *Runtime) executeSignalCatchEvent(ctx context.Context, engineRepo *repos
 	}
 	defer tx.Rollback()
 
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, exec.ProcessInstanceID)
+	if err != nil {
+		return fmt.Errorf("signal catch: resolve process instance: %w", err)
+	}
 	_, err = tx.Exec(`
 		INSERT INTO event_subscriptions
-		  (process_instance_id, execution_id, event_type, event_name)
+		  (process_instance_key, execution_key, event_type, event_name)
 		VALUES ($1, $2, 'signal', $3)
-	`, exec.ProcessInstanceID, exec.ID, node.SignalRef)
+	`, instanceKey, exec.ID, node.SignalRef)
 	if err != nil {
 		return fmt.Errorf("signal catch: insert subscription: %w", err)
 	}
 
 	_, err = tx.Exec(`
-		UPDATE executions SET status = 'waiting', updated_at = NOW() WHERE process_instance_id = $1 AND id = $2
-	`, exec.ProcessInstanceID, exec.ID)
+		UPDATE executions SET status = 'waiting', updated_at = NOW()
+		WHERE process_instance_key = $1 AND engine_key = $2
+	`, instanceKey, exec.ID)
 	if err != nil {
 		return fmt.Errorf("signal catch: set waiting: %w", err)
 	}

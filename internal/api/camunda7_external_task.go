@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -103,7 +104,7 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 			rawVars := make(map[string]interface{})
 			if len(job.Payload) > 0 {
 				if err := json.Unmarshal(job.Payload, &rawVars); err != nil {
-					log.Printf("Warning: failed to parse job payload for job %s: %v", job.ID, err)
+					log.Printf("Warning: failed to parse job payload for job %d: %v", job.ID, err)
 				}
 			}
 			if names, ok := wanted[topicJob.TopicName]; ok {
@@ -125,7 +126,7 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 			expires := time.Now().Add(time.Duration(lockDuration[topicJob.TopicName]) * time.Millisecond)
 			info := instances[job.ProcessInstanceID]
 			response = append(response, FetchAndLockResponse{
-				ID:                   job.ID.String(),
+				ID:                   strconv.FormatInt(job.ID, 10),
 				TopicName:            topicJob.TopicName,
 				ProcessInstanceID:    job.ProcessInstanceID.String(),
 				Variables:            formatVariablesForResponse(rawVars),
@@ -133,8 +134,8 @@ func (ctrl *ExternalTaskController) FetchAndLock(c *fiber.Ctx) error {
 				WorkerId:             req.WorkerId,
 				Headers:              headers,
 				ActivityID:           job.CurrentElementID,
-				ActivityInstanceID:   job.ExecutionID.String(),
-				ExecutionID:          job.ExecutionID.String(),
+				ActivityInstanceID:   strconv.FormatInt(job.ExecutionID, 10),
+				ExecutionID:          strconv.FormatInt(job.ExecutionID, 10),
 				ProcessDefinitionID:  info.DefinitionID.String(),
 				ProcessDefinitionKey: info.ProcessKey,
 				BusinessKey:          info.BusinessKey,
@@ -166,7 +167,13 @@ func (ctrl *ExternalTaskController) lockJobs(topics []repository.TopicConfig, wo
 	if err != nil {
 		return nil, err
 	}
-	return topicJobs, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	if err := ctrl.externalTaskRepo.HydrateLockedJobs(topicJobs); err != nil {
+		return nil, err
+	}
+	return topicJobs, nil
 }
 
 type jobInstanceInfo struct {
@@ -207,17 +214,17 @@ func (ctrl *ExternalTaskController) instanceInfo(topicJobs []repository.TopicJob
 
 // lockHeldBy answers Camunda 7's errors when the worker doesn't hold the
 // task's lock: 404 for an unknown task, 500 otherwise.
-func (ctrl *ExternalTaskController) lockHeldBy(c *fiber.Ctx, jobID uuid.UUID, workerID string) (bool, error) {
+func (ctrl *ExternalTaskController) lockHeldBy(c *fiber.Ctx, jobID int64, workerID string) (bool, error) {
 	owner, err := ctrl.externalTaskRepo.LockOwner(jobID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, c7Error(c, fiber.StatusNotFound, "RestException", fmt.Sprintf("External task with id %s does not exist", jobID))
+		return false, c7Error(c, fiber.StatusNotFound, "RestException", fmt.Sprintf("External task with id %d does not exist", jobID))
 	}
 	if err != nil {
 		return false, c7Error(c, fiber.StatusInternalServerError, "ProcessEngineException", err.Error())
 	}
 	if owner != workerID {
 		return false, c7Error(c, fiber.StatusInternalServerError, "BadUserRequestException",
-			fmt.Sprintf("External Task %s cannot be handled by worker '%s'. It is locked by worker '%s'.", jobID, workerID, owner))
+			fmt.Sprintf("External Task %d cannot be handled by worker '%s'. It is locked by worker '%s'.", jobID, workerID, owner))
 	}
 	return true, nil
 }
@@ -227,7 +234,7 @@ func (ctrl *ExternalTaskController) lockHeldBy(c *fiber.Ctx, jobID uuid.UUID, wo
 // is caught by the nearest matching error boundary or error event
 // sub-process (or a calling process); with none, an incident is raised.
 func (ctrl *ExternalTaskController) HandleBpmnError(c *fiber.Ctx) error {
-	jobID, err := uuid.Parse(c.Params("id"))
+	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c7Error(c, fiber.StatusBadRequest, "InvalidRequestException", "invalid external task id")
 	}
@@ -269,7 +276,7 @@ func (ctrl *ExternalTaskController) HandleBpmnError(c *fiber.Ctx) error {
 // ExtendLock handles POST /engine-rest/external-task/:id/extendLock
 // {"workerId", "newDuration" (ms)}.
 func (ctrl *ExternalTaskController) ExtendLock(c *fiber.Ctx) error {
-	jobID, err := uuid.Parse(c.Params("id"))
+	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c7Error(c, fiber.StatusBadRequest, "InvalidRequestException", "invalid external task id")
 	}
@@ -296,12 +303,12 @@ func (ctrl *ExternalTaskController) ExtendLock(c *fiber.Ctx) error {
 // Unlock handles POST /engine-rest/external-task/:id/unlock: the task can
 // be fetched again right away.
 func (ctrl *ExternalTaskController) Unlock(c *fiber.Ctx) error {
-	jobID, err := uuid.Parse(c.Params("id"))
+	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c7Error(c, fiber.StatusBadRequest, "InvalidRequestException", "invalid external task id")
 	}
 	if _, err := ctrl.externalTaskRepo.LockOwner(jobID); errors.Is(err, sql.ErrNoRows) {
-		return c7Error(c, fiber.StatusNotFound, "RestException", fmt.Sprintf("External task with id %s does not exist", jobID))
+		return c7Error(c, fiber.StatusNotFound, "RestException", fmt.Sprintf("External task with id %d does not exist", jobID))
 	}
 	if err := ctrl.externalTaskRepo.Unlock(jobID); err != nil && !errors.Is(err, repository.ErrJobNotLockedBy) {
 		return c7Error(c, fiber.StatusInternalServerError, "ProcessEngineException", err.Error())

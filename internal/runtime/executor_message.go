@@ -23,7 +23,8 @@ func (r *Runtime) executeMessageCatchEvent(ctx context.Context, engineRepo *repo
 	}
 
 	_, err = tx.Exec(`
-		UPDATE executions SET status = 'waiting', updated_at = NOW() WHERE process_instance_id = $1 AND id = $2
+		UPDATE executions SET status = 'waiting', updated_at = NOW()
+		WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1) AND engine_key = $2
 	`, exec.ProcessInstanceID, exec.ID)
 	if err != nil {
 		return fmt.Errorf("message catch: set waiting: %w", err)

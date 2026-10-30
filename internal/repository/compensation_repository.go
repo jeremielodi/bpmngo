@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strconv"
+
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -21,12 +23,16 @@ const compensationHandlerPrefix = "compensation:"
 
 // RecordCompensableTx records that activityID, run by execID, completed
 // and can be compensated by handlerID.
-func (r *EngineRepository) RecordCompensableTx(tx *sqlx.Tx, instanceID, execID uuid.UUID, activityID, handlerID string) error {
-	_, err := tx.Exec(`
+func (r *EngineRepository) RecordCompensableTx(tx *sqlx.Tx, instanceID uuid.UUID, execID int64, activityID, handlerID string) error {
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
 		INSERT INTO event_subscriptions
-		  (process_instance_id, execution_id, event_type, event_name, target_element_id)
+		  (process_instance_key, execution_key, event_type, event_name, target_element_id)
 		VALUES ($1, $2, 'compensable', $3, $4)
-	`, instanceID, execID, activityID, handlerID)
+	`, instanceKey, execID, activityID, handlerID)
 	return err
 }
 
@@ -42,14 +48,19 @@ func (r *EngineRepository) TakeCompensablesTx(tx *sqlx.Tx, instanceID uuid.UUID,
 	if len(activityIDs) == 0 {
 		return nil, nil
 	}
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return nil, err
+	}
 	var out []Compensable
-	err := tx.Select(&out, `
+	err = tx.Select(&out, `
 		UPDATE event_subscriptions
 		SET consumed_at = NOW()
-		WHERE process_instance_id = $1 AND event_type = 'compensable' AND consumed_at IS NULL
+		WHERE process_instance_key = $1
+		  AND event_type = 'compensable' AND consumed_at IS NULL
 		  AND event_name = ANY($2::text[])
 		RETURNING event_name, target_element_id
-	`, instanceID, pq.Array(activityIDs))
+	`, instanceKey, pq.Array(activityIDs))
 	return out, err
 }
 
@@ -58,27 +69,28 @@ func (r *EngineRepository) TakeCompensablesTx(tx *sqlx.Tx, instanceID uuid.UUID,
 // throwExecID. Handler executions have no parent — as a child they'd make
 // the thrower look like a fork parent to the live-work and join logic — so
 // the link to the thrower lives in path_id.
-func CompensationHandlerPathID(throwExecID uuid.UUID) string {
-	return compensationHandlerPrefix + throwExecID.String()
+func CompensationHandlerPathID(throwExecID int64) string {
+	return compensationHandlerPrefix + strconv.FormatInt(throwExecID, 10)
 }
 
 // ParseCompensationHandlerPathID returns the thrower a handler execution
 // reports to; ok is false for any other execution.
-func ParseCompensationHandlerPathID(pathID *string) (throwExecID uuid.UUID, ok bool) {
+func ParseCompensationHandlerPathID(pathID *string) (throwExecID int64, ok bool) {
 	if pathID == nil || len(*pathID) <= len(compensationHandlerPrefix) || (*pathID)[:len(compensationHandlerPrefix)] != compensationHandlerPrefix {
-		return uuid.Nil, false
+		return 0, false
 	}
-	id, err := uuid.Parse((*pathID)[len(compensationHandlerPrefix):])
+	id, err := strconv.ParseInt((*pathID)[len(compensationHandlerPrefix):], 10, 64)
 	return id, err == nil
 }
 
 // CountRunningCompensationHandlersTx counts the handler executions of a
 // thrower that are still running.
-func (r *EngineRepository) CountRunningCompensationHandlersTx(tx *sqlx.Tx, instanceID, throwExecID uuid.UUID) (int, error) {
+func (r *EngineRepository) CountRunningCompensationHandlersTx(tx *sqlx.Tx, instanceID uuid.UUID, throwExecID int64) (int, error) {
 	var n int
 	err := tx.Get(&n, `
 		SELECT count(*) FROM public.executions
-		WHERE process_instance_id = $1 AND path_id = $2 AND status IN ('active', 'waiting')
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+		  AND path_id = $2 AND status IN ('active', 'waiting')
 	`, instanceID, CompensationHandlerPathID(throwExecID))
 	return n, err
 }

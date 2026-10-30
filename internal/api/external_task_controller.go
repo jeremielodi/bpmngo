@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -122,9 +123,8 @@ func formatVariablesForResponse(variables map[string]interface{}) map[string]Cam
 	return result
 }
 
-
 func (ctrl *ExternalTaskController) CompleteTask(c *fiber.Ctx) error {
-	jobID, err := uuid.Parse(c.Params("id"))
+	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"title":   "Validation Error",
@@ -178,7 +178,7 @@ func (ctrl *ExternalTaskController) CompleteTask(c *fiber.Ctx) error {
 }
 
 func (ctrl *ExternalTaskController) HandleFailure(c *fiber.Ctx) error {
-	jobID, err := uuid.Parse(c.Params("id"))
+	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"title":   "Validation Error",
@@ -271,27 +271,27 @@ func (ctrl *ExternalTaskController) GetJobs(c *fiber.Ctx) error {
 	var jobs []models.Job
 	query := `
 		SELECT 
-			id, process_instance_id, execution_id, job_type, status, 
-			payload, retries, created_at, updated_at, completed_at 
-		FROM public.jobs WHERE 1=1`
+			j.engine_key, pi.id AS process_instance_id, j.execution_key, j.job_type, j.status,
+			j.payload, j.retries, j.created_at, j.updated_at, j.completed_at
+		FROM public.jobs j JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key WHERE 1=1`
 
 	if processInstanceID != "" {
 		pid, err := uuid.Parse(processInstanceID)
 		if err == nil {
-			query += " AND process_instance_id = $1"
+			query += " AND pi.id = $1"
 			if topic != "" {
-				query += " AND job_type = $2 ORDER BY created_at DESC"
+				query += " AND j.job_type = $2 ORDER BY j.created_at DESC"
 				ctrl.db.Select(&jobs, query, pid, topic)
 			} else {
-				query += " ORDER BY created_at DESC"
+				query += " ORDER BY j.created_at DESC"
 				ctrl.db.Select(&jobs, query, pid)
 			}
 		}
 	} else if topic != "" {
-		query += " AND job_type = $1 ORDER BY created_at DESC"
+		query += " AND j.job_type = $1 ORDER BY j.created_at DESC"
 		ctrl.db.Select(&jobs, query, topic)
 	} else {
-		query += " ORDER BY created_at DESC"
+		query += " ORDER BY j.created_at DESC"
 		ctrl.db.Select(&jobs, query)
 	}
 
@@ -311,9 +311,10 @@ func (ctrl *ExternalTaskController) GetJob(c *fiber.Ctx) error {
 	var job models.Job
 	query := `
 			SELECT 
-				id, process_instance_id, execution_id, job_type, status, 
-				payload, retries, created_at, updated_at, completed_at 
-			FROM public.jobs WHERE id = $1`
+				j.engine_key, pi.id AS process_instance_id, j.execution_key, j.job_type, j.status,
+				j.payload, j.retries, j.created_at, j.updated_at, j.completed_at
+			FROM public.jobs j JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key
+			WHERE j.engine_key = $1`
 
 	err := ctrl.db.Get(&job, query, id)
 	if err != nil {

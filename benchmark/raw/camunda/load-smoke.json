@@ -1,0 +1,20 @@
+{
+  "engine": "camunda-8.10.7-smoke",
+  "generated_at": "2026-10-29T15:01:07.639411Z",
+  "clients": 10,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 2,
+  "seconds": 5.036914125,
+  "completed": 694,
+  "instances_per_second": 137.7827738923383,
+  "errors": {},
+  "latency": {
+    "count": 694,
+    "errors": 0,
+    "p50_us": 66139,
+    "p95_us": 127604,
+    "p99_us": 257606,
+    "mean_us": 72406.65561959654
+  }
+}

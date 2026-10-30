@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,20 +21,20 @@ const boundaryTriggerPrefix = "boundary:"
 
 // BoundaryTriggerPathID is the path_id of the trigger arming boundaryNodeID
 // for the activity running in activityExecID.
-func BoundaryTriggerPathID(boundaryNodeID string, activityExecID uuid.UUID) string {
-	return boundaryTriggerPrefix + boundaryNodeID + ":" + activityExecID.String()
+func BoundaryTriggerPathID(boundaryNodeID string, activityExecID int64) string {
+	return boundaryTriggerPrefix + boundaryNodeID + ":" + strconv.FormatInt(activityExecID, 10)
 }
 
 // ParseBoundaryTriggerPathID returns the activity execution a boundary
 // trigger watches; ok is false when pathID isn't a boundary trigger's.
-func ParseBoundaryTriggerPathID(pathID *string) (activityExecID uuid.UUID, ok bool) {
+func ParseBoundaryTriggerPathID(pathID *string) (activityExecID int64, ok bool) {
 	if pathID == nil || !strings.HasPrefix(*pathID, boundaryTriggerPrefix) {
-		return uuid.Nil, false
+		return 0, false
 	}
 	i := strings.LastIndex(*pathID, ":")
-	id, err := uuid.Parse((*pathID)[i+1:])
+	id, err := strconv.ParseInt((*pathID)[i+1:], 10, 64)
 	if err != nil {
-		return uuid.Nil, false
+		return 0, false
 	}
 	return id, true
 }
@@ -43,21 +44,26 @@ func ParseBoundaryTriggerPathID(pathID *string) (activityExecID uuid.UUID, ok bo
 // activity is left, so its boundary events can no longer fire. Also drops
 // boundary timers created directly on the activity's execution by older
 // versions of the engine.
-func (r *EngineRepository) DisarmBoundaryTriggersTx(tx *sqlx.Tx, instanceID uuid.UUID, activityExecIDs ...uuid.UUID) error {
+func (r *EngineRepository) DisarmBoundaryTriggersTx(tx *sqlx.Tx, instanceID uuid.UUID, activityExecIDs ...int64) error {
 	if len(activityExecIDs) == 0 {
 		return nil
 	}
-	activities := pq.Array(uuidStrings(activityExecIDs))
+	activities := pq.Array(activityExecIDs)
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
 
-	var triggers []string
+	var triggers []int64
 	if err := tx.Select(&triggers, `
 		UPDATE public.executions
 		SET status = 'completed', is_active = false, updated_at = NOW()
-		WHERE process_instance_id = $1 AND status = 'waiting'
+		WHERE process_instance_key = $1
+		  AND status = 'waiting'
 		  AND path_id LIKE 'boundary:%'
-		  AND split_part(path_id, ':', 3) = ANY($2::text[])
-		RETURNING id::text
-	`, instanceID, activities); err != nil {
+		  AND split_part(path_id, ':', 3)::bigint = ANY($2::bigint[])
+		RETURNING engine_key
+	`, instanceKey, activities); err != nil {
 		return err
 	}
 	if len(triggers) > 0 {
@@ -65,33 +71,39 @@ func (r *EngineRepository) DisarmBoundaryTriggersTx(tx *sqlx.Tx, instanceID uuid
 			return err
 		}
 	}
-	_, err := tx.Exec(`
+	_, err = tx.Exec(`
 		DELETE FROM public.timer_jobs
-		WHERE process_instance_id = $1 AND execution_id = ANY($2::uuid[])
+		WHERE process_instance_key = $1
+		  AND execution_key = ANY($2::bigint[])
 		  AND event_type = 'boundary' AND is_triggered = false
-	`, instanceID, activities)
+	`, instanceKey, activities)
 	return err
 }
 
 // ActivityExecution is the state of the execution a boundary trigger
 // watches, read under a row lock when the trigger fires.
 type ActivityExecution struct {
-	ID                uuid.UUID  `db:"id"`
-	ParentExecutionID *uuid.UUID `db:"parent_execution_id"`
-	CurrentElementID  string     `db:"current_element_id"`
-	Status            string     `db:"status"`
+	ID                int64  `db:"engine_key"`
+	ParentExecutionID *int64 `db:"parent_execution_key"`
+	CurrentElementID  string `db:"current_element_id"`
+	Status            string `db:"status"`
 }
 
 // LockActivityExecutionTx loads and locks the execution a boundary trigger
 // watches, so a boundary firing and the activity completing can't both win.
-func (r *EngineRepository) LockActivityExecutionTx(tx *sqlx.Tx, instanceID, execID uuid.UUID) (*ActivityExecution, error) {
+func (r *EngineRepository) LockActivityExecutionTx(tx *sqlx.Tx, instanceID uuid.UUID, execID int64) (*ActivityExecution, error) {
 	var e ActivityExecution
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.Get(&e, `
-		SELECT id, parent_execution_id, current_element_id, status
+		SELECT engine_key, parent_execution_key, current_element_id, status
 		FROM public.executions
-		WHERE process_instance_id = $1 AND id = $2
+		WHERE process_instance_key = $1
+		  AND engine_key = $2
 		FOR UPDATE
-	`, instanceID, execID); err != nil {
+	`, instanceKey, execID); err != nil {
 		return nil, err
 	}
 	return &e, nil
@@ -99,21 +111,27 @@ func (r *EngineRepository) LockActivityExecutionTx(tx *sqlx.Tx, instanceID, exec
 
 // CancelActivityWorkTx cancels the open user tasks and pending/locked jobs
 // of one activity execution, for an interrupting boundary event.
-func (r *EngineRepository) CancelActivityWorkTx(tx *sqlx.Tx, instanceID, execID uuid.UUID) (cancelledTasks, cancelledJobs []uuid.UUID, err error) {
+func (r *EngineRepository) CancelActivityWorkTx(tx *sqlx.Tx, instanceID uuid.UUID, execID int64) (cancelledTasks, cancelledJobs []int64, err error) {
+	instanceKey, err := processInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return nil, nil, err
+	}
 	if err = tx.Select(&cancelledTasks, `
 		UPDATE public.tasks
 		SET status = 'cancelled', updated_at = NOW()
-		WHERE process_instance_id = $1 AND execution_id = $2 AND status IN ('created', 'claimed')
-		RETURNING id
-	`, instanceID, execID); err != nil {
+		WHERE process_instance_key = $1
+		  AND execution_key = $2 AND status IN ('created', 'claimed')
+		RETURNING engine_key
+	`, instanceKey, execID); err != nil {
 		return nil, nil, err
 	}
 	if err = tx.Select(&cancelledJobs, `
 		UPDATE public.jobs
 		SET status = 'cancelled', updated_at = NOW()
-		WHERE process_instance_id = $1 AND execution_id = $2 AND status IN ('pending', 'locked')
-		RETURNING id
-	`, instanceID, execID); err != nil {
+		WHERE process_instance_key = $1
+		  AND execution_key = $2 AND status IN ('pending', 'locked')
+		RETURNING engine_key
+	`, instanceKey, execID); err != nil {
 		return nil, nil, err
 	}
 	return cancelledTasks, cancelledJobs, nil

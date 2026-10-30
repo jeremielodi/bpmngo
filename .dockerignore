@@ -1,5 +1,8 @@
 # .dockerignore
 .git
+.benchmark-cache
+benchmark
+benchmark.zip
 .gitignore
 README.md
 .env.example

@@ -8,8 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // Audit rows are written in batches. An instance writes about ten of them,
@@ -28,8 +30,8 @@ import (
 // row logged before it (archiving, token history, step back, audit routes).
 
 const (
-	auditFlushEvery = 20 * time.Millisecond
-	auditFlushAt    = 200
+	auditFlushEvery = 50 * time.Millisecond
+	auditFlushAt    = 500
 )
 
 type auditWriter struct {
@@ -121,23 +123,55 @@ func (w *auditWriter) flush() {
 }
 
 func insertAuditLogs(db *sqlx.DB, batch []*models.AuditLog) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	type instanceKeyRow struct {
+		ID  uuid.UUID `db:"id"`
+		Key int64     `db:"engine_key"`
+	}
+	uniqueIDs := make(map[uuid.UUID]struct{}, len(batch))
+	for _, e := range batch {
+		if e.ProcessInstanceID != nil {
+			uniqueIDs[*e.ProcessInstanceID] = struct{}{}
+		}
+	}
+	ids := make([]uuid.UUID, 0, len(uniqueIDs))
+	for id := range uniqueIDs {
+		ids = append(ids, id)
+	}
+	keys := make(map[uuid.UUID]int64, len(ids))
+	if len(ids) > 0 {
+		var rows []instanceKeyRow
+		if err := tx.Select(&rows, `SELECT id, engine_key FROM public.process_instances WHERE id = ANY($1::uuid[])`, pq.Array(ids)); err != nil {
+			return err
+		}
+		for _, row := range rows {
+			keys[row.ID] = row.Key
+		}
+	}
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO public.audit_logs
-		(id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at) VALUES `)
+		(id, process_instance_key, task_key, user_id, action, old_data, new_data, created_at) VALUES `)
 	args := make([]interface{}, 0, len(batch)*8)
 	for i, e := range batch {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
 		n := i * 8
+		var instanceKey *int64
+		if e.ProcessInstanceID != nil {
+			key, ok := keys[*e.ProcessInstanceID]
+			if !ok {
+				return fmt.Errorf("process instance %s not found for audit log", *e.ProcessInstanceID)
+			}
+			instanceKey = &key
+		}
 		fmt.Fprintf(&sb, "($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", n+1, n+2, n+3, n+4, n+5, n+6, n+7, n+8)
-		args = append(args, e.ID, e.ProcessInstanceID, e.TaskID, e.UserID, string(e.Action), e.OldData, e.NewData, e.CreatedAt)
+		args = append(args, e.ID, instanceKey, e.TaskID, e.UserID, string(e.Action), e.OldData, e.NewData, e.CreatedAt)
 	}
-	tx, err := db.Beginx()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 	if _, err := tx.Exec(`SET LOCAL synchronous_commit TO OFF`); err != nil {
 		return err
 	}

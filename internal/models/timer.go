@@ -8,9 +8,9 @@ import (
 )
 
 type TimerJob struct {
-	ID                uuid.UUID  `db:"id" json:"id"`
+	ID                int64      `db:"engine_key" json:"id"`
 	ProcessInstanceID uuid.UUID  `db:"process_instance_id" json:"processInstanceId"`
-	ExecutionID       *uuid.UUID `db:"execution_id" json:"executionId,omitempty"`
+	ExecutionID       *int64     `db:"execution_key" json:"executionId,omitempty"`
 	EventType         string     `db:"event_type" json:"eventType"` // intermediate, boundary, start
 	DueAt             time.Time  `db:"due_at" json:"dueAt"`
 	Payload           []byte     `db:"payload" json:"payload"`

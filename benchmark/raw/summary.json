@@ -1,0 +1,792 @@
+{
+  "behavior": {
+    "camunda": {
+      "duration_seconds": 25,
+      "cpu_seconds": 6.625634000000001,
+      "cpu_seconds_by_container": {
+        "connectors": 0.252976,
+        "orchestration": 6.372658
+      },
+      "cpu_average_percent_exact": 26.502536000000003,
+      "cpu_average_percent_sampled": 25.63166666666667,
+      "cpu_peak_percent_sampled": 55.760000000000005,
+      "memory_idle_bytes_cgroup": 2076016640,
+      "memory_idle_bytes_sampled": 1287127040,
+      "memory_peak_bytes_sampled": 1324141772.8000002,
+      "sample_count": 6,
+      "cpu_average_percent_by_container_sampled": {
+        "orchestration": 24.64833333333333,
+        "connectors": 0.9833333333333333
+      }
+    },
+    "bpmngo": {
+      "duration_seconds": 23,
+      "cpu_seconds": 18.26947,
+      "cpu_seconds_by_container": {
+        "bpmngo-benchmark-app": 7.671634,
+        "bpmngo-benchmark-postgres": 10.597836
+      },
+      "cpu_average_percent_exact": 79.43247826086956,
+      "cpu_average_percent_sampled": 82.354,
+      "cpu_peak_percent_sampled": 101.00999999999999,
+      "memory_idle_bytes_cgroup": 668971008,
+      "memory_idle_bytes_sampled": 453823692.8,
+      "memory_peak_bytes_sampled": 456445132.8,
+      "sample_count": 5,
+      "cpu_average_percent_by_container_sampled": {
+        "bpmngo-benchmark-app": 36.036,
+        "bpmngo-benchmark-postgres": 46.318
+      }
+    }
+  },
+  "latency": {
+    "camunda": [
+      {
+        "CompleteJob": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2204,
+          "p95_us": 3915,
+          "p99_us": 4067,
+          "mean_us": 2389.7
+        },
+        "CreateProcessInstance": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2104,
+          "p95_us": 4930,
+          "p99_us": 6023,
+          "mean_us": 2570.8333333333335
+        },
+        "CreateProcessInstanceWithResult": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2134,
+          "p95_us": 4773,
+          "p99_us": 5203,
+          "mean_us": 2419.8
+        },
+        "DeployResource": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 4722,
+          "p95_us": 9253,
+          "p99_us": 12750,
+          "mean_us": 5256.666666666667
+        },
+        "JobDelivery": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 3374,
+          "p95_us": 8463,
+          "p99_us": 10012,
+          "mean_us": 4230.9
+        },
+        "Topology": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 492,
+          "p95_us": 1408,
+          "p99_us": 1848,
+          "mean_us": 592.3333333333334
+        }
+      },
+      {
+        "CompleteJob": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 1945,
+          "p95_us": 2736,
+          "p99_us": 3512,
+          "mean_us": 1959.2
+        },
+        "CreateProcessInstance": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2005,
+          "p95_us": 2878,
+          "p99_us": 3090,
+          "mean_us": 2000.3666666666666
+        },
+        "CreateProcessInstanceWithResult": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2002,
+          "p95_us": 6959,
+          "p99_us": 7038,
+          "mean_us": 2898.0333333333333
+        },
+        "DeployResource": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2766,
+          "p95_us": 7007,
+          "p99_us": 8528,
+          "mean_us": 3407.6666666666665
+        },
+        "JobDelivery": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 3394,
+          "p95_us": 6743,
+          "p99_us": 8407,
+          "mean_us": 3831.2
+        },
+        "Topology": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 315,
+          "p95_us": 614,
+          "p99_us": 1120,
+          "mean_us": 367.6666666666667
+        }
+      }
+    ],
+    "bpmngo": [
+      {
+        "CompleteJob": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2193,
+          "p95_us": 2717,
+          "p99_us": 2728,
+          "mean_us": 2253.1
+        },
+        "CreateProcessInstance": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2471,
+          "p95_us": 3169,
+          "p99_us": 4915,
+          "mean_us": 2628.0666666666666
+        },
+        "CreateProcessInstanceWithResult": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2553,
+          "p95_us": 2924,
+          "p99_us": 3014,
+          "mean_us": 2595.1
+        },
+        "DeployResource": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 1876,
+          "p95_us": 2574,
+          "p99_us": 5626,
+          "mean_us": 2067.9
+        },
+        "JobDelivery": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 3434,
+          "p95_us": 3775,
+          "p99_us": 3810,
+          "mean_us": 3475.5333333333333
+        },
+        "Topology": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 461,
+          "p95_us": 1123,
+          "p99_us": 1585,
+          "mean_us": 594.7666666666667
+        }
+      },
+      {
+        "CompleteJob": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2040,
+          "p95_us": 2594,
+          "p99_us": 2822,
+          "mean_us": 2120.633333333333
+        },
+        "CreateProcessInstance": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2358,
+          "p95_us": 2833,
+          "p99_us": 2975,
+          "mean_us": 2425.366666666667
+        },
+        "CreateProcessInstanceWithResult": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 2446,
+          "p95_us": 2826,
+          "p99_us": 6467,
+          "mean_us": 2613.766666666667
+        },
+        "DeployResource": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 1489,
+          "p95_us": 2171,
+          "p99_us": 2273,
+          "mean_us": 1563
+        },
+        "JobDelivery": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 3374,
+          "p95_us": 4022,
+          "p99_us": 5142,
+          "mean_us": 3468.4666666666667
+        },
+        "Topology": {
+          "count": 30,
+          "errors": 0,
+          "p50_us": 330,
+          "p95_us": 423,
+          "p99_us": 665,
+          "mean_us": 339.4
+        }
+      }
+    ]
+  },
+  "load": [
+    {
+      "engine": "camunda",
+      "pass": 1,
+      "clients": 10,
+      "result": {
+        "engine": "camunda-8.10.7",
+        "generated_at": "2026-10-29T15:02:36.120425Z",
+        "clients": 10,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.0264375,
+        "completed": 10389,
+        "instances_per_second": 173.0737393835841,
+        "errors": {},
+        "latency": {
+          "count": 10389,
+          "errors": 0,
+          "p50_us": 53636,
+          "p95_us": 101595,
+          "p99_us": 126912,
+          "mean_us": 57765.64452786601
+        }
+      },
+      "resources": {
+        "duration_seconds": 74,
+        "cpu_seconds": 74.02255,
+        "cpu_seconds_by_container": {
+          "connectors": 0.207781,
+          "orchestration": 73.814769
+        },
+        "cpu_average_percent_exact": 100.03047297297296,
+        "cpu_average_percent_sampled": 97.24999999999999,
+        "cpu_peak_percent_sampled": 130.26999999999998,
+        "memory_idle_bytes_cgroup": 1575870464,
+        "memory_idle_bytes_sampled": 1430886809.6,
+        "memory_peak_bytes_sampled": 1609866149.888,
+        "sample_count": 15,
+        "cpu_average_percent_by_container_sampled": {
+          "orchestration": 96.74733333333334,
+          "connectors": 0.5026666666666667
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.0056189922484117805
+      }
+    },
+    {
+      "engine": "camunda",
+      "pass": 1,
+      "clients": 50,
+      "result": {
+        "engine": "camunda-8.10.7",
+        "generated_at": "2026-10-29T15:03:49.696885Z",
+        "clients": 50,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.173630375,
+        "completed": 13905,
+        "instances_per_second": 231.0812878223321,
+        "errors": {},
+        "latency": {
+          "count": 13905,
+          "errors": 0,
+          "p50_us": 190573,
+          "p95_us": 441898,
+          "p99_us": 575534,
+          "mean_us": 216092.7151384394
+        }
+      },
+      "resources": {
+        "duration_seconds": 73,
+        "cpu_seconds": 72.287691,
+        "cpu_seconds_by_container": {
+          "connectors": 0.231636,
+          "orchestration": 72.056055
+        },
+        "cpu_average_percent_exact": 99.02423424657533,
+        "cpu_average_percent_sampled": 97.978,
+        "cpu_peak_percent_sampled": 136.22,
+        "memory_idle_bytes_cgroup": 2053378048,
+        "memory_idle_bytes_sampled": 1402155827.1999998,
+        "memory_peak_bytes_sampled": 2029099417.6,
+        "sample_count": 15,
+        "cpu_average_percent_by_container_sampled": {
+          "orchestration": 97.73000000000002,
+          "connectors": 0.24800000000000003
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.004239979832349335
+      }
+    },
+    {
+      "engine": "camunda",
+      "pass": 1,
+      "clients": 100,
+      "result": {
+        "engine": "camunda-8.10.7",
+        "generated_at": "2026-10-29T15:05:03.719989Z",
+        "clients": 100,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.361310167,
+        "completed": 12929,
+        "instances_per_second": 214.19349520793511,
+        "errors": {},
+        "latency": {
+          "count": 12929,
+          "errors": 0,
+          "p50_us": 407634,
+          "p95_us": 974144,
+          "p99_us": 1456098,
+          "mean_us": 465504.54621393763
+        }
+      },
+      "resources": {
+        "duration_seconds": 74,
+        "cpu_seconds": 63.005542,
+        "cpu_seconds_by_container": {
+          "connectors": 0.244944,
+          "orchestration": 62.760598
+        },
+        "cpu_average_percent_exact": 85.14262432432432,
+        "cpu_average_percent_sampled": 90.47466666666666,
+        "cpu_peak_percent_sampled": 128.22,
+        "memory_idle_bytes_cgroup": 2098892800,
+        "memory_idle_bytes_sampled": 2025953689.6,
+        "memory_peak_bytes_sampled": 2025953689.6,
+        "sample_count": 15,
+        "cpu_average_percent_by_container_sampled": {
+          "orchestration": 90.12799999999999,
+          "connectors": 0.3466666666666667
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.004223968920196923
+      }
+    },
+    {
+      "engine": "camunda",
+      "pass": 2,
+      "clients": 10,
+      "result": {
+        "engine": "camunda-8.10.7",
+        "generated_at": "2026-10-29T15:06:17.06956Z",
+        "clients": 10,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.053163041,
+        "completed": 10122,
+        "instances_per_second": 168.55065557645023,
+        "errors": {},
+        "latency": {
+          "count": 10122,
+          "errors": 0,
+          "p50_us": 52932,
+          "p95_us": 102930,
+          "p99_us": 135305,
+          "mean_us": 59305.097510373445
+        }
+      },
+      "resources": {
+        "duration_seconds": 74,
+        "cpu_seconds": 69.497811,
+        "cpu_seconds_by_container": {
+          "connectors": 0.256539,
+          "orchestration": 69.241272
+        },
+        "cpu_average_percent_exact": 93.9159608108108,
+        "cpu_average_percent_sampled": 94.75428571428571,
+        "cpu_peak_percent_sampled": 133.93,
+        "memory_idle_bytes_cgroup": 2099855360,
+        "memory_idle_bytes_sampled": 1458254643.1999998,
+        "memory_peak_bytes_sampled": 1549816299.52,
+        "sample_count": 14,
+        "cpu_average_percent_by_container_sampled": {
+          "orchestration": 94.55642857142857,
+          "connectors": 0.1978571428571429
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.0056217097103670195
+      }
+    },
+    {
+      "engine": "camunda",
+      "pass": 2,
+      "clients": 50,
+      "result": {
+        "engine": "camunda-8.10.7",
+        "generated_at": "2026-10-29T15:07:30.566678Z",
+        "clients": 50,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.134200708,
+        "completed": 11670,
+        "instances_per_second": 194.06593689782713,
+        "errors": {},
+        "latency": {
+          "count": 11670,
+          "errors": 0,
+          "p50_us": 199431,
+          "p95_us": 503765,
+          "p99_us": 899698,
+          "mean_us": 257379.5153384747
+        }
+      },
+      "resources": {
+        "duration_seconds": 73,
+        "cpu_seconds": 59.724569,
+        "cpu_seconds_by_container": {
+          "connectors": 0.2245,
+          "orchestration": 59.500069
+        },
+        "cpu_average_percent_exact": 81.81447808219178,
+        "cpu_average_percent_sampled": 81.06066666666669,
+        "cpu_peak_percent_sampled": 129.39000000000001,
+        "memory_idle_bytes_cgroup": 1798463488,
+        "memory_idle_bytes_sampled": 1534863605.76,
+        "memory_peak_bytes_sampled": 1965983531.008,
+        "sample_count": 15,
+        "cpu_average_percent_by_container_sampled": {
+          "orchestration": 80.70533333333333,
+          "connectors": 0.3553333333333334
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.004176965208961114
+      }
+    },
+    {
+      "engine": "camunda",
+      "pass": 2,
+      "clients": 100,
+      "result": {
+        "engine": "camunda-8.10.7",
+        "generated_at": "2026-10-29T15:08:44.520909Z",
+        "clients": 100,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.243529167,
+        "completed": 10772,
+        "instances_per_second": 178.807585626983,
+        "errors": {
+          "ResourceExhausted": 2309
+        },
+        "latency": {
+          "count": 13081,
+          "errors": 2309,
+          "p50_us": 417004,
+          "p95_us": 1271504,
+          "p99_us": 3741045,
+          "mean_us": 556186.2036761976
+        }
+      },
+      "resources": {
+        "duration_seconds": 74,
+        "cpu_seconds": 55.307528999999995,
+        "cpu_seconds_by_container": {
+          "connectors": 0.227233,
+          "orchestration": 55.080296
+        },
+        "cpu_average_percent_exact": 74.73990405405405,
+        "cpu_average_percent_sampled": 79.22642857142856,
+        "cpu_peak_percent_sampled": 125.76,
+        "memory_idle_bytes_cgroup": 2124013568,
+        "memory_idle_bytes_sampled": 1296669081.6,
+        "memory_peak_bytes_sampled": 1874610618.368,
+        "sample_count": 14,
+        "cpu_average_percent_by_container_sampled": {
+          "orchestration": 78.88642857142857,
+          "connectors": 0.33999999999999997
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.004430820330895004
+      }
+    },
+    {
+      "engine": "bpmngo",
+      "pass": 1,
+      "clients": 10,
+      "result": {
+        "engine": "bpmngo-1.0.1",
+        "generated_at": "2026-10-29T15:14:42.875979Z",
+        "clients": 10,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.027680958,
+        "completed": 12911,
+        "instances_per_second": 215.08410443231236,
+        "errors": {},
+        "latency": {
+          "count": 12911,
+          "errors": 0,
+          "p50_us": 44049,
+          "p95_us": 69807,
+          "p99_us": 86402,
+          "mean_us": 46483.79041127721
+        }
+      },
+      "resources": {
+        "duration_seconds": 73,
+        "cpu_seconds": 138.282636,
+        "cpu_seconds_by_container": {
+          "bpmngo-benchmark-app": 48.617782,
+          "bpmngo-benchmark-postgres": 89.664854
+        },
+        "cpu_average_percent_exact": 189.42826849315068,
+        "cpu_average_percent_sampled": 178.48666666666668,
+        "cpu_peak_percent_sampled": 195.77999999999997,
+        "memory_idle_bytes_cgroup": 668266496,
+        "memory_idle_bytes_sampled": 472802918.40000004,
+        "memory_peak_bytes_sampled": 486958694.40000004,
+        "sample_count": 15,
+        "cpu_average_percent_by_container_sampled": {
+          "bpmngo-benchmark-app": 66.496,
+          "bpmngo-benchmark-postgres": 111.99066666666666
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.00829845920681865
+      }
+    },
+    {
+      "engine": "bpmngo",
+      "pass": 1,
+      "clients": 50,
+      "result": {
+        "engine": "bpmngo-1.0.1",
+        "generated_at": "2026-10-29T15:15:56.289676Z",
+        "clients": 50,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.116125,
+        "completed": 14574,
+        "instances_per_second": 242.43079539807331,
+        "errors": {},
+        "latency": {
+          "count": 14574,
+          "errors": 0,
+          "p50_us": 189190,
+          "p95_us": 388929,
+          "p99_us": 498261,
+          "mean_us": 206058.90524221215
+        }
+      },
+      "resources": {
+        "duration_seconds": 74,
+        "cpu_seconds": 139.097739,
+        "cpu_seconds_by_container": {
+          "bpmngo-benchmark-app": 48.80541,
+          "bpmngo-benchmark-postgres": 90.292329
+        },
+        "cpu_average_percent_exact": 187.96991756756756,
+        "cpu_average_percent_sampled": 180.3493333333333,
+        "cpu_peak_percent_sampled": 195.73000000000002,
+        "memory_idle_bytes_cgroup": 689266688,
+        "memory_idle_bytes_sampled": 558995865.6,
+        "memory_peak_bytes_sampled": 576716800,
+        "sample_count": 15,
+        "cpu_average_percent_by_container_sampled": {
+          "bpmngo-benchmark-app": 66.86866666666667,
+          "bpmngo-benchmark-postgres": 113.48066666666666
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.007439208910617078
+      }
+    },
+    {
+      "engine": "bpmngo",
+      "pass": 1,
+      "clients": 100,
+      "result": {
+        "engine": "bpmngo-1.0.1",
+        "generated_at": "2026-10-29T15:17:10.037015Z",
+        "clients": 100,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.343242834,
+        "completed": 13602,
+        "instances_per_second": 225.410491070527,
+        "errors": {},
+        "latency": {
+          "count": 13602,
+          "errors": 0,
+          "p50_us": 418367,
+          "p95_us": 798987,
+          "p99_us": 972334,
+          "mean_us": 442205.5960888105
+        }
+      },
+      "resources": {
+        "duration_seconds": 74,
+        "cpu_seconds": 138.03864099999998,
+        "cpu_seconds_by_container": {
+          "bpmngo-benchmark-app": 47.991259,
+          "bpmngo-benchmark-postgres": 90.047382
+        },
+        "cpu_average_percent_exact": 186.53870405405405,
+        "cpu_average_percent_sampled": 187.81357142857146,
+        "cpu_peak_percent_sampled": 196.54,
+        "memory_idle_bytes_cgroup": 713461760,
+        "memory_idle_bytes_sampled": 498283315.20000005,
+        "memory_peak_bytes_sampled": 517996544,
+        "sample_count": 14,
+        "cpu_average_percent_by_container_sampled": {
+          "bpmngo-benchmark-app": 66.22785714285713,
+          "bpmngo-benchmark-postgres": 121.58571428571427
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.008332068775352957
+      }
+    },
+    {
+      "engine": "bpmngo",
+      "pass": 2,
+      "clients": 10,
+      "result": {
+        "engine": "bpmngo-1.0.1",
+        "generated_at": "2026-10-29T15:18:23.7492Z",
+        "clients": 10,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.028947875,
+        "completed": 11530,
+        "instances_per_second": 192.07399776536562,
+        "errors": {},
+        "latency": {
+          "count": 11530,
+          "errors": 0,
+          "p50_us": 46891,
+          "p95_us": 79927,
+          "p99_us": 129434,
+          "mean_us": 52052.8222896791
+        }
+      },
+      "resources": {
+        "duration_seconds": 73,
+        "cpu_seconds": 129.032511,
+        "cpu_seconds_by_container": {
+          "bpmngo-benchmark-app": 45.648592,
+          "bpmngo-benchmark-postgres": 83.383919
+        },
+        "cpu_average_percent_exact": 176.75686438356163,
+        "cpu_average_percent_sampled": 171.75857142857146,
+        "cpu_peak_percent_sampled": 193.24,
+        "memory_idle_bytes_cgroup": 727920640,
+        "memory_idle_bytes_sampled": 503316480,
+        "memory_peak_bytes_sampled": 522610278.40000004,
+        "sample_count": 14,
+        "cpu_average_percent_by_container_sampled": {
+          "bpmngo-benchmark-app": 61.96928571428572,
+          "bpmngo-benchmark-postgres": 109.78928571428573
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.008942312516366157
+      }
+    },
+    {
+      "engine": "bpmngo",
+      "pass": 2,
+      "clients": 50,
+      "result": {
+        "engine": "bpmngo-1.0.1",
+        "generated_at": "2026-10-29T15:19:37.191691Z",
+        "clients": 50,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.136017875,
+        "completed": 12105,
+        "instances_per_second": 201.29367436935564,
+        "errors": {},
+        "latency": {
+          "count": 12105,
+          "errors": 0,
+          "p50_us": 204193,
+          "p95_us": 473353,
+          "p99_us": 1345486,
+          "mean_us": 248151.56414704668
+        }
+      },
+      "resources": {
+        "duration_seconds": 74,
+        "cpu_seconds": 126.882066,
+        "cpu_seconds_by_container": {
+          "bpmngo-benchmark-app": 43.49117,
+          "bpmngo-benchmark-postgres": 83.390896
+        },
+        "cpu_average_percent_exact": 171.46225135135134,
+        "cpu_average_percent_sampled": 167.34533333333331,
+        "cpu_peak_percent_sampled": 198.10999999999999,
+        "memory_idle_bytes_cgroup": 714555392,
+        "memory_idle_bytes_sampled": 571369062.4,
+        "memory_peak_bytes_sampled": 582588825.6,
+        "sample_count": 15,
+        "cpu_average_percent_by_container_sampled": {
+          "bpmngo-benchmark-app": 63.534000000000006,
+          "bpmngo-benchmark-postgres": 103.81133333333334
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.008313491909649869
+      }
+    },
+    {
+      "engine": "bpmngo",
+      "pass": 2,
+      "clients": 100,
+      "result": {
+        "engine": "bpmngo-1.0.1",
+        "generated_at": "2026-10-29T15:20:50.869839Z",
+        "clients": 100,
+        "workers": 8,
+        "batch": 32,
+        "warmup_seconds": 10,
+        "seconds": 60.229653291,
+        "completed": 11594,
+        "instances_per_second": 192.49654225940014,
+        "errors": {},
+        "latency": {
+          "count": 11594,
+          "errors": 0,
+          "p50_us": 451253,
+          "p95_us": 997536,
+          "p99_us": 1818086,
+          "mean_us": 518584.6831119545
+        }
+      },
+      "resources": {
+        "duration_seconds": 73,
+        "cpu_seconds": 126.765041,
+        "cpu_seconds_by_container": {
+          "bpmngo-benchmark-app": 43.986992,
+          "bpmngo-benchmark-postgres": 82.778049
+        },
+        "cpu_average_percent_exact": 173.6507410958904,
+        "cpu_average_percent_sampled": 171.60357142857143,
+        "cpu_peak_percent_sampled": 198.57999999999998,
+        "memory_idle_bytes_cgroup": 707497984,
+        "memory_idle_bytes_sampled": 530055168,
+        "memory_peak_bytes_sampled": 580281958.4,
+        "sample_count": 14,
+        "cpu_average_percent_by_container_sampled": {
+          "bpmngo-benchmark-app": 58.952857142857134,
+          "bpmngo-benchmark-postgres": 112.65071428571427
+        },
+        "cpu_seconds_per_instance_estimated_from_sampled_average": 0.008914631370226161
+      }
+    }
+  ]
+}

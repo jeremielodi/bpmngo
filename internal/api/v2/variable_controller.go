@@ -1,7 +1,11 @@
 package v2
 
 import (
+	"encoding/json"
+	"sort"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
@@ -59,16 +63,35 @@ func (vc *VariableController) SearchVariables(c *fiber.Ctx) error {
 	}
 
 	items := make([]fiber.Map, 0, len(vars))
-	for name, value := range vars {
+	names := make([]string, 0, len(vars))
+	for name := range vars {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	tenantID := "<default>"
+	inst, _ := vc.instanceRepo.FindByID(instanceID)
+	if inst == nil {
+		inst, _ = vc.instanceRepo.FindHistoricByID(instanceID)
+	}
+	if inst != nil && inst.TenantID != nil && *inst.TenantID != "" {
+		tenantID = *inst.TenantID
+	}
+	for _, name := range names {
 		if req.Filter.Name != "" && name != req.Filter.Name {
 			continue
 		}
+		encoded, _ := json.Marshal(vars[name])
 		items = append(items, fiber.Map{
-			"name":               name,
-			"value":              value,
-			"processInstanceKey": instanceID,
+			"name":                   name,
+			"value":                  string(encoded),
+			"processInstanceKey":     instanceID,
+			"rootProcessInstanceKey": instanceID,
+			"scopeKey":               instanceID,
+			"variableKey":            uuid.NewSHA1(instanceID, []byte("variable:"+name)),
+			"tenantId":               tenantID,
+			"isTruncated":            false,
 		})
 	}
 
-	return c.JSON(fiber.Map{"items": items})
+	return c.JSON(fiber.Map{"items": items, "page": searchPage(items, "variableKey")})
 }

@@ -9,6 +9,7 @@ import (
 
 type ProcessInstance struct {
 	ID                  uuid.UUID  `db:"id" json:"id"`
+	EngineKey           int64      `db:"engine_key" json:"-"`
 	ProcessDefinitionID uuid.UUID  `db:"process_definition_id" json:"processDefinitionId"`
 	Status              string     `db:"status" json:"status"`
 	StartedBy           *string    `db:"started_by" json:"startedBy,omitempty"`

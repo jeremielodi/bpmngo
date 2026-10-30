@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/pkg/database"
 	"github.com/jmoiron/sqlx"
@@ -31,13 +32,15 @@ func (r *ProcessRepository) CreateDeployment(
 
 	adapter := database.NewDabaseAdapter(r.db)
 
-	id := uuid.New()
+	id := ids.NewGlobalID()
+	engineKey := ids.NewEngineKey()
 	now := time.Now()
 
 	return adapter.Insert(
 		"public.deployments",
 		[]database.QueryParameter{
 			{Key: "id", Value: id},
+			{Key: "engine_key", Value: engineKey},
 			{Key: "name", Value: deploy.Name},
 			{Key: "deployed_by", Value: deploy.DeployedBy},
 			{Key: "status", Value: deploy.Status},
@@ -58,6 +61,7 @@ func (r *ProcessRepository) FindDeploymentByID(
 		`
         SELECT
             id,
+			engine_key,
             name,
             deployed_by,
             status,
@@ -83,6 +87,7 @@ func (r *ProcessRepository) FindDeploymentByName(
 		`
         SELECT
             id,
+			engine_key,
             name,
             deployed_by,
             status,
@@ -119,7 +124,8 @@ func (r *ProcessRepository) CreateProcessDefinition(
 
 	adapter := database.NewDabaseAdapter(r.db)
 
-	id := uuid.New()
+	id := ids.NewGlobalID()
+	engineKey := ids.NewEngineKey()
 	now := time.Now()
 
 	// Automatically calculate next version
@@ -130,12 +136,18 @@ func (r *ProcessRepository) CreateProcessDefinition(
 			err,
 		)
 	}
+	var deploymentKey int64
+	if err := r.db.Get(&deploymentKey, `SELECT engine_key FROM public.deployments WHERE id = $1`, def.DeploymentID); err != nil {
+		return "", 0, fmt.Errorf("failed to resolve deployment key: %w", err)
+	}
 
 	_, err = adapter.Insert(
 		"public.process_definitions",
 		[]database.QueryParameter{
 			{Key: "id", Value: id},
+			{Key: "engine_key", Value: engineKey},
 			{Key: "deployment_id", Value: def.DeploymentID},
+			{Key: "deployment_key", Value: deploymentKey},
 			{Key: "process_key", Value: def.ProcessKey},
 			{Key: "process_name", Value: def.ProcessName},
 			{Key: "version", Value: version},

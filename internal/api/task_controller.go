@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -138,7 +139,7 @@ func (tc *TaskController) Claim(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Assignee not defined"})
 	}
 
-	taskId, err := uuid.Parse(id)
+	taskId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -170,7 +171,7 @@ func (tc *TaskController) Claim(c *fiber.Ctx) error {
 	}
 	service.LogAuditErr("task claimed", tc.auditService.LogTaskClaimed(taskId, task.ProcessInstanceID, assignee))
 	if p := eventlog.Global(); p != nil {
-		p.TaskClaimed(task.ProcessInstanceID.String(), taskId.String(), assignee)
+		p.TaskClaimed(task.ProcessInstanceID.String(), strconv.FormatInt(taskId, 10), assignee)
 	}
 
 	return c.Status(200).JSON(fiber.Map{
@@ -182,7 +183,7 @@ func (tc *TaskController) Claim(c *fiber.Ctx) error {
 func (tc *TaskController) UnClaim(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	taskId, err := uuid.Parse(id)
+	taskId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -214,7 +215,7 @@ func (tc *TaskController) UnClaim(c *fiber.Ctx) error {
 	}
 	service.LogAuditErr("task unclaimed", tc.auditService.LogTaskUnclaimed(taskId, task.ProcessInstanceID))
 	if p := eventlog.Global(); p != nil {
-		p.TaskUnclaimed(task.ProcessInstanceID.String(), taskId.String())
+		p.TaskUnclaimed(task.ProcessInstanceID.String(), strconv.FormatInt(taskId, 10))
 	}
 
 	return c.Status(200).JSON(fiber.Map{
@@ -227,7 +228,7 @@ func (tc *TaskController) UnClaim(c *fiber.Ctx) error {
 func (tc *TaskController) GetTask(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	taskId, err := uuid.Parse(id)
+	taskId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}

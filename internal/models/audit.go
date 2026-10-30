@@ -61,7 +61,7 @@ const (
 type AuditLog struct {
 	ID                uuid.UUID   `db:"id" json:"id"`
 	ProcessInstanceID *uuid.UUID  `db:"process_instance_id" json:"processInstanceId,omitempty"`
-	TaskID            *uuid.UUID  `db:"task_id" json:"taskId,omitempty"`
+	TaskID            *int64      `db:"task_key" json:"taskId,omitempty"`
 	UserID            *uuid.UUID  `db:"user_id" json:"userId,omitempty"`
 	Action            AuditAction `db:"action" json:"action"`
 	OldData           []byte      `db:"old_data" json:"oldData,omitempty"`

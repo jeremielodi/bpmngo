@@ -21,6 +21,10 @@ func (r *Runtime) executeEventBasedGateway(ctx context.Context, engineRepo *repo
 		return fmt.Errorf("EBG: begin tx: %w", err)
 	}
 	defer tx.Rollback()
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, exec.ProcessInstanceID)
+	if err != nil {
+		return fmt.Errorf("EBG: resolve process instance: %w", err)
+	}
 
 	for _, flow := range node.Outgoing {
 		catchNode, ok := graph.Nodes[flow.TargetRef]
@@ -44,9 +48,9 @@ func (r *Runtime) executeEventBasedGateway(ctx context.Context, engineRepo *repo
 		case engine.IntermediateSignalCatchEventType:
 			_, err = tx.Exec(`
 				INSERT INTO event_subscriptions
-				  (process_instance_id, execution_id, event_type, event_name, target_element_id)
+				  (process_instance_key, execution_key, event_type, event_name, target_element_id)
 				VALUES ($1, $2, 'signal', $3, $4)
-			`, exec.ProcessInstanceID, exec.ID, catchNode.SignalRef, targetElementID)
+			`, instanceKey, exec.ID, catchNode.SignalRef, targetElementID)
 			if err != nil {
 				return fmt.Errorf("EBG: insert signal subscription: %w", err)
 			}
@@ -64,8 +68,9 @@ func (r *Runtime) executeEventBasedGateway(ctx context.Context, engineRepo *repo
 
 	// Park the execution at the EBG node (waiting for first event)
 	_, err = tx.Exec(`
-		UPDATE executions SET status = 'waiting', updated_at = NOW() WHERE process_instance_id = $1 AND id = $2
-	`, exec.ProcessInstanceID, exec.ID)
+		UPDATE executions SET status = 'waiting', updated_at = NOW()
+		WHERE process_instance_key = $1 AND engine_key = $2
+	`, instanceKey, exec.ID)
 	if err != nil {
 		return fmt.Errorf("EBG: set waiting: %w", err)
 	}

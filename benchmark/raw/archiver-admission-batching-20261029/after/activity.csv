@@ -1,0 +1,4 @@
+state,wait_event_type,wait_event,sessions,oldest_transaction_seconds
+idle,Client,ClientRead,43,
+active,Timeout,VacuumDelay,1,4.054783
+active,,,1,0.001908

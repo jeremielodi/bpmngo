@@ -17,22 +17,29 @@ import (
 
 // Keys in the /v2 API. BpmnGo's objects are identified by UUIDs, the gRPC
 // gateway's by int64 keys (Zeebe's protocol), issued on first use in
-// zeebe_keys. /v2 accepts both forms of a key, and answers with the UUID —
-// or, with REST_KEYS=int, with the int64 key, as a string as Camunda does,
-// so a client sees one key whichever API it calls.
+// zeebe_keys. /v2 accepts both forms and answers with the int64 key by
+// default, as a string as Camunda does. REST_KEYS=uuid keeps the legacy
+// BpmnGo response format when explicitly requested.
 
-// RestIntKeys tells whether /v2 answers with int64 keys (REST_KEYS=int).
+// RestIntKeys tells whether /v2 answers with int64 keys. Camunda-compatible
+// int keys are the default; REST_KEYS=uuid is the explicit legacy opt-out.
 func RestIntKeys() bool {
 	restKeysOnce.Do(func() {
-		switch m := strings.ToLower(strings.TrimSpace(os.Getenv("REST_KEYS"))); m {
-		case "int":
-			restKeysInt = true
-		case "", "uuid":
-		default:
-			log.Printf("⚠️ unknown REST_KEYS %q — using \"uuid\"", m)
-		}
+		restKeysInt = restIntKeysMode(os.Getenv("REST_KEYS"))
 	})
 	return restKeysInt
+}
+
+func restIntKeysMode(value string) bool {
+	switch m := strings.ToLower(strings.TrimSpace(value)); m {
+	case "", "int":
+		return true
+	case "uuid":
+		return false
+	default:
+		log.Printf("⚠️ unknown REST_KEYS %q — using \"int\"", m)
+		return true
+	}
 }
 
 var (
@@ -45,6 +52,7 @@ var (
 // same key).
 var keyFields = map[string]string{
 	"processInstanceKey":       "process_instance",
+	"rootProcessInstanceKey":   "process_instance",
 	"parentProcessInstanceKey": "process_instance",
 	"processDefinitionKey":     "process_definition",
 	"jobKey":                   "job",
@@ -52,6 +60,10 @@ var keyFields = map[string]string{
 	"flowNodeInstanceKey":      "element_instance",
 	"incidentKey":              "incident",
 	"userTaskKey":              "user_task",
+	"messageKey":               "message",
+	"signalKey":                "signal",
+	"variableKey":              "variable",
+	"scopeKey":                 "process_instance",
 	"jobId":                    "job", // POST /v2/jobs/:key/completion, when the instance ended
 }
 
@@ -66,7 +78,7 @@ var keyListFields = map[string]string{
 // it's no key).
 var routeKeyFields = map[string]func(at []string) string{
 	"/v2/messages/publication": func(at []string) string {
-		if len(at) == 1 && at[0] == "key" {
+		if len(at) == 1 && (at[0] == "messageKey" || at[0] == "key") {
 			return "message"
 		}
 		return ""
@@ -86,9 +98,6 @@ var routeKeyFields = map[string]func(at []string) string{
 // pathKeys are the path segments followed by a key, with its resource type.
 var pathKeys = map[string]string{
 	"process-instances": "process_instance",
-	"jobs":              "job",
-	"user-tasks":        "user_task",
-	"incidents":         "incident",
 }
 
 // KeyTranslation, mounted on /v2 after authentication, lets the handlers

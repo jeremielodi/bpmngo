@@ -70,15 +70,34 @@ SUPER_USER_PASSWORD=admin123
 # logged), feel (native interpreter decides), cel (legacy only)
 # FEEL_MODE=shadow
 
-# Keys in /v2 (Camunda 8 API) answers: uuid (default, BpmnGo's UUIDs) or int
-# (the gRPC gateway's int64 key, as a string as Camunda 8 does, so a client
-# sees one key in gRPC and REST). /v2 accepts both forms in requests either
-# way; /engine-rest (Camunda 7 API) stays on UUIDs.
-# REST_KEYS=uuid
+# Keys in /v2 (Camunda 8 API) answers: int by default (the gRPC gateway's
+# int64 key, as a string as Camunda 8 does) or uuid for the legacy BpmnGo
+# response format. /v2 accepts both forms in requests either way;
+# /engine-rest (Camunda 7 API) stays on UUIDs.
+# REST_KEYS=int
 
 # Connection pool per BpmnGo instance (keep instances × this under
 # Postgres's max_connections, or put PgBouncer in front)
 # DB_MAX_OPEN_CONNS=80
+# Top-level runtime admission limit; default 4 × GOMAXPROCS (minimum 4).
+# On a two-CPU container, start with 8 and tune from
+# goflow_runtime_admission_wait_seconds.
+# RUNTIME_MAX_CONCURRENCY=8
+# Minimum foreground concurrency retained above the hard archive backlog.
+# Defaults to one quarter of RUNTIME_MAX_CONCURRENCY (minimum 1).
+# RUNTIME_MIN_CONCURRENCY=2
+# Halve admission at the soft backlog and use the minimum at the hard backlog.
+# ARCHIVER_BACKLOG_SOFT_LIMIT=1000
+# ARCHIVER_BACKLOG_HARD_LIMIT=5000
+# POSTGRES_MAX_CONNECTIONS=200
+# POSTGRES_SHARED_BUFFERS=256MB
+# POSTGRES_EFFECTIVE_CACHE_SIZE=768MB
+# POSTGRES_WORK_MEM=8MB
+# POSTGRES_MAINTENANCE_WORK_MEM=128MB
+# POSTGRES_MAX_WAL_SIZE=2GB
+# PGBOUNCER_POOL_SIZE=80       # docker-compose.scale.yaml only
+# In scale mode the manifest defaults each replica to 40 open / 10 idle
+# client connections; PgBouncer multiplexes them onto PGBOUNCER_POOL_SIZE.
 
 # Finished instances: archived in the background (async, default) or in the
 # call that finishes them (sync)
@@ -106,7 +125,23 @@ SUPER_USER_PASSWORD=admin123
 # only set when using docker-compose.citus.yml, which sets both automatically
 # CITUS_ENABLED=true
 # CITUS_WORKERS=citus-worker-1:5432,citus-worker-2:5432
+# CITUS_COORDINATOR_PORT=5433
 ```
+
+`pg_stat_statements` is preloaded by every supplied PostgreSQL Compose
+profile and migration 014 creates the extension. Query its cumulative view
+after a representative load, for example:
+
+```sql
+SELECT calls, total_exec_time, mean_exec_time, rows, query
+FROM pg_stat_statements
+ORDER BY total_exec_time DESC
+LIMIT 20;
+```
+
+Migration 015 partitions history and audit tables monthly and installs
+`goflow_ensure_history_partitions(integer)`. BpmnGo calls it at startup to
+keep twelve future months ready; DEFAULT partitions remain a safety net.
 
 **Trying the Citus-backed deployment:**
 

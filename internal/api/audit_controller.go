@@ -2,6 +2,7 @@
 package api
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -161,7 +162,7 @@ func stringOrEmpty(s *string) string {
 
 // GetTaskAuditLogs retrieves audit logs for a task
 func (c *AuditController) GetTaskAuditLogs(ctx *fiber.Ctx) error {
-	taskID, err := uuid.Parse(ctx.Params("taskId"))
+	taskID, err := strconv.ParseInt(ctx.Params("taskId"), 10, 64)
 	if err != nil {
 		return ctx.Status(400).JSON(fiber.Map{
 			"title":   "Validation Error",

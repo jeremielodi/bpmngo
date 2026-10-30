@@ -33,8 +33,9 @@ vérification.
 
 ## Migrations à appliquer
 
-Dans l'ordre, après la baseline, chacune une seule fois (elles sont
-idempotentes : une exécution en double ne casse rien). Toutes ajoutent
+Dans l'ordre, après la baseline, chacune une seule fois. La plupart sont
+idempotentes ; la migration de partitionnement 015 doit impérativement être
+pilotée par `schema_migrations` et ne pas être rejouée. Toutes ajoutent
 sans rien modifier aux données existantes, sauf 007 qui renomme les types
 des incidents déjà enregistrés.
 
@@ -48,6 +49,17 @@ des incidents déjà enregistrés.
 | 006 | `006_business_key.sql` | colonne `business_key` sur `process_instances` et `historic_process_instances` | business key des applications Camunda 7 |
 | 007 | `007_incident_types.sql` | renomme `incident_type` des incidents existants (live et archivés) en types Camunda 8 | types d'incident de Camunda 8 (`/v2`, gRPC) |
 | 008 | `008_id_indexes.sql` | index sur `executions(id)`, `incidents(id)`, `incidents(job_id)` | performance sous charge (recherches par identifiant seul) |
+| 009 | `009_hybrid_identifiers_phase1.sql` | identités BIGINT futures et UUID globales, avec backfill des clés Zeebe existantes | migration hybride sans renumérotation client |
+| 010 | `010_hybrid_identifiers_primary_keys.sql` | promotion des `engine_key` en PK physiques; UUID legacy conservés comme uniques pendant le rolling upgrade | nécessite 009 |
+| 011 | `011_hybrid_identifiers_foreign_keys.sql` | graphe de relations BIGINT, backfill et triggers de double écriture | nécessite 010 |
+| 012 | `012_message_start_bigint_reservation.sql` | autorise la réservation message-start avant création de l'instance | correctif de 011 |
+| 013 | `013_direct_bigint_hot_relationships.sql` | écrit les relations runtime directement en BIGINT, migre les tables auxiliaires et retire les UUID/triggers de compatibilité des entités chaudes | nécessite 009–012; arrêt des anciens binaires avant application |
+| 014 | `014_postgresql_runtime_tuning.sql` | active `pg_stat_statements`, remplace les index de polling redondants par des index partiels et règle l'autovacuum des tables chaudes | redémarrer PostgreSQL avec `shared_preload_libraries=pg_stat_statements` |
+| 015 | `015_monthly_history_partitions.sql` | convertit les tables `historic_*` et `audit_logs` en partitions mensuelles et prépare douze mois | fenêtre de maintenance : copie et verrouille les tables existantes |
+| 016 | `016_gateway_state_bigint.sql` | remplace la dernière relation UUID de `gateway_state` par `process_instance_key BIGINT` | nécessite 013; prépare la colocation Citus |
+| 017 | `017_remove_identity_compatibility.sql` | retire les `uid` dupliqués, les triggers d'identité de rolling upgrade et `executions.gateway_join_id` inutilisé | les racines gardent `BIGINT PK + id UUIDv7 UNIQUE`; les entités chaudes restent BIGINT uniquement |
+| 018 | `018_parent_fk_indexes.sql` | indexe les FK parentes utilisées par `ON DELETE SET NULL/CASCADE` | évite trois scans complets par instance pendant l'archivage |
+| 019 | `019_partition_retention.sql` | détache et supprime les partitions historiques expirées devenues vides | la purge ligne par ligne reste l'autorité pour ne pas perdre les audits non liés |
 
 Pour voir où en est une base :
 

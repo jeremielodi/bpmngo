@@ -2,13 +2,14 @@ package api
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jeremielodi/bpmngo/internal/models"
-	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/runtime"
 	"github.com/jeremielodi/bpmngo/internal/service"
@@ -454,7 +455,7 @@ func (pc *ProcessInstanceController) StartProcess(c *fiber.Ctx) error {
 // ============================================================
 
 func (pc *ProcessInstanceController) CompleteTask(c *fiber.Ctx) error {
-	taskID, err := uuid.Parse(c.Params("id"))
+	taskID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"title":   "Validation Error",
@@ -495,9 +496,7 @@ func (pc *ProcessInstanceController) CompleteTask(c *fiber.Ctx) error {
 			"error":   err.Error(),
 		})
 	}
-	return c.JSON(fiber.Map{
-		"message": "task completed successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // ============================================================

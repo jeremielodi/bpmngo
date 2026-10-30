@@ -10,7 +10,7 @@ import (
 
 // Job represents an external task job
 type Job struct {
-	ID                uuid.UUID       `db:"id" json:"id"`
+	ID                int64           `db:"engine_key" json:"id"`
 	JobType           string          `db:"job_type" json:"jobType"`
 	Status            string          `db:"status" json:"status"`
 	Payload           json.RawMessage `db:"payload" json:"payload"`
@@ -18,7 +18,7 @@ type Job struct {
 	LockedBy          sql.NullString  `db:"locked_by" json:"lockedBy,omitempty"`
 	LockedUntil       sql.NullTime    `db:"locked_until" json:"lockedUntil,omitempty"`
 	ErrorMessage      sql.NullString  `db:"error_message" json:"errorMessage,omitempty"`
-	ExecutionID       uuid.UUID       `db:"execution_id" json:"executionId"`
+	ExecutionID       int64           `db:"execution_key" json:"executionId"`
 	ProcessInstanceID uuid.UUID       `db:"process_instance_id" json:"processInstanceId"`
 	CreatedAt         time.Time       `db:"created_at" json:"createdAt"`
 	UpdatedAt         time.Time       `db:"updated_at" json:"updatedAt"`
@@ -27,12 +27,12 @@ type Job struct {
 
 // JobCreateModel represents the data needed to create a new job
 type JobCreateModel struct {
-	ID                uuid.UUID       `json:"id"`
+	ID                int64           `json:"id"`
 	JobType           string          `json:"jobType"`
 	Status            string          `json:"status"`
 	Payload           json.RawMessage `json:"payload"`
 	Retries           int             `json:"retries"`
-	ExecutionID       uuid.UUID       `json:"executionId"`
+	ExecutionID       int64           `json:"executionId"`
 	ProcessInstanceID uuid.UUID       `json:"processInstanceId"`
 }
 

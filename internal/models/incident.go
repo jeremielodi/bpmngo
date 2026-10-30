@@ -9,9 +9,9 @@ import (
 )
 
 type Incident struct {
-	ID                uuid.UUID      `db:"id" json:"id"`
+	ID                int64          `db:"engine_key" json:"id"`
 	ProcessInstanceID uuid.UUID      `db:"process_instance_id" json:"processInstanceId"`
-	JobID             *uuid.UUID     `db:"job_id" json:"jobId,omitempty"`
+	JobID             *int64         `db:"job_key" json:"jobId,omitempty"`
 	IncidentType      string         `db:"incident_type" json:"incidentType"`
 	ActivityID        string         `db:"activity_id" json:"activityId"`
 	ErrorMessage      sql.NullString `db:"error_message" json:"errorMessage,omitempty"`
@@ -49,12 +49,12 @@ func (i Incident) MarshalJSON() ([]byte, error) {
 
 type IncidentCreate struct {
 	ProcessInstanceID uuid.UUID
-	JobID             *uuid.UUID
+	JobID             *int64
 	IncidentType      string
 	ActivityID        string
 	ErrorMessage      string
 	ErrorCode         string
 	// ExecutionID: the execution to run again when the incident is
 	// resolved (runtime incidents only).
-	ExecutionID *uuid.UUID
+	ExecutionID *int64
 }
