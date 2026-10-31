@@ -139,8 +139,11 @@ func CompleteJob(db *sqlx.DB, jobID int64, variables map[string]interface{}) (*C
 	// Fast unit-of-work: for a plain service-task successor, create its job
 	// in this same transaction. Complex activities keep the general runtime
 	// path, which arms boundaries, handles local input scopes and MI bodies.
+	// An iteration of a multi-instance activity never takes it: leaving the
+	// activity ends the iteration, the body moves on.
 	nextNode := graph.Nodes[nextNodeID]
-	fastNext := nextNode != nil && nextNode.Type == engine.ServiceTaskType && nextNode.JobType != nil &&
+	fastNext := currentNode.MultiInstance == nil &&
+		nextNode != nil && nextNode.Type == engine.ServiceTaskType && nextNode.JobType != nil &&
 		nextNode.MultiInstance == nil && len(nextNode.InputMappings) == 0 && !hasAttachedBoundary(&graph, nextNode.ID)
 	var nextJobID int64
 	if fastNext {
