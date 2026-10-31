@@ -256,14 +256,13 @@ func (r *ExternalTaskRepository) GetJobWithExecutionTx(tx *sqlx.Tx, jobID int64)
 			j.execution_key,
 			j.process_instance_key,
 			pi.id AS process_instance_id,
-			pd.parsed_graph,
+			pi.process_definition_id,
 			e.current_element_id,
 			j.status,
 			j.retries
 		FROM public.jobs j
 		JOIN public.executions e ON e.process_instance_key = j.process_instance_key AND e.engine_key = j.execution_key
 		JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key
-		JOIN public.process_definitions pd ON pd.id = pi.process_definition_id
 		WHERE j.process_instance_key = $1 AND j.engine_key = $2
 		FOR UPDATE OF j
 	`
@@ -464,10 +463,11 @@ type JobWithExecution struct {
 	ExecutionID        int64     `db:"execution_key"`
 	ProcessInstanceKey int64     `db:"process_instance_key"`
 	ProcessInstanceID  uuid.UUID `db:"process_instance_id"`
-	GraphJSON          []byte    `db:"parsed_graph"`
-	CurrentElementID   string    `db:"current_element_id"`
-	Status             string    `db:"status"`
-	Retries            int       `db:"retries"`
+	// The graph comes from ProcessGraphByDefinitionID's cache.
+	ProcessDefinitionID uuid.UUID `db:"process_definition_id"`
+	CurrentElementID    string    `db:"current_element_id"`
+	Status              string    `db:"status"`
+	Retries             int       `db:"retries"`
 }
 
 // LockedJob represents a job with its execution context

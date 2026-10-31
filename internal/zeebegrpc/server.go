@@ -161,15 +161,13 @@ func (s *Server) resolveDefinition(req *pb.CreateProcessInstanceRequest, tenant 
 		if err != nil {
 			return models.ProcessDefinition{}, fmt.Errorf("process definition key %d not found", req.ProcessDefinitionKey)
 		}
-		return s.processRepo.FindProcessDefinitionByID(id)
+		return s.processRepo.FindDefinitionHeaderForStart(id, "", 0, "")
 	}
 	if req.BpmnProcessId == "" {
 		return models.ProcessDefinition{}, fmt.Errorf("either processDefinitionKey or bpmnProcessId must be set")
 	}
-	if req.Version <= 0 {
-		return s.processRepo.FindLatestProcessDefinitionByKeyForTenant(req.BpmnProcessId, tenant)
-	}
-	return s.processRepo.FindProcessDefinitionByKeyAndVersion(req.BpmnProcessId, int(req.Version))
+	// No model: the runtime takes the graph from its cache.
+	return s.processRepo.FindDefinitionHeaderForStart(uuid.Nil, req.BpmnProcessId, int(req.Version), tenant)
 }
 
 func (s *Server) CreateProcessInstance(ctx context.Context, req *pb.CreateProcessInstanceRequest) (*pb.CreateProcessInstanceResponse, error) {

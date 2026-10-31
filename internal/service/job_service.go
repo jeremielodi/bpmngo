@@ -85,11 +85,11 @@ func CompleteJob(db *sqlx.DB, jobID int64, variables map[string]interface{}) (*C
 	executionID := jobWithExec.ExecutionID
 	currentElementID := jobWithExec.CurrentElementID
 
-	var graph engine.ProcessGraph
-	if err := json.Unmarshal(jobWithExec.GraphJSON, &graph); err != nil {
-		return nil, fmt.Errorf("failed to parse process graph: %w", err)
+	graph, err := repository.ProcessGraphByDefinitionID(tx, jobWithExec.ProcessDefinitionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load process graph: %w", err)
 	}
-	currentNode, err := externalTaskRepo.GetNodeByID(&graph, currentElementID)
+	currentNode, err := externalTaskRepo.GetNodeByID(graph, currentElementID)
 	if err != nil {
 		return nil, fmt.Errorf("current node not found: %w", err)
 	}
@@ -144,7 +144,7 @@ func CompleteJob(db *sqlx.DB, jobID int64, variables map[string]interface{}) (*C
 	nextNode := graph.Nodes[nextNodeID]
 	fastNext := currentNode.MultiInstance == nil &&
 		nextNode != nil && nextNode.Type == engine.ServiceTaskType && nextNode.JobType != nil &&
-		nextNode.MultiInstance == nil && len(nextNode.InputMappings) == 0 && !hasAttachedBoundary(&graph, nextNode.ID)
+		nextNode.MultiInstance == nil && len(nextNode.InputMappings) == 0 && !hasAttachedBoundary(graph, nextNode.ID)
 	var nextJobID int64
 	if fastNext {
 		visible, err := repository.VariablesForExecutionByKey(tx, processInstanceKey, executionID)
@@ -190,7 +190,7 @@ func CompleteJob(db *sqlx.DB, jobID int64, variables map[string]interface{}) (*C
 		}
 	}
 
-	result := &CompleteJobResult{ProcessInstanceID: processInstanceID, ProcessCompleted: false, Graph: &graph, ExecutionID: executionID}
+	result := &CompleteJobResult{ProcessInstanceID: processInstanceID, ProcessCompleted: false, Graph: graph, ExecutionID: executionID}
 	if fastNext {
 		result.ExecutionWaiting = true
 		result.NextJobID = nextJobID
@@ -277,9 +277,8 @@ func FailJobWithBackoff(db *sqlx.DB, jobID int64, retriesRemaining int, errorMes
 
 		// If an error code was provided, check for a matching error boundary event.
 		if errorCode != "" && jobErr == nil && jobCtx != nil {
-			if len(jobCtx.GraphJSON) > 0 {
-				var graph engine.ProcessGraph
-				if jsonErr := json.Unmarshal(jobCtx.GraphJSON, &graph); jsonErr == nil {
+			if jobCtx.ProcessDefinitionID != uuid.Nil {
+				if graph, graphErr := repository.ProcessGraphByDefinitionID(tx, jobCtx.ProcessDefinitionID); graphErr == nil {
 					node, scope := graph.FindErrorCatcher(jobCtx.CurrentElementID, errorCode)
 					if node != nil && node.Type == engine.EventSubProcessType {
 						// Caught by an error event sub-process: the caller
@@ -296,7 +295,7 @@ func FailJobWithBackoff(db *sqlx.DB, jobID int64, retriesRemaining int, errorMes
 								p.JobFailed(jobCtx.ProcessInstanceID.String(), strconv.FormatInt(jobID, 10), errorMessage, 0, false)
 							}
 							result.BoundaryTriggered = true
-							result.Graph = &graph
+							result.Graph = graph
 							result.ExecutionID = triggerID
 							return result, nil
 						} else {
@@ -346,7 +345,7 @@ func FailJobWithBackoff(db *sqlx.DB, jobID int64, retriesRemaining int, errorMes
 									p.ExecutionMoved(jobCtx.ProcessInstanceID.String(), strconv.FormatInt(catchingExecID, 10), fromNodeID, node.ID)
 								}
 								result.BoundaryTriggered = true
-								result.Graph = &graph
+								result.Graph = graph
 								result.ExecutionID = catchingExecID
 							}
 							return result, nil
