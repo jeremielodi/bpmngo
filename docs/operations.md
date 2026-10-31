@@ -78,7 +78,7 @@ docker compose -f docker-compose.yaml -f docker-compose.scale.yaml up -d --scale
 `docker-compose.scale.yaml` leaves `docker-compose.yaml` untouched for a single instance and adds:
 
 - an nginx load balancer (`deploy/nginx-lb.conf`: HTTP, server-sent events, WebSocket and the gRPC gateway) in front of the replicas;
-- PgBouncer in transaction mode: the replicas may open many client connections, Postgres only sees the pool (`PGBOUNCER_POOL_SIZE`). What needs a Postgres session — `LISTEN`, the advisory locks of the archiver and the retention job — reaches Postgres directly (`DB_DIRECT_HOST`). BpmnGo uses the pgx driver, which sends each query in one round trip, as a transaction-mode pooler requires;
+- PgBouncer in transaction mode: the replicas may open many client connections, Postgres only sees the pool (`PGBOUNCER_POOL_SIZE`). What needs a Postgres session — `LISTEN`, the advisory locks of the archiver and the retention job — reaches Postgres directly (`DB_DIRECT_HOST`). BpmnGo uses the pgx driver, which sends each query in one round trip, as a transaction-mode pooler requires; queries are named prepared statements, which PgBouncer 1.21+ keeps working in transaction mode with `max_prepared_statements` (set to 1000 in `docker-compose.scale.yaml`; behind an older pooler set `DB_QUERY_EXEC_MODE=cache_describe`, at the cost of Postgres planning every query again);
 - a streaming read replica (`deploy/replica-entrypoint.sh`): history and analytics read it (`DB_READ_HOST`), a few milliseconds behind the primary; everything else reads and writes the primary.
 
 The scale manifest defaults each BpmnGo replica to 40 open and 10 idle client

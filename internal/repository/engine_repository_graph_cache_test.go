@@ -23,7 +23,8 @@ func newMockEngineRepo(t *testing.T) (*EngineRepository, sqlmock.Sqlmock) {
 
 // Regression: the graph cache must be keyed by process_definition_id, not
 // process_instance_id, so two instances of the same definition share one
-// cached graph and only trigger one DB query between them.
+// cached graph: the second only looks up its definition id, it never reads
+// parsed_graph again.
 func TestGetProcessGraphByInstanceID_DedupesAcrossInstancesOfSameDefinition(t *testing.T) {
 	ClearGraphCache()
 	repo, mock := newMockEngineRepo(t)
@@ -33,18 +34,15 @@ func TestGetProcessGraphByInstanceID_DedupesAcrossInstancesOfSameDefinition(t *t
 	instanceB := uuid.New()
 	graphJSON, _ := json.Marshal(map[string]interface{}{"nodes": map[string]interface{}{}})
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT pd.parsed_graph, pd.id AS process_definition_id")).
-		WithArgs(instanceA).
-		WillReturnRows(sqlmock.NewRows([]string{"parsed_graph", "process_definition_id"}).AddRow(graphJSON, defID))
+	expectDefinitionLookup(mock, instanceA, defID)
+	expectGraphRead(mock, defID, graphJSON)
 
 	graphA, err := repo.GetProcessGraphByInstanceID(instanceA)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT pd.parsed_graph, pd.id AS process_definition_id")).
-		WithArgs(instanceB).
-		WillReturnRows(sqlmock.NewRows([]string{"parsed_graph", "process_definition_id"}).AddRow(graphJSON, defID))
+	expectDefinitionLookup(mock, instanceB, defID)
 
 	graphB, err := repo.GetProcessGraphByInstanceID(instanceB)
 	if err != nil {
@@ -78,9 +76,8 @@ func TestGetProcessGraphByInstanceID_EvictsOnOverflow(t *testing.T) {
 	for i := 0; i < graphCacheMaxEntries+5; i++ {
 		instanceID := uuid.New()
 		defID := uuid.New()
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT pd.parsed_graph, pd.id AS process_definition_id")).
-			WithArgs(instanceID).
-			WillReturnRows(sqlmock.NewRows([]string{"parsed_graph", "process_definition_id"}).AddRow(graphJSON, defID))
+		expectDefinitionLookup(mock, instanceID, defID)
+		expectGraphRead(mock, defID, graphJSON)
 		if _, err := repo.GetProcessGraphByInstanceID(instanceID); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -92,4 +89,16 @@ func TestGetProcessGraphByInstanceID_EvictsOnOverflow(t *testing.T) {
 	if size > graphCacheMaxEntries {
 		t.Errorf("expected graphCache to stay bounded at %d entries, got %d", graphCacheMaxEntries, size)
 	}
+}
+
+func expectDefinitionLookup(mock sqlmock.Sqlmock, instanceID, defID uuid.UUID) {
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT process_definition_id FROM public.process_instances WHERE id = $1")).
+		WithArgs(instanceID).
+		WillReturnRows(sqlmock.NewRows([]string{"process_definition_id"}).AddRow(defID))
+}
+
+func expectGraphRead(mock sqlmock.Sqlmock, defID uuid.UUID, graphJSON []byte) {
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT parsed_graph FROM public.process_definitions WHERE id = $1")).
+		WithArgs(defID).
+		WillReturnRows(sqlmock.NewRows([]string{"parsed_graph"}).AddRow(graphJSON))
 }

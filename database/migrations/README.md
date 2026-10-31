@@ -60,6 +60,7 @@ des incidents déjà enregistrés.
 | 017 | `017_remove_identity_compatibility.sql` | retire les `uid` dupliqués, les triggers d'identité de rolling upgrade et `executions.gateway_join_id` inutilisé | les racines gardent `BIGINT PK + id UUIDv7 UNIQUE`; les entités chaudes restent BIGINT uniquement |
 | 018 | `018_parent_fk_indexes.sql` | indexe les FK parentes utilisées par `ON DELETE SET NULL/CASCADE` | évite trois scans complets par instance pendant l'archivage |
 | 019 | `019_partition_retention.sql` | détache et supprime les partitions historiques expirées devenues vides | la purge ligne par ligne reste l'autorité pour ne pas perdre les audits non liés |
+| 020 | `020_hot_path_cpu.sql` | retire les index qui bloquaient les HOT updates (`executions.is_active`, `executions.current_element_id`, GIN `variables.data`), ajoute l'index partiel de l'archiver, retire la FK `process_definition_id` redondante, limite le NOTIFY des variables aux instances qui attendent une condition | CPU PostgreSQL du chemin chaud ; redémarrer BpmnGo après application (plans préparés) |
 
 Pour voir où en est une base :
 

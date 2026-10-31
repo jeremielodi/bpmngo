@@ -774,43 +774,19 @@ func (r *EngineRepository) GetProcessGraphByInstanceID(instanceID uuid.UUID) (*e
 		return cachedGraph, nil
 	}
 
-	var row struct {
-		ParsedGraph         []byte    `db:"parsed_graph"`
-		ProcessDefinitionID uuid.UUID `db:"process_definition_id"`
+	// Only the definition id: its graph is usually cached already (every
+	// new instance misses instanceToDefCache, not graphCache).
+	var definitionID uuid.UUID
+	if err := r.db.Get(&definitionID, `SELECT process_definition_id FROM public.process_instances WHERE id = $1`, instanceID); err != nil {
+		return nil, err
 	}
-	query := `
-		SELECT pd.parsed_graph, pd.id AS process_definition_id
-		FROM public.process_definitions pd
-		JOIN public.process_instances pi ON pi.process_definition_id = pd.id
-		WHERE pi.id = $1
-	`
-	if err := r.db.Get(&row, query, instanceID); err != nil {
+	graphPtr, err := ProcessGraphByDefinitionID(r.db, definitionID)
+	if err != nil {
 		return nil, err
 	}
 
-	var graph engine.ProcessGraph
-	if err := json.Unmarshal(row.ParsedGraph, &graph); err != nil {
-		return nil, err
-	}
-	graphPtr := &graph
-
-	defKey := row.ProcessDefinitionID.String()
+	defKey := definitionID.String()
 	graphCacheMu.Lock()
-	// Another instance of this same definition may already have populated
-	// graphCache — reuse that pointer instead of overwriting it with the
-	// one just parsed, so instances of one definition truly share a single
-	// cached graph rather than the most-recently-queried instance winning.
-	if existing, ok := graphCache[defKey]; ok {
-		graphPtr = existing
-	} else {
-		if len(graphCache) >= graphCacheMaxEntries {
-			for k := range graphCache {
-				delete(graphCache, k)
-				break
-			}
-		}
-		graphCache[defKey] = graphPtr
-	}
 	if len(instanceToDefCache) >= instanceDefCacheMaxEntries {
 		for k := range instanceToDefCache {
 			delete(instanceToDefCache, k)
@@ -1157,6 +1133,14 @@ func (r *EngineRepository) CreateProcessInstanceWithVariables(processKey string,
 // GetProcessGraphByDefinitionID returns a definition's graph, from the
 // same cache as GetProcessGraphByInstanceID.
 func (r *EngineRepository) GetProcessGraphByDefinitionID(definitionID uuid.UUID) (*engine.ProcessGraph, error) {
+	return ProcessGraphByDefinitionID(r.db, definitionID)
+}
+
+// ProcessGraphByDefinitionID is GetProcessGraphByDefinitionID on q: a
+// caller holding a transaction passes it, so a cache miss doesn't take a
+// second pool connection. parsed_graph is read and decoded once per
+// definition, not once per job or instance.
+func ProcessGraphByDefinitionID(q sqlx.Queryer, definitionID uuid.UUID) (*engine.ProcessGraph, error) {
 	defKey := definitionID.String()
 	graphCacheMu.RLock()
 	cached := graphCache[defKey]
@@ -1166,7 +1150,7 @@ func (r *EngineRepository) GetProcessGraphByDefinitionID(definitionID uuid.UUID)
 	}
 
 	var raw []byte
-	if err := r.db.Get(&raw, `SELECT parsed_graph FROM public.process_definitions WHERE id = $1`, definitionID); err != nil {
+	if err := sqlx.Get(q, &raw, `SELECT parsed_graph FROM public.process_definitions WHERE id = $1`, definitionID); err != nil {
 		return nil, err
 	}
 	var graph engine.ProcessGraph

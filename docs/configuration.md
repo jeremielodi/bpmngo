@@ -79,6 +79,11 @@ SUPER_USER_PASSWORD=admin123
 # Connection pool per BpmnGo instance (keep instances × this under
 # Postgres's max_connections, or put PgBouncer in front)
 # DB_MAX_OPEN_CONNS=80
+# How queries reach Postgres. Default cache_statement: each query is prepared
+# once per connection and its plan reused (no re-planning, ~3x less Postgres
+# CPU on the engine lookups). cache_describe re-plans every call; only for a
+# pooler without prepared-statement support (PgBouncer < 1.21).
+# DB_QUERY_EXEC_MODE=cache_statement
 # Top-level runtime admission limit; default 4 × GOMAXPROCS (minimum 4).
 # On a two-CPU container, start with 8 and tune from
 # goflow_runtime_admission_wait_seconds.

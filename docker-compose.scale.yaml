@@ -68,7 +68,7 @@ services:
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 2000
       DEFAULT_POOL_SIZE: ${PGBOUNCER_POOL_SIZE:-80}
-      MAX_PREPARED_STATEMENTS: 200
+      MAX_PREPARED_STATEMENTS: 1000
       IGNORE_STARTUP_PARAMETERS: extra_float_digits,statement_timeout,idle_in_transaction_session_timeout
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U goflow -d goflow"]

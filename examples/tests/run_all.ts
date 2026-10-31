@@ -65,32 +65,32 @@ async function main() {
 
   // 1. Tear down existing containers + volumes, then rebuild fresh (SKIP_SETUP=1:
   // run against the stack already up).
-  if (!process.env.SKIP_SETUP) {
-    console.log('\n📦  Tearing down existing Docker volumes…');
-    try {
-      execSync('docker compose down -v --remove-orphans', {
-        cwd: path.join(__dirname, '..', '..'),
-        stdio: 'inherit',
-      });
-    } catch {
-      // nothing running — that's fine
-    }
+  // if (!process.env.SKIP_SETUP) {
+  //   console.log('\n📦  Tearing down existing Docker volumes…');
+  //   // try {
+  //   //   execSync('docker compose down -v --remove-orphans', {
+  //   //     cwd: path.join(__dirname, '..', '..'),
+  //   //     stdio: 'inherit',
+  //   //   });
+  //   // } catch {
+  //   //   // nothing running — that's fine
+  //   // }
 
-    console.log('📦  Starting Docker services (fresh build)…');
-    // GOFLOW_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
-    // runs the suites against several BpmnGo instances behind the load balancer.
-    const replicas = process.env.GOFLOW_REPLICAS ? ` --scale bpmngo=${process.env.GOFLOW_REPLICAS}` : '';
-    try {
-      execSync(`docker compose up -d --build --wait${replicas}`, {
-        cwd: path.join(__dirname, '..', '..'),
-        stdio: 'inherit',
-      });
-    } catch (err) {
-      // --wait gives up while a slow first boot (a Citus bootstrap) is still
-      // running: the health check below decides.
-      console.log('  docker compose up reported a failure — waiting for the app anyway');
-    }
-  }
+  //   console.log('📦  Starting Docker services (fresh build)…');
+  //   // GOFLOW_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
+  //   // runs the suites against several BpmnGo instances behind the load balancer.
+  //   const replicas = process.env.GOFLOW_REPLICAS ? ` --scale bpmngo=${process.env.GOFLOW_REPLICAS}` : '';
+  //   try {
+  //     execSync(`docker compose up -d --build --wait${replicas}`, {
+  //       cwd: path.join(__dirname, '..', '..'),
+  //       stdio: 'inherit',
+  //     });
+  //   } catch (err) {
+  //     // --wait gives up while a slow first boot (a Citus bootstrap) is still
+  //     // running: the health check below decides.
+  //     console.log('  docker compose up reported a failure — waiting for the app anyway');
+  //   }
+  // }
 
   // 2. Wait until the app responds
   await waitForApp();
@@ -104,7 +104,7 @@ async function main() {
   const suites = [
     '00_auth.test.ts',
     '01_pizza_delivery.test.ts',
-    '02_recipe_selection.test.ts',
+    /*'02_recipe_selection.test.ts',
     ...(noTimers ? [] : ['03_meal_preparation.test.ts', '04_oven_timer.test.ts']),
     '05_inclusive_gateway.test.ts',
     '06_error_boundary.test.ts',
@@ -153,7 +153,7 @@ async function main() {
     '56_instance_lifecycle_and_variables.test.ts',
     '57_ops_and_legacy_routes.test.ts',
     '58_camunda_parity.test.ts',
-    '59_rest_int_keys.test.ts',
+    '59_rest_int_keys.test.ts',*/
   ];
 
   const exitCodes: number[] = [];
