@@ -133,12 +133,12 @@ type c7Task struct {
 }
 
 type c7TaskRow struct {
-	ID                  uuid.UUID  `db:"id"`
+	ID                  int64      `db:"engine_key"`
 	Name                *string    `db:"task_name"`
 	Assignee            *string    `db:"assignee"`
 	CreatedAt           time.Time  `db:"created_at"`
 	UpdatedAt           *time.Time `db:"updated_at"`
-	ExecutionID         *uuid.UUID `db:"execution_id"`
+	ExecutionID         *int64     `db:"execution_key"`
 	Priority            int        `db:"priority"`
 	ProcessInstanceID   uuid.UUID  `db:"process_instance_id"`
 	TaskDefinitionKey   string     `db:"task_definition_key"`
@@ -149,7 +149,7 @@ type c7TaskRow struct {
 
 func (tc *Camunda7TaskController) dto(r c7TaskRow) c7Task {
 	t := c7Task{
-		ID:                  r.ID.String(),
+		ID:                  strconv.FormatInt(r.ID, 10),
 		Name:                r.Name,
 		Assignee:            r.Assignee,
 		Created:             c7Time(&r.CreatedAt),
@@ -162,7 +162,7 @@ func (tc *Camunda7TaskController) dto(r c7TaskRow) c7Task {
 		TenantID:            r.TenantID,
 	}
 	if r.ExecutionID != nil {
-		s := r.ExecutionID.String()
+		s := strconv.FormatInt(*r.ExecutionID, 10)
 		t.ExecutionID = &s
 	}
 	if graph, err := tc.engineRepo.GetProcessGraphByInstanceID(r.ProcessInstanceID); err == nil && graph != nil {
@@ -246,8 +246,8 @@ func (tc *Camunda7TaskController) parseQuery(c *fiber.Ctx) (c7TaskQuery, error) 
 }
 
 var c7SortColumns = map[string]string{
-	"id": "t.id", "name": "t.task_name", "assignee": "t.assignee", "created": "t.created_at",
-	"priority": "t.priority", "processInstanceId": "t.process_instance_id",
+	"id": "t.engine_key", "name": "t.task_name", "assignee": "t.assignee", "created": "t.created_at",
+	"priority": "t.priority", "processInstanceId": "p.id",
 	"taskDefinitionKey": "t.task_definition_key", "lastUpdated": "t.updated_at",
 }
 
@@ -269,13 +269,13 @@ func (tc *Camunda7TaskController) find(c *fiber.Ctx, q c7TaskQuery) ([]c7TaskRow
 			where = append(where, col+" = ANY("+arg(vs)+")")
 		}
 	}
-	eq("t.process_instance_id::text", q.ProcessInstanceID)
-	in("t.process_instance_id::text", q.ProcessInstanceIDIn)
+	eq("p.id::text", q.ProcessInstanceID)
+	in("p.id::text", q.ProcessInstanceIDIn)
 	eq("p.process_definition_id::text", q.ProcessDefinitionID)
 	eq("d.process_key", q.ProcessDefinitionKey)
-	eq("t.execution_id::text", q.ExecutionID)
-	eq("t.id::text", q.TaskID)
-	in("t.id::text", q.TaskIDIn)
+	eq("t.execution_key::text", q.ExecutionID)
+	eq("t.engine_key::text", q.TaskID)
+	in("t.engine_key::text", q.TaskIDIn)
 	eq("t.task_definition_key", q.TaskDefinitionKey)
 	in("t.task_definition_key", q.TaskDefinitionKeyIn)
 	eq("t.task_name", q.Name)
@@ -321,16 +321,16 @@ func (tc *Camunda7TaskController) find(c *fiber.Ctx, q c7TaskQuery) ([]c7TaskRow
 			order = append(order, col+" "+dir)
 		}
 	}
-	order = append(order, "t.created_at ASC", "t.id ASC")
+	order = append(order, "t.created_at ASC", "t.engine_key ASC")
 
 	var rows []c7TaskRow
 	if err := tc.db.Select(&rows, `
-		SELECT t.id, t.task_name, t.assignee, t.created_at, t.updated_at, t.execution_id, t.priority,
-		       t.process_instance_id, t.task_definition_key, p.process_definition_id, p.tenant_id,
+		SELECT t.engine_key, t.task_name, t.assignee, t.created_at, t.updated_at, t.execution_key, t.priority,
+		       p.id AS process_instance_id, t.task_definition_key, p.process_definition_id, p.tenant_id,
 		       p.status AS instance_status
 		FROM public.tasks t
-		JOIN public.process_instances p ON p.id = t.process_instance_id
-		JOIN public.process_definitions d ON d.id = p.process_definition_id
+		JOIN public.process_instances p ON p.engine_key = t.process_instance_key
+		JOIN public.process_definitions d ON d.engine_key = p.process_definition_key
 		WHERE `+strings.Join(where, " AND ")+`
 		ORDER BY `+strings.Join(order, ", "), args...); err != nil {
 		return nil, err
@@ -429,7 +429,7 @@ func (tc *Camunda7TaskController) Claim(c *fiber.Ctx) error {
 	}
 	if t.Assignee != nil && *t.Assignee != "" && *t.Assignee != body.UserID {
 		return c7Error(c, fiber.StatusInternalServerError, "TaskAlreadyClaimedException",
-			fmt.Sprintf("Task '%s' is already claimed by someone else.", t.ID))
+			fmt.Sprintf("Task '%d' is already claimed by someone else.", t.ID))
 	}
 	if err := tc.assign(t, body.UserID); err != nil {
 		return c7Error(c, fiber.StatusInternalServerError, "ProcessEngineException", err.Error())
@@ -482,7 +482,7 @@ func (tc *Camunda7TaskController) assign(t c7TaskRow, user string) error {
 		}
 		service.LogAuditErr("task unclaimed", tc.audit.LogTaskUnclaimed(t.ID, t.ProcessInstanceID))
 		if p := eventlog.Global(); p != nil {
-			p.TaskUnclaimed(t.ProcessInstanceID.String(), t.ID.String())
+			p.TaskUnclaimed(t.ProcessInstanceID.String(), strconv.FormatInt(t.ID, 10))
 		}
 		return nil
 	}
@@ -494,7 +494,7 @@ func (tc *Camunda7TaskController) assign(t c7TaskRow, user string) error {
 	}
 	service.LogAuditErr("task claimed", tc.audit.LogTaskClaimed(t.ID, t.ProcessInstanceID, user))
 	if p := eventlog.Global(); p != nil {
-		p.TaskClaimed(t.ProcessInstanceID.String(), t.ID.String(), user)
+		p.TaskClaimed(t.ProcessInstanceID.String(), strconv.FormatInt(t.ID, 10), user)
 	}
 	return nil
 }
@@ -528,7 +528,7 @@ func (tc *Camunda7TaskController) Complete(c *fiber.Ctx) error {
 	}
 	if err := runtime.CompleteUserTask(c.Context(), tc.db, t.ID, vars); err != nil {
 		if errors.Is(err, runtime.ErrUserTaskNotFound) {
-			return c7NotFound(c, t.ID.String())
+			return c7NotFound(c, strconv.FormatInt(t.ID, 10))
 		}
 		return c7Error(c, fiber.StatusInternalServerError, "ProcessEngineException", err.Error())
 	}
@@ -538,11 +538,11 @@ func (tc *Camunda7TaskController) Complete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func execOf(t c7TaskRow) uuid.UUID {
+func execOf(t c7TaskRow) int64 {
 	if t.ExecutionID != nil {
 		return *t.ExecutionID
 	}
-	return uuid.Nil
+	return 0
 }
 
 // Variables handles GET /engine-rest/task/:id/variables and

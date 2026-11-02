@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jmoiron/sqlx"
 )
@@ -21,24 +22,33 @@ func NewIncidentRepository(db *sqlx.DB) *IncidentRepository {
 
 func (r *IncidentRepository) CreateIncidentTx(tx *sqlx.Tx, c *models.IncidentCreate) (*models.Incident, error) {
 	inc := &models.Incident{}
-	err := tx.QueryRowx(`
+	instanceKey, err := processInstanceEngineKey(tx, c.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.QueryRowx(`
 		INSERT INTO public.incidents
-			(process_instance_id, job_id, incident_type, activity_id, error_message, error_code, state, execution_id)
-		VALUES ($1, $2, $3, $4, $5, $6, 'open', $7)
-		RETURNING id, process_instance_id, job_id, incident_type, activity_id,
+			(engine_key, process_instance_key, job_key, incident_type, activity_id, error_message, error_code, state, execution_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8)
+		RETURNING engine_key, job_key, incident_type, activity_id,
 		          error_message, error_code, state, created_at, resolved_at
-	`, c.ProcessInstanceID, c.JobID, c.IncidentType, c.ActivityID,
+	`, ids.NewEngineKey(), instanceKey, c.JobID, c.IncidentType, c.ActivityID,
 		nullableString(c.ErrorMessage), nullableString(c.ErrorCode), c.ExecutionID,
 	).StructScan(inc)
+	inc.ProcessInstanceID = c.ProcessInstanceID
 	return inc, err
 }
 
 // ExecutionOf returns the execution an incident stopped, when resolving it
 // should run that execution again (incidents raised by the runtime on an
 // element; job incidents have none: their job is retried instead).
-func (r *IncidentRepository) ExecutionOf(processInstanceID, id uuid.UUID) *uuid.UUID {
-	var exec *uuid.UUID
-	if err := r.db.Get(&exec, `SELECT execution_id FROM public.incidents WHERE process_instance_id = $1 AND id = $2`, processInstanceID, id); err != nil {
+func (r *IncidentRepository) ExecutionOf(processInstanceID uuid.UUID, id int64) *int64 {
+	var exec *int64
+	if err := r.db.Get(&exec, `
+		SELECT execution_key FROM public.incidents
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+		  AND engine_key = $2
+	`, processInstanceID, id); err != nil {
 		return nil
 	}
 	return exec
@@ -46,18 +56,24 @@ func (r *IncidentRepository) ExecutionOf(processInstanceID, id uuid.UUID) *uuid.
 
 // HasOpenIncidentOnExecution tells whether execID already has an open
 // runtime incident.
-func (r *IncidentRepository) HasOpenIncidentOnExecution(processInstanceID, execID uuid.UUID) bool {
+func (r *IncidentRepository) HasOpenIncidentOnExecution(processInstanceID uuid.UUID, execID int64) bool {
 	var open bool
-	r.db.Get(&open, `SELECT EXISTS (SELECT 1 FROM public.incidents WHERE process_instance_id = $1 AND execution_id = $2 AND state = 'open')`, processInstanceID, execID)
+	r.db.Get(&open, `SELECT EXISTS (
+		SELECT 1 FROM public.incidents
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+		  AND execution_key = $2 AND state = 'open'
+	)`, processInstanceID, execID)
 	return open
 }
 
-func (r *IncidentRepository) GetByID(id uuid.UUID) (*models.Incident, error) {
+func (r *IncidentRepository) GetByID(id int64) (*models.Incident, error) {
 	inc := &models.Incident{}
 	err := r.db.QueryRowx(`
-		SELECT id, process_instance_id, job_id, incident_type, activity_id,
+		SELECT i.engine_key, pi.id AS process_instance_id, i.job_key, i.incident_type, i.activity_id,
 		       error_message, error_code, state, created_at, resolved_at
-		FROM public.incidents WHERE id = $1
+		FROM public.incidents i
+		JOIN public.process_instances pi ON pi.engine_key = i.process_instance_key
+		WHERE i.engine_key = $1
 	`, id).StructScan(inc)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -77,47 +93,49 @@ type IncidentFilter struct {
 
 func (r *IncidentRepository) List(f IncidentFilter) ([]models.Incident, error) {
 	query := `
-		SELECT id, process_instance_id, job_id, incident_type, activity_id,
-		       error_message, error_code, state, created_at, resolved_at
-		FROM public.incidents WHERE 1=1`
+		SELECT i.engine_key, pi.id AS process_instance_id, i.job_key, i.incident_type, i.activity_id,
+		       i.error_message, i.error_code, i.state, i.created_at, i.resolved_at
+		FROM public.incidents i
+		JOIN public.process_instances pi ON pi.engine_key = i.process_instance_key
+		WHERE 1=1`
 	args := []interface{}{}
 	n := 1
 
 	if f.ProcessInstanceID != nil {
-		query += ` AND process_instance_id = $` + itoa(n)
+		query += ` AND pi.id = $` + itoa(n)
 		args = append(args, *f.ProcessInstanceID)
 		n++
 	}
 	if f.State != nil {
-		query += ` AND state = $` + itoa(n)
+		query += ` AND i.state = $` + itoa(n)
 		args = append(args, *f.State)
 		n++
 	}
 	if f.IncidentType != nil {
-		query += ` AND incident_type = $` + itoa(n)
+		query += ` AND i.incident_type = $` + itoa(n)
 		args = append(args, *f.IncidentType)
 		n++
 	}
 	if f.LegacyIncidentType != nil {
 		switch *f.LegacyIncidentType {
 		case "failedExternalTask":
-			query += ` AND (incident_type = 'JOB_NO_RETRIES' OR (incident_type = 'UNHANDLED_ERROR_EVENT' AND job_id IS NOT NULL))`
+			query += ` AND (i.incident_type = 'JOB_NO_RETRIES' OR (i.incident_type = 'UNHANDLED_ERROR_EVENT' AND i.job_key IS NOT NULL))`
 		case "unhandledErrorEvent":
-			query += ` AND incident_type = 'UNHANDLED_ERROR_EVENT' AND job_id IS NULL`
+			query += ` AND i.incident_type = 'UNHANDLED_ERROR_EVENT' AND i.job_key IS NULL`
 		case "executionError":
-			query += ` AND incident_type NOT IN ('JOB_NO_RETRIES', 'UNHANDLED_ERROR_EVENT')`
+			query += ` AND i.incident_type NOT IN ('JOB_NO_RETRIES', 'UNHANDLED_ERROR_EVENT')`
 		default:
-			query += ` AND incident_type = $` + itoa(n)
+			query += ` AND i.incident_type = $` + itoa(n)
 			args = append(args, *f.LegacyIncidentType)
 			n++
 		}
 	}
 	if f.ActivityID != nil {
-		query += ` AND activity_id = $` + itoa(n)
+		query += ` AND i.activity_id = $` + itoa(n)
 		args = append(args, *f.ActivityID)
 		n++
 	}
-	query += ` ORDER BY created_at DESC`
+	query += ` ORDER BY i.created_at DESC`
 	_ = n
 
 	var result []models.Incident
@@ -128,11 +146,17 @@ func (r *IncidentRepository) List(f IncidentFilter) ([]models.Incident, error) {
 	return result, nil
 }
 
-func (r *IncidentRepository) Resolve(processInstanceID, id uuid.UUID) error {
+func (r *IncidentRepository) Resolve(processInstanceID uuid.UUID, id int64) error {
 	now := time.Now()
-	_, err := r.db.Exec(`
-		UPDATE public.incidents SET state = 'resolved', resolved_at = $1 WHERE process_instance_id = $2 AND id = $3 AND state = 'open'
-	`, now, processInstanceID, id)
+	instanceKey, err := processInstanceEngineKey(r.db, processInstanceID)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.Exec(`
+		UPDATE public.incidents SET state = 'resolved', resolved_at = $1
+		WHERE process_instance_key = $2
+		  AND engine_key = $3 AND state = 'open'
+	`, now, instanceKey, id)
 	return err
 }
 
@@ -141,22 +165,18 @@ func (r *IncidentRepository) Resolve(processInstanceID, id uuid.UUID) error {
 // so the actual write below can route to a single Citus shard, even though
 // the caller (a REST handler with just an incident ID) has no cheaper way
 // to already have it in scope.
-func (r *IncidentRepository) Delete(id uuid.UUID) error {
-	var processInstanceID uuid.UUID
-	if err := r.db.Get(&processInstanceID, `SELECT process_instance_id FROM public.incidents WHERE id = $1`, id); err != nil {
-		return err
-	}
+func (r *IncidentRepository) Delete(id int64) error {
 	_, err := r.db.Exec(`
-		UPDATE public.incidents SET state = 'deleted' WHERE process_instance_id = $1 AND id = $2
-	`, processInstanceID, id)
+		UPDATE public.incidents SET state = 'deleted' WHERE engine_key = $1
+	`, id)
 	return err
 }
 
-func (r *IncidentRepository) ResolveByJobID(tx *sqlx.Tx, jobID uuid.UUID) error {
+func (r *IncidentRepository) ResolveByJobID(tx *sqlx.Tx, jobID int64) error {
 	now := time.Now()
 	_, err := tx.Exec(`
 		UPDATE public.incidents SET state = 'resolved', resolved_at = $1
-		WHERE job_id = $2 AND state = 'open'
+		WHERE job_key = $2 AND state = 'open'
 	`, now, jobID)
 	return err
 }

@@ -57,15 +57,23 @@ func (r *AuditRepository) insertNow(log *models.AuditLog) error {
 
 // CreateAuditLogTx creates a single audit log entry within a transaction
 func (r *AuditRepository) CreateAuditLogTx(tx *sqlx.Tx, log *models.AuditLog) error {
+	var instanceKey *int64
+	if log.ProcessInstanceID != nil {
+		key, err := processInstanceEngineKey(tx, *log.ProcessInstanceID)
+		if err != nil {
+			return err
+		}
+		instanceKey = &key
+	}
 	query := `
 		INSERT INTO public.audit_logs 
-		(id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at)
+		(id, process_instance_key, task_key, user_id, action, old_data, new_data, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
 	_, err := tx.Exec(query,
 		log.ID,
-		log.ProcessInstanceID,
+		instanceKey,
 		log.TaskID,
 		log.UserID,
 		string(log.Action),
@@ -79,12 +87,20 @@ func (r *AuditRepository) CreateAuditLogTx(tx *sqlx.Tx, log *models.AuditLog) er
 // GetProcessAuditLogs retrieves all audit logs for a process instance
 func (r *AuditRepository) GetProcessAuditLogs(processInstanceID uuid.UUID) ([]models.AuditLog, error) {
 	FlushAuditLogs() // rows still queued for their batch
+	return r.GetProcessAuditLogsFlushed(processInstanceID)
+}
+
+// GetProcessAuditLogsFlushed reads audit rows without forcing the global
+// writer to flush. It is used by the background archiver, which flushes once
+// for the whole selected batch instead of once per process instance.
+func (r *AuditRepository) GetProcessAuditLogsFlushed(processInstanceID uuid.UUID) ([]models.AuditLog, error) {
 	var logs []models.AuditLog
 
 	query := `
-		SELECT id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at
-		FROM public.audit_logs
-		WHERE process_instance_id = $1
+		SELECT a.id, pi.id AS process_instance_id, a.task_key, a.user_id, a.action, a.old_data, a.new_data, a.created_at
+		FROM public.audit_logs a
+		JOIN public.process_instances pi ON pi.engine_key = a.process_instance_key
+		WHERE pi.id = $1
 		ORDER BY created_at ASC
 	`
 
@@ -93,14 +109,15 @@ func (r *AuditRepository) GetProcessAuditLogs(processInstanceID uuid.UUID) ([]mo
 }
 
 // GetTaskAuditLogs retrieves all audit logs for a task
-func (r *AuditRepository) GetTaskAuditLogs(taskID uuid.UUID) ([]models.AuditLog, error) {
+func (r *AuditRepository) GetTaskAuditLogs(taskID int64) ([]models.AuditLog, error) {
 	FlushAuditLogs() // rows still queued for their batch
 	var logs []models.AuditLog
 
 	query := `
-		SELECT id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at
-		FROM public.audit_logs
-		WHERE task_id = $1
+		SELECT a.id, pi.id AS process_instance_id, a.task_key, a.user_id, a.action, a.old_data, a.new_data, a.created_at
+		FROM public.audit_logs a
+		JOIN public.process_instances pi ON pi.engine_key = a.process_instance_key
+		WHERE a.task_key = $1
 		ORDER BY created_at ASC
 	`
 
@@ -114,10 +131,11 @@ func (r *AuditRepository) GetAuditLogsByAction(action models.AuditAction, limit 
 	var logs []models.AuditLog
 
 	query := `
-		SELECT id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at
-		FROM public.audit_logs
-		WHERE action = $1
-		ORDER BY created_at DESC
+		SELECT a.id, pi.id AS process_instance_id, a.task_key, a.user_id, a.action, a.old_data, a.new_data, a.created_at
+		FROM public.audit_logs a
+		LEFT JOIN public.process_instances pi ON pi.engine_key = a.process_instance_key
+		WHERE a.action = $1
+		ORDER BY a.created_at DESC
 		LIMIT $2
 	`
 
@@ -131,10 +149,11 @@ func (r *AuditRepository) GetAuditLogsByDateRange(start, end time.Time) ([]model
 	var logs []models.AuditLog
 
 	query := `
-		SELECT id, process_instance_id, task_id, user_id, action, old_data, new_data, created_at
-		FROM public.audit_logs
-		WHERE created_at BETWEEN $1 AND $2
-		ORDER BY created_at ASC
+		SELECT a.id, pi.id AS process_instance_id, a.task_key, a.user_id, a.action, a.old_data, a.new_data, a.created_at
+		FROM public.audit_logs a
+		LEFT JOIN public.process_instances pi ON pi.engine_key = a.process_instance_key
+		WHERE a.created_at BETWEEN $1 AND $2
+		ORDER BY a.created_at ASC
 	`
 
 	err := r.db.Select(&logs, query, start, end)

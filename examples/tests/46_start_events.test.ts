@@ -87,7 +87,7 @@ async function main() {
         async fn() {
           const before = new Set((await openTasks('ss_task')).map(t => t.processInstanceId));
           const res = await client.api.post('/v2/signals/broadcast', { signalName: 'Go46', variables: { reason: 'signal' } });
-          assert(res.data.resumed >= 1, `the broadcast should report the started instance, got ${JSON.stringify(res.data)}`);
+          assert(res.data.signalKey !== undefined, `a broadcast answers with its signalKey (Camunda 8), got ${JSON.stringify(res.data)}`); // the started instance is found below
 
           const deadline = Date.now() + 5000;
           let started = (await openTasks('ss_task')).filter(t => !before.has(t.processInstanceId));

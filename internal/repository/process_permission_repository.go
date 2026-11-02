@@ -54,9 +54,15 @@ func (r *ProcessPermissionRepository) Create(processKey, granteeType string, gra
 		GranteeID:    granteeID,
 		Permission:   permission,
 	}
-	_, err := r.db.Exec(`
+	// Granting what is already granted is a no-op answering with the
+	// existing grant: a definition deleted and deployed again as version 1
+	// finds its deployer's grant still there.
+	err := r.db.Get(&perm.ID, `
 		INSERT INTO public.process_permissions (id, resource_type, process_key, grantee_type, grantee_id, permission)
 		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (process_key, grantee_type, grantee_id, permission)
+		DO UPDATE SET resource_type = EXCLUDED.resource_type
+		RETURNING id
 	`, perm.ID, perm.ResourceType, perm.ProcessKey, perm.GranteeType, perm.GranteeID, perm.Permission)
 	return perm, err
 }

@@ -108,19 +108,20 @@ async function run() {
           assert(lowTasks.length === 1, `expected exactly 1 task for low instance, got ${lowTasks.length}`);
           assert(lowTasks[0].priority === 20, `expected priority 20, got ${lowTasks[0].priority}`);
 
+          const highKey = await client.instanceKey(highId), lowKey = await client.instanceKey(lowId);
           const byPriority = await searchUserTasks({ priority: 80, elementId: 'reviewTask' });
           assert(
-            byPriority.some((t: any) => t.processInstanceKey === highId),
+            byPriority.some((t: any) => t.processInstanceKey === highKey),
             'expected the priority=80 filter to include the high-priority instance'
           );
           assert(
-            !byPriority.some((t: any) => t.processInstanceKey === lowId),
+            !byPriority.some((t: any) => t.processInstanceKey === lowKey),
             'expected the priority=80 filter to exclude the low-priority instance'
           );
 
           const byGroup = await searchUserTasks({ candidateGroup: 'reviewers', state: 'CREATED', elementId: 'reviewTask' });
           const groupInstanceIds = byGroup.map((t: any) => t.processInstanceKey);
-          assert(groupInstanceIds.includes(highId) && groupInstanceIds.includes(lowId),
+          assert(groupInstanceIds.includes(highKey) && groupInstanceIds.includes(lowKey),
             'expected candidateGroup+state filter to find both tasks');
 
           // ── F: completing flips state to COMPLETED ─────────────────────────

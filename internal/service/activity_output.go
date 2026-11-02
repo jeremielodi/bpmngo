@@ -20,7 +20,7 @@ import (
 // The activity's local scope (its input mappings) is dropped as it is left
 // — except for an inner instance of a multi-instance activity, whose scope
 // still serves its outputElement (see runtime.completeInnerInstance).
-func ApplyActivityOutputTx(tx *sqlx.Tx, instanceID, execID uuid.UUID, node *engine.Node, vars map[string]interface{}) error {
+func ApplyActivityOutputTx(tx *sqlx.Tx, instanceID uuid.UUID, execID int64, node *engine.Node, vars map[string]interface{}) error {
 	if len(node.OutputMappings) > 0 {
 		if err := repository.SetLocalVariablesTx(tx, instanceID, execID, vars); err != nil {
 			return err
@@ -30,11 +30,15 @@ func ApplyActivityOutputTx(tx *sqlx.Tx, instanceID, execID uuid.UUID, node *engi
 			return err
 		}
 		mapped := common.EvaluateIOMappings(node.OutputMappings, view)
-		var parent *uuid.UUID
-		if err := tx.Get(&parent, `SELECT parent_execution_id FROM public.executions WHERE process_instance_id = $1 AND id = $2`, instanceID, execID); err != nil {
+		var parent *int64
+		if err := tx.Get(&parent, `
+			SELECT parent_execution_key FROM public.executions
+			WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+			  AND engine_key = $2
+		`, instanceID, execID); err != nil {
 			return err
 		}
-		scope := uuid.Nil
+		scope := int64(0)
 		if parent != nil {
 			scope = *parent
 		}

@@ -11,7 +11,7 @@ import (
 )
 
 type HistoricTask struct {
-	ID                   uuid.UUID  `db:"id"`
+	ID                   int64      `db:"id"`
 	ProcessInstanceID    uuid.UUID  `db:"process_instance_id"`
 	ProcessDefinitionID  uuid.UUID  `db:"process_definition_id"`
 	ProcessDefinitionKey string     `db:"process_definition_key"`
@@ -61,8 +61,8 @@ func NewHistoricTaskRepository(db *sqlx.DB) *HistoricTaskRepository {
 func (r *HistoricTaskRepository) FindHistoricTasks(params HistoricTaskQueryParams) ([]HistoricTask, error) {
 	query := `
 		SELECT 
-			t.id,
-			t.process_instance_id,
+			t.engine_key AS id,
+			pi.id AS process_instance_id,
 			pd.id as process_definition_id,
 			pd.process_key as process_definition_key,
 			t.task_definition_key,
@@ -76,7 +76,7 @@ func (r *HistoricTaskRepository) FindHistoricTasks(params HistoricTaskQueryParam
 			t.created_at,
 			t.updated_at
 		FROM public.tasks t
-		LEFT JOIN public.process_instances pi ON pi.id = t.process_instance_id
+		LEFT JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
 		LEFT JOIN public.process_definitions pd ON pd.id = pi.process_definition_id
 		WHERE 1=1
 	`
@@ -87,7 +87,7 @@ func (r *HistoricTaskRepository) FindHistoricTasks(params HistoricTaskQueryParam
 
 	// Add filters
 	if params.TaskId != "" {
-		conditions = append(conditions, fmt.Sprintf("t.id = $%d", argIndex))
+		conditions = append(conditions, fmt.Sprintf("t.engine_key = $%d", argIndex))
 		args = append(args, params.TaskId)
 		argIndex++
 	}
@@ -117,7 +117,7 @@ func (r *HistoricTaskRepository) FindHistoricTasks(params HistoricTaskQueryParam
 	}
 
 	if params.ProcessInstanceId != "" {
-		conditions = append(conditions, fmt.Sprintf("t.process_instance_id = $%d", argIndex))
+		conditions = append(conditions, fmt.Sprintf("pi.id = $%d", argIndex))
 		args = append(args, params.ProcessInstanceId)
 		argIndex++
 	}

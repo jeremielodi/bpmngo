@@ -88,8 +88,8 @@ func (r *AnalyticsRepository) GetIncidentCounts(processKey string) ([]IncidentCo
 		SELECT process_key, SUM(count)::int AS count FROM (
 			SELECT pd.process_key AS process_key, COUNT(*) AS count
 			FROM public.incidents i
-			JOIN public.process_instances pi ON pi.id = i.process_instance_id
-			JOIN public.process_definitions pd ON pd.id = pi.process_definition_id
+			JOIN public.process_instances pi ON pi.engine_key = i.process_instance_key
+			JOIN public.process_definitions pd ON pd.engine_key = pi.process_definition_key
 			WHERE ($1 = '' OR pd.process_key = $1)
 			GROUP BY pd.process_key
 

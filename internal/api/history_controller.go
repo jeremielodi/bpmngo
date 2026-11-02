@@ -399,17 +399,17 @@ func (hc *HistoryController) ListHistoricActivityInstances(c *fiber.Ctx) error {
 	}
 
 	query := `
-		SELECT e.id, e.current_element_id, e.process_instance_id,
+		SELECT e.engine_key, e.current_element_id, pi.id AS process_instance_id,
 		       pi.process_definition_id, e.status,
 		       e.created_at, e.updated_at
 		FROM executions e
-		JOIN process_instances pi ON pi.id = e.process_instance_id
+		JOIN process_instances pi ON pi.engine_key = e.process_instance_key
 		WHERE 1=1
 	`
 	args := []interface{}{}
 	idx := 1
 	if processInstanceID != "" {
-		query += ` AND e.process_instance_id = $` + itoa(idx)
+		query += ` AND pi.id = $` + itoa(idx)
 		args = append(args, processInstanceID)
 		idx++
 	}
@@ -418,7 +418,7 @@ func (hc *HistoryController) ListHistoricActivityInstances(c *fiber.Ctx) error {
 	args = append(args, maxResults, firstResult)
 
 	type row struct {
-		ID                  uuid.UUID `db:"id"`
+		ID                  int64     `db:"engine_key"`
 		CurrentElementID    string    `db:"current_element_id"`
 		ProcessInstanceID   uuid.UUID `db:"process_instance_id"`
 		ProcessDefinitionID uuid.UUID `db:"process_definition_id"`
@@ -451,7 +451,7 @@ func (hc *HistoryController) ListHistoricActivityInstances(c *fiber.Ctx) error {
 		}
 
 		resp[i] = HistoricActivityInstanceResponse{
-			ID:                  r.ID.String(),
+			ID:                  strconv.FormatInt(r.ID, 10),
 			ActivityID:          r.CurrentElementID,
 			ActivityType:        "unknown",
 			ProcessInstanceID:   r.ProcessInstanceID.String(),

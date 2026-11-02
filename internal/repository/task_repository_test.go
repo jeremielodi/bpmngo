@@ -24,11 +24,11 @@ func newMockTaskRepo(t *testing.T) (*TaskRepository, sqlmock.Sqlmock) {
 
 func taskRow() *sqlmock.Rows {
 	return sqlmock.NewRows([]string{
-		"id", "process_instance_id", "execution_id", "task_definition_key",
+		"engine_key", "process_instance_id", "execution_key", "task_definition_key",
 		"task_name", "assignee", "candidate_group", "status", "priority",
 		"form_data", "created_at", "claimed_at", "completed_at",
 	}).AddRow(
-		uuid.New(), uuid.New(), nil, "ReviewTask",
+		int64(101), uuid.New(), nil, "ReviewTask",
 		"Review order", nil, nil, "created", 50,
 		nil, time.Now(), nil, nil,
 	)
@@ -86,7 +86,7 @@ func TestFindAll_NoExclusions_ReturnsEveryStatus(t *testing.T) {
 
 	// Anchored: no WHERE between FROM and ORDER BY, so no hidden
 	// "status NOT IN (...)" default can slip in.
-	mock.ExpectQuery(`FROM public\.tasks\s+ORDER BY created_at ASC$`).
+	mock.ExpectQuery(`FROM public\.tasks t\s+JOIN public\.process_instances pi ON pi\.engine_key = t\.process_instance_key\s+ORDER BY t\.created_at ASC$`).
 		WillReturnRows(taskRow())
 
 	_, err := repo.FindAll(map[string]interface{}{})

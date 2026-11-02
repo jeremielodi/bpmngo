@@ -124,9 +124,33 @@ func RunOnce(ctx context.Context, db *sqlx.DB, cfg Config) (int, error) {
 			return total, err
 		}
 		if n < cfg.BatchSize {
+			if err := dropEmptyPartitions(ctx, conn, cutoff); err != nil {
+				return total, fmt.Errorf("drop empty history partitions: %w", err)
+			}
 			return total, nil
 		}
 	}
+}
+
+// dropEmptyPartitions reclaims the physical tables left behind after the
+// instance-aware purge. Migration 019 deliberately drops only empty monthly
+// partitions whose upper bound is expired; non-instance audit rows and data
+// from long-running processes therefore keep their partitions attached.
+func dropEmptyPartitions(ctx context.Context, conn *sqlx.Conn, cutoff time.Time) error {
+	var installed bool
+	if err := conn.GetContext(ctx, &installed,
+		`SELECT to_regprocedure('public.goflow_drop_empty_history_partitions(timestamp without time zone)') IS NOT NULL`); err != nil || !installed {
+		return err
+	}
+	var dropped []string
+	if err := conn.SelectContext(ctx, &dropped,
+		`SELECT partition_name FROM public.goflow_drop_empty_history_partitions($1)`, cutoff); err != nil {
+		return err
+	}
+	for _, partition := range dropped {
+		log.Printf("retention: detached and dropped empty partition %s", partition)
+	}
+	return nil
 }
 
 // purgeTables lists what is deleted for each purged instance, children
@@ -137,7 +161,6 @@ var purgeTables = []struct {
 	table  string
 	column string
 }{
-	{"audit_logs", "process_instance_id"},
 	{"eventlog_projected_jobs", "process_instance_id"},
 	{"eventlog_projected_instances", "id"},
 	{"historic_activity_instances", "process_instance_id"},

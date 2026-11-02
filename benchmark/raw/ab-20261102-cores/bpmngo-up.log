@@ -1,0 +1,107 @@
+ Image bpmngo-benchmark-bpmngo Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 515B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from dockerfile
+#2 transferring dockerfile: 993B 0.2s done
+#2 DONE 0.3s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#3 DONE 3.5s
+
+#4 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#4 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#4 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.3s done
+#4 DONE 0.3s
+
+#4 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#4 CACHED
+
+#5 [internal] load metadata for docker.io/library/alpine:latest
+#5 ...
+
+#6 [internal] load metadata for docker.io/library/golang:1.26-alpine
+#6 DONE 1.4s
+
+#5 [internal] load metadata for docker.io/library/alpine:latest
+#5 DONE 1.5s
+
+#7 [internal] load .dockerignore
+#7 transferring context:
+#7 transferring context: 281B 0.1s done
+#7 DONE 0.2s
+
+#8 [internal] load build context
+#8 DONE 0.0s
+
+#9 [stage-1 1/4] FROM docker.io/library/alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+#9 resolve docker.io/library/alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a 0.1s done
+#9 DONE 0.2s
+
+#10 [builder 1/5] FROM docker.io/library/golang:1.26-alpine@sha256:a2012b4a1d1f9f7e9f44e0d39b805a901e856b1dd80b4e6ee4338db547050308
+#10 resolve docker.io/library/golang:1.26-alpine@sha256:a2012b4a1d1f9f7e9f44e0d39b805a901e856b1dd80b4e6ee4338db547050308
+#10 resolve docker.io/library/golang:1.26-alpine@sha256:a2012b4a1d1f9f7e9f44e0d39b805a901e856b1dd80b4e6ee4338db547050308 0.1s done
+#10 DONE 0.2s
+
+#8 [internal] load build context
+#8 transferring context: 1.68MB 4.6s
+#8 transferring context: 2.63MB 7.0s done
+#8 DONE 7.3s
+
+#11 [stage-1 3/4] WORKDIR /app
+#11 CACHED
+
+#12 [builder 2/5] RUN apk add --no-cache git ca-certificates tzdata
+#12 CACHED
+
+#13 [builder 3/5] WORKDIR /app
+#13 CACHED
+
+#14 [builder 4/5] COPY . .
+#14 CACHED
+
+#15 [builder 5/5] RUN --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -a -installsuffix cgo -o bpmngo .
+#15 CACHED
+
+#16 [stage-1 2/4] RUN apk --no-cache add ca-certificates tzdata
+#16 CACHED
+
+#17 [stage-1 4/4] COPY --from=builder /app/bpmngo .
+#17 CACHED
+
+#18 exporting to image
+#18 exporting layers done
+#18 exporting manifest sha256:3ba9dba403fb0b5d620d600501614f7b07a9f243e3cbbaef9ec9228e76e997ef 0.0s done
+#18 exporting config sha256:b7d5f17cedc645dac4828ca9404157eaa5e38e57dab96d59daa8ef2cad49ce4b 0.0s done
+#18 exporting attestation manifest sha256:dc280ffdcc0bd4e8b7deda6de1933c321124a92a41f2460d150af7bc76753b97
+#18 exporting attestation manifest sha256:dc280ffdcc0bd4e8b7deda6de1933c321124a92a41f2460d150af7bc76753b97 0.1s done
+#18 exporting manifest list sha256:ca9f464b22d4b97ca121a6e42508aeed84765a1586540451cf82377c5df48333
+#18 exporting manifest list sha256:ca9f464b22d4b97ca121a6e42508aeed84765a1586540451cf82377c5df48333 0.1s done
+#18 naming to docker.io/library/bpmngo-benchmark-bpmngo:latest done
+#18 unpacking to docker.io/library/bpmngo-benchmark-bpmngo:latest 0.0s done
+#18 DONE 0.5s
+
+#19 resolving provenance for metadata file
+#19 DONE 0.1s
+ Image bpmngo-benchmark-bpmngo Built 
+ Network bpmngo-benchmark_bpmngo-network Creating 
+ Network bpmngo-benchmark_bpmngo-network Created 
+ Volume bpmngo-benchmark_postgres_data Creating 
+ Volume bpmngo-benchmark_postgres_data Created 
+ Volume bpmngo-benchmark_bpmngo_data Creating 
+ Volume bpmngo-benchmark_bpmngo_data Created 
+ Container bpmngo-benchmark-postgres Creating 
+ Container bpmngo-benchmark-postgres Created 
+ Container bpmngo-benchmark-app Creating 
+ Container bpmngo-benchmark-app Created 
+ Container bpmngo-benchmark-postgres Starting 
+ Container bpmngo-benchmark-postgres Started 
+ Container bpmngo-benchmark-postgres Waiting 
+ Container bpmngo-benchmark-postgres Healthy 
+ Container bpmngo-benchmark-app Starting 
+ Container bpmngo-benchmark-app Started 
+ Container bpmngo-benchmark-postgres Waiting 
+ Container bpmngo-benchmark-app Waiting 
+ Container bpmngo-benchmark-postgres Healthy 
+container bpmngo-benchmark-app is unhealthy

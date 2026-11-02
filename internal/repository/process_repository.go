@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/pkg/database"
 	"github.com/jmoiron/sqlx"
@@ -31,13 +32,15 @@ func (r *ProcessRepository) CreateDeployment(
 
 	adapter := database.NewDabaseAdapter(r.db)
 
-	id := uuid.New()
+	id := ids.NewGlobalID()
+	engineKey := ids.NewEngineKey()
 	now := time.Now()
 
 	return adapter.Insert(
 		"public.deployments",
 		[]database.QueryParameter{
 			{Key: "id", Value: id},
+			{Key: "engine_key", Value: engineKey},
 			{Key: "name", Value: deploy.Name},
 			{Key: "deployed_by", Value: deploy.DeployedBy},
 			{Key: "status", Value: deploy.Status},
@@ -58,6 +61,7 @@ func (r *ProcessRepository) FindDeploymentByID(
 		`
         SELECT
             id,
+			engine_key,
             name,
             deployed_by,
             status,
@@ -83,6 +87,7 @@ func (r *ProcessRepository) FindDeploymentByName(
 		`
         SELECT
             id,
+			engine_key,
             name,
             deployed_by,
             status,
@@ -119,7 +124,8 @@ func (r *ProcessRepository) CreateProcessDefinition(
 
 	adapter := database.NewDabaseAdapter(r.db)
 
-	id := uuid.New()
+	id := ids.NewGlobalID()
+	engineKey := ids.NewEngineKey()
 	now := time.Now()
 
 	// Automatically calculate next version
@@ -130,12 +136,18 @@ func (r *ProcessRepository) CreateProcessDefinition(
 			err,
 		)
 	}
+	var deploymentKey int64
+	if err := r.db.Get(&deploymentKey, `SELECT engine_key FROM public.deployments WHERE id = $1`, def.DeploymentID); err != nil {
+		return "", 0, fmt.Errorf("failed to resolve deployment key: %w", err)
+	}
 
 	_, err = adapter.Insert(
 		"public.process_definitions",
 		[]database.QueryParameter{
 			{Key: "id", Value: id},
+			{Key: "engine_key", Value: engineKey},
 			{Key: "deployment_id", Value: def.DeploymentID},
+			{Key: "deployment_key", Value: deploymentKey},
 			{Key: "process_key", Value: def.ProcessKey},
 			{Key: "process_name", Value: def.ProcessName},
 			{Key: "version", Value: version},
@@ -233,6 +245,34 @@ const latestForTenantSQL = `
         WHERE process_key = $1 AND (tenant_id = $2 OR tenant_id IS NULL OR tenant_id = '')
         ORDER BY (tenant_id = $2) DESC NULLS LAST, version DESC
         LIMIT 1`
+
+// definitionHeaderColumns is every column but bpmn_xml and parsed_graph:
+// starting an instance only needs the definition's identity, and reading
+// the model (often TOASTed, so decompressed) on each start costs the
+// database CPU for nothing — the graph comes from the in-process cache.
+const definitionHeaderColumns = `id, deployment_id, process_key, process_name, tenant_id, version, is_active, created_at, write_path`
+
+// FindDefinitionHeaderForStart resolves the definition a start request
+// names — by id, by key and version (version > 0), or the latest version
+// of key visible to callerTenant — without its model.
+func (r *ProcessRepository) FindDefinitionHeaderForStart(id uuid.UUID, processKey string, version int, callerTenant string) (models.ProcessDefinition, error) {
+	var def models.ProcessDefinition
+	var err error
+	switch {
+	case id != uuid.Nil:
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions WHERE id = $1`, id)
+	case version > 0:
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions WHERE process_key = $1 AND version = $2`, processKey, version)
+	case callerTenant == "":
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions WHERE process_key = $1 ORDER BY version DESC LIMIT 1`, processKey)
+	default:
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions
+			WHERE process_key = $1 AND (tenant_id = $2 OR tenant_id IS NULL OR tenant_id = '')
+			ORDER BY (tenant_id = $2) DESC NULLS LAST, version DESC
+			LIMIT 1`, processKey, callerTenant)
+	}
+	return def, err
+}
 
 // FindLatestProcessDefinitionByKeyForTenant is FindLatestProcessDefinitionByKey
 // as seen by a caller of tenant callerTenant ("" = no tenant: any version).

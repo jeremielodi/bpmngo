@@ -1,0 +1,7 @@
+96db3dbadb1b bpmngo-frontend
+dbee88fb96c5 bpmngo-app
+aba55239106b bpmngo-postgres
+6ef4c80c790b uchis_backend-app-1
+250db02a91c7 uchis_postgres_db
+35bc6619fcfc uchis_backend-adminer-1
+0fe07710efde uchis-postgres-prod

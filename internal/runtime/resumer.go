@@ -4,14 +4,13 @@ package runtime
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jmoiron/sqlx"
 )
 
 // ResumeExecution resumes an execution from a given ID
-func ResumeExecution(db *sqlx.DB, execID uuid.UUID, dispatcher *events.TaskEventDispatcher) error {
+func ResumeExecution(db *sqlx.DB, execID int64, dispatcher *events.TaskEventDispatcher) error {
 	engineRepo := repository.NewEngineRepository(db, dispatcher)
 
 	// Get execution
@@ -32,8 +31,8 @@ func ResumeExecution(db *sqlx.DB, execID uuid.UUID, dispatcher *events.TaskEvent
 }
 
 // CreateResumer returns a function that can resume executions
-func CreateResumer(db *sqlx.DB, dispatcher *events.TaskEventDispatcher) func(ctx context.Context, execID uuid.UUID) error {
-	return func(ctx context.Context, execID uuid.UUID) error {
+func CreateResumer(db *sqlx.DB, dispatcher *events.TaskEventDispatcher) func(ctx context.Context, execID int64) error {
+	return func(ctx context.Context, execID int64) error {
 		return ResumeExecution(db, execID, dispatcher)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	timerpkg "github.com/jeremielodi/bpmngo/internal/timer"
@@ -30,7 +32,7 @@ type TimerScheduler struct {
 	dispatcher   *events.TaskEventDispatcher
 	engineRepo   *repository.EngineRepository
 	stopChan     chan bool
-	resumer      func(ctx context.Context, execID uuid.UUID) error
+	resumer      func(ctx context.Context, execID int64) error
 	auditService *AuditService
 	// startTimer fires a timer start event (runtime.PostStartTimer; the
 	// runtime package can't be imported from here).
@@ -42,7 +44,7 @@ func (s *TimerScheduler) SetStartTimerHandler(h func(ctx context.Context, timer 
 	s.startTimer = h
 }
 
-func NewTimerScheduler(db *sqlx.DB, resumer func(ctx context.Context, execID uuid.UUID) error, dispatcher *events.TaskEventDispatcher) *TimerScheduler {
+func NewTimerScheduler(db *sqlx.DB, resumer func(ctx context.Context, execID int64) error, dispatcher *events.TaskEventDispatcher) *TimerScheduler {
 	s := &TimerScheduler{
 		db:           db,
 		dispatcher:   dispatcher,
@@ -129,7 +131,7 @@ func (s *TimerScheduler) processDueTimers(ctx context.Context) (claimed int, rea
 		claimed += len(timers)
 
 		for _, timer := range timers {
-			log.Printf("🔥 Processing timer %s (due_at: %s)", timer.ID, timer.DueAt)
+			log.Printf("🔥 Processing timer %d (due_at: %s)", timer.ID, timer.DueAt)
 			if s.triggerTimer(ctx, timer) {
 				rearmed = true
 			}
@@ -146,25 +148,25 @@ func (s *TimerScheduler) processDueTimers(ctx context.Context) (claimed int, rea
 // start event, the start handler. rearmed is true when the timer could not
 // be handed over and is due again.
 func (s *TimerScheduler) triggerTimer(ctx context.Context, timer models.TimerJob) (rearmed bool) {
-	log.Printf("Triggering timer %s for process instance %s", timer.ID, timer.ProcessInstanceID)
+	log.Printf("Triggering timer %d for process instance %s", timer.ID, timer.ProcessInstanceID)
 
 	if timer.EventType == TimerStartEventType {
 		if s.startTimer == nil {
-			log.Printf("timer %s: no timer start handler set", timer.ID)
+			log.Printf("timer %d: no timer start handler set", timer.ID)
 			return false
 		}
 		if err := s.startTimer(ctx, timer); err != nil {
-			log.Printf("timer start %s: %v", timer.ID, err)
+			log.Printf("timer start %d: %v", timer.ID, err)
 		}
 		return false
 	}
 
 	if err := cmdbus.Post(ctx, cmdbus.Key(timer.ProcessInstanceID), CmdFireTimer, timer); err != nil {
-		log.Printf("timer %s: %v", timer.ID, err)
+		log.Printf("timer %d: %v", timer.ID, err)
 		if cmdbus.Partitioned() {
 			// Never reached its partition: claim it again on the next poll.
-			if _, uerr := s.db.Exec(`UPDATE public.timer_jobs SET is_triggered = false, triggered_at = NULL WHERE id = $1`, timer.ID); uerr != nil {
-				log.Printf("timer %s: re-arming after a failed send: %v", timer.ID, uerr)
+			if _, uerr := s.db.Exec(`UPDATE public.timer_jobs SET is_triggered = false, triggered_at = NULL WHERE engine_key = $1`, timer.ID); uerr != nil {
+				log.Printf("timer %d: re-arming after a failed send: %v", timer.ID, uerr)
 				return false
 			}
 			return true
@@ -176,25 +178,25 @@ func (s *TimerScheduler) triggerTimer(ctx context.Context, timer models.TimerJob
 // fireTimer moves the timer's execution on, arms a cycle's next
 // occurrence and continues the process.
 func (s *TimerScheduler) fireTimer(ctx context.Context, timer models.TimerJob) {
-	var execID uuid.UUID
+	var execID int64
 	if timer.ExecutionID != nil {
 		execID = *timer.ExecutionID
 	}
 
-	if execID != uuid.Nil {
+	if execID != 0 {
 		targetNodeID, err := ParseTimerTargetNode(timer.Payload)
 		if err != nil {
-			log.Printf("Failed to resume execution for timer %s: %v", timer.ID, err)
+			log.Printf("Failed to resume execution for timer %d: %v", timer.ID, err)
 			return
 		}
 		if _, _, err := ResumeTimerExecution(s.db, s.dispatcher, timer.ProcessInstanceID, execID, targetNodeID); err != nil {
 			if errors.Is(err, ErrStaleTimer) {
 				// Disarmed after it was claimed: nothing to resume, and a
 				// cycle must not arm its next occurrence.
-				log.Printf("timer %s: its execution moved on meanwhile — ignored", timer.ID)
+				log.Printf("timer %d: its execution moved on meanwhile — ignored", timer.ID)
 				return
 			}
-			log.Printf("Failed to resume execution for timer %s: %v", timer.ID, err)
+			log.Printf("Failed to resume execution for timer %d: %v", timer.ID, err)
 			return
 		}
 	}
@@ -203,13 +205,13 @@ func (s *TimerScheduler) fireTimer(ctx context.Context, timer models.TimerJob) {
 
 	LogAuditErr("timer triggered", s.auditService.LogTimerTriggered(timer.ProcessInstanceID, timer.ID, timer.EventType))
 	if p := eventlog.Global(); p != nil {
-		p.TimerTriggered(timer.ProcessInstanceID.String(), timer.ID.String(), timer.EventType)
+		p.TimerTriggered(timer.ProcessInstanceID.String(), strconv.FormatInt(timer.ID, 10), timer.EventType)
 	}
 
 	// Continue execution after ResumeTimerExecution's own transaction
 	// committed.
-	if execID != uuid.Nil && s.resumer != nil {
-		log.Printf("🔄 Continuing execution %s after timer", execID)
+	if execID != 0 && s.resumer != nil {
+		log.Printf("🔄 Continuing execution %d after timer", execID)
 		if err := s.resumer(ctx, execID); err != nil {
 			log.Printf("❌ Failed to continue execution after timer: %v", err)
 		}
@@ -241,7 +243,7 @@ func (s *TimerScheduler) scheduleNextCycleIfNeeded(ctx context.Context, timer mo
 		value, _ := payload["timer_value"].(string)
 		t, err := timerpkg.Parse(timerpkg.Kind(kind), value)
 		if err != nil {
-			log.Printf("timer %s: %v", timer.ID, err)
+			log.Printf("timer %d: %v", timer.ID, err)
 			return
 		}
 		d := timer.DueAt
@@ -258,16 +260,16 @@ func (s *TimerScheduler) scheduleNextCycleIfNeeded(ctx context.Context, timer mo
 		newPayload, _ := json.Marshal(payload)
 		tx, err := s.db.BeginTxx(ctx, nil)
 		if err != nil {
-			log.Printf("timer %s: scheduling the next cycle: %v", timer.ID, err)
+			log.Printf("timer %d: scheduling the next cycle: %v", timer.ID, err)
 			return
 		}
 		defer tx.Rollback()
-		if err := s.engineRepo.CreateTimerWithCycleTx(tx, uuid.New(), timer.ProcessInstanceID, timer.ExecutionID, next.In(time.Local), timer.EventType, newPayload, nextCycle, t.Repetitions, ""); err != nil {
-			log.Printf("timer %s: scheduling the next cycle: %v", timer.ID, err)
+		if err := s.engineRepo.CreateTimerWithCycleTx(tx, ids.NewEngineKey(), timer.ProcessInstanceID, timer.ExecutionID, next.In(time.Local), timer.EventType, newPayload, nextCycle, t.Repetitions, ""); err != nil {
+			log.Printf("timer %d: scheduling the next cycle: %v", timer.ID, err)
 			return
 		}
 		if err := tx.Commit(); err != nil {
-			log.Printf("timer %s: scheduling the next cycle: %v", timer.ID, err)
+			log.Printf("timer %d: scheduling the next cycle: %v", timer.ID, err)
 		}
 		return
 	}
@@ -290,7 +292,7 @@ func (s *TimerScheduler) scheduleNextCycleIfNeeded(ctx context.Context, timer mo
 
 	// totalCycles == -1 means infinite
 	if totalCyclesInt != -1 && nextCycle >= totalCyclesInt {
-		log.Printf("✅ Timer cycle completed for timer %s (final cycle)", timer.ID)
+		log.Printf("✅ Timer cycle completed for timer %d (final cycle)", timer.ID)
 		return
 	}
 
@@ -300,21 +302,21 @@ func (s *TimerScheduler) scheduleNextCycleIfNeeded(ctx context.Context, timer mo
 
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
-		log.Printf("Failed to begin transaction to schedule next cycle for timer %s: %v", timer.ID, err)
+		log.Printf("Failed to begin transaction to schedule next cycle for timer %d: %v", timer.ID, err)
 		return
 	}
 	defer tx.Rollback()
 
-	nextTimerID := uuid.New()
+	nextTimerID := ids.NewEngineKey()
 	if err := s.engineRepo.CreateTimerWithDurationSeconds(tx, nextTimerID, timer.ProcessInstanceID, timer.ExecutionID, int(interval.Seconds()), timer.EventType, newPayload, nextCycle, totalCyclesInt, repeatInterval); err != nil {
 		log.Printf("Failed to schedule next cycle: %v", err)
 		return
 	}
 	if err := tx.Commit(); err != nil {
-		log.Printf("Failed to commit next-cycle transaction for timer %s: %v", timer.ID, err)
+		log.Printf("Failed to commit next-cycle transaction for timer %d: %v", timer.ID, err)
 		return
 	}
-	log.Printf("🔄 Scheduled cycle %d/%d for timer %s at %s", nextCycle, totalCyclesInt, timer.ID, nextDueAt)
+	log.Printf("🔄 Scheduled cycle %d/%d for timer %d at %s", nextCycle, totalCyclesInt, timer.ID, nextDueAt)
 }
 
 // ParseTimerTargetNode extracts the target_node_id an intermediate timer's
@@ -351,7 +353,7 @@ func ParseTimerTargetNode(payload []byte) (string, error) {
 // (its element was left, the timer disarmed, after the timer was claimed).
 var ErrStaleTimer = errors.New("timer is stale: its execution no longer waits")
 
-func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, processInstanceID, execID uuid.UUID, targetNodeID string) (fromNodeID string, cancelledTaskIDs []uuid.UUID, err error) {
+func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, processInstanceID uuid.UUID, execID int64, targetNodeID string) (fromNodeID string, cancelledTaskIDs []int64, err error) {
 	engineRepo := repository.NewEngineRepository(db, dispatcher)
 	auditService := NewAuditService(db)
 
@@ -360,6 +362,10 @@ func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, p
 		return "", nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, processInstanceID)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to resolve process instance: %w", err)
+	}
 
 	// Locked: the timer and whatever left its element meanwhile (an
 	// activity completing disarms its boundary timers) take turns. A timer
@@ -369,7 +375,7 @@ func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, p
 		Node   string `db:"current_element_id"`
 		Status string `db:"status"`
 	}
-	if err := tx.Get(&at, `SELECT current_element_id, status FROM public.executions WHERE process_instance_id = $1 AND id = $2 FOR UPDATE`, processInstanceID, execID); err != nil {
+	if err := tx.Get(&at, `SELECT current_element_id, status FROM public.executions WHERE process_instance_key = $1 AND engine_key = $2 FOR UPDATE`, instanceKey, execID); err != nil {
 		return "", nil, fmt.Errorf("failed to load current node: %w", err)
 	}
 	if at.Status != "waiting" {
@@ -380,8 +386,8 @@ func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, p
 	if err := tx.Select(&cancelledTaskIDs, `
 		UPDATE public.tasks
 		SET status = 'cancelled', updated_at = NOW()
-		WHERE execution_id = $1 AND status = 'created'
-		RETURNING id
+		WHERE execution_key = $1 AND status = 'created'
+		RETURNING engine_key
 	`, execID); err != nil {
 		return "", nil, fmt.Errorf("failed to cancel user task: %w", err)
 	}
@@ -390,7 +396,7 @@ func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, p
 	// execution parked on the sub-process node: interrupt everything still
 	// running inside it. No-op for a timer on a plain activity, whose
 	// execution has no children.
-	scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, processInstanceID, execID, uuid.Nil)
+	scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, processInstanceID, execID, 0)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to interrupt sub-process: %w", err)
 	}
@@ -399,9 +405,10 @@ func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, p
 	// An event-based gateway's competing message/signal events lose.
 	if _, err := tx.Exec(`
 		UPDATE event_subscriptions SET consumed_at = NOW()
-		WHERE process_instance_id = $1 AND execution_id = $2 AND consumed_at IS NULL
+		WHERE process_instance_key = $1
+		  AND execution_key = $2 AND consumed_at IS NULL
 		  AND event_type IN ('message', 'signal')
-	`, processInstanceID, execID); err != nil {
+	`, instanceKey, execID); err != nil {
 		return "", nil, fmt.Errorf("failed to cancel competing events: %w", err)
 	}
 
@@ -413,7 +420,7 @@ func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, p
 		return "", nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Printf("Execution %s resumed after timer, moving to node %s (user task cancelled)", execID, targetNodeID)
+	log.Printf("Execution %d resumed after timer, moving to node %s (user task cancelled)", execID, targetNodeID)
 
 	// processInstanceID is already known from the caller — no need to
 	// re-discover it via a scatter-gathered GetExecutionByID lookup the
@@ -426,7 +433,7 @@ func ResumeTimerExecution(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, p
 	}
 	LogAuditErr("execution moved", auditService.LogExecutionMoved(execID, processInstanceID, fromNodeID, targetNodeID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(processInstanceID.String(), execID.String(), fromNodeID, targetNodeID)
+		p.ExecutionMoved(processInstanceID.String(), strconv.FormatInt(execID, 10), fromNodeID, targetNodeID)
 	}
 
 	return fromNodeID, cancelledTaskIDs, nil

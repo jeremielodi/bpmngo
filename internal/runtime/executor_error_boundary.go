@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
@@ -35,7 +36,7 @@ func (r *Runtime) executeErrorBoundaryNode(ctx context.Context, engineRepo *repo
 	}
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(exec.ID, exec.ProcessInstanceID, node.ID, nextNodeID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), exec.ID.String(), node.ID, nextNodeID)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), node.ID, nextNodeID)
 	}
 
 	return nextNodeID, nil

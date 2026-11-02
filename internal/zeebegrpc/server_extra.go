@@ -31,10 +31,7 @@ func (s *Server) ThrowError(ctx context.Context, req *pb.ThrowErrorRequest) (*pb
 	if req.ErrorCode == "" {
 		return nil, status.Error(codes.InvalidArgument, "errorCode is required")
 	}
-	jobID, err := s.zeebeKeys.ResolveKey("job", req.JobKey)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "job key %d not found", req.JobKey)
-	}
+	jobID := req.JobKey
 	vars, err := parseVariables(req.Variables)
 	if err != nil {
 		return nil, err
@@ -69,13 +66,10 @@ func (s *Server) ThrowError(ctx context.Context, req *pb.ThrowErrorRequest) (*pb
 // only; otherwise each one propagates outwards from it (see
 // repository.SetVariablesTx).
 func (s *Server) SetVariables(ctx context.Context, req *pb.SetVariablesRequest) (*pb.SetVariablesResponse, error) {
-	scopeID := uuid.Nil
+	var scopeID int64
 	instanceID, err := s.zeebeKeys.ResolveKey("process_instance", req.ElementInstanceKey)
 	if err != nil {
-		execID, execErr := s.zeebeKeys.ResolveKey("element_instance", req.ElementInstanceKey)
-		if execErr != nil {
-			return nil, status.Errorf(codes.NotFound, "element instance key %d not found", req.ElementInstanceKey)
-		}
+		execID := req.ElementInstanceKey
 		exec, execErr := s.engineRepo.GetExecutionByID(execID)
 		if execErr != nil || exec == nil {
 			return nil, status.Errorf(codes.NotFound, "element instance key %d not found", req.ElementInstanceKey)

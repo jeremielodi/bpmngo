@@ -29,15 +29,17 @@ func TestAuditWriter_BatchesAndFlushes(t *testing.T) {
 		auditWriterMu.Unlock()
 	}()
 	StartAuditWriter(ctx, sqlxDB)
+	instance := uuid.New()
 
 	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, engine_key FROM public.process_instances WHERE id = ANY($1::uuid[])")).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "engine_key"}).AddRow(instance, int64(42)))
 	mock.ExpectExec(regexp.QuoteMeta("SET LOCAL synchronous_commit TO OFF")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO public.audit_logs")+`.*\(\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8\), \(\$9, .*\(\$17, `).
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO public.audit_logs") + `.*\(\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8\), \(\$9, .*\(\$17, `).
 		WillReturnResult(sqlmock.NewResult(0, 3))
 	mock.ExpectCommit()
 
 	repo := NewAuditRepository(sqlxDB)
-	instance := uuid.New()
 	for _, action := range []models.AuditAction{models.ActionProcessStarted, models.ActionExecutionMoved, models.ActionProcessCompleted} {
 		if err := repo.CreateAuditLog(&models.AuditLog{ProcessInstanceID: &instance, Action: action}); err != nil {
 			t.Fatal(err)

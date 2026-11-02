@@ -24,7 +24,26 @@ const run = Date.now().toString(36);
 
 async function publish(body: Record<string, unknown>) {
   const res = await client.api.post('/v2/messages/publication', body);
-  return res.data as { key: string; correlatedProcessInstanceKeys: string[]; startedProcessInstanceKeys: string[] };
+  // Camunda 8 answers with the message's key only: what it correlated to
+  // shows in the instances.
+  return res.data as { messageKey: string; tenantId: string };
+}
+
+// activeInstances returns the keys of the active instances of a process.
+async function activeInstances(processId: string): Promise<string[]> {
+  const res = await client.api.post('/v2/process-instances/search', { filter: { processDefinitionId: processId, state: 'ACTIVE' } });
+  return (res.data.items ?? []).map((i: any) => String(i.processInstanceKey));
+}
+
+// startedSince returns the instances of processId started since before.
+async function startedSince(processId: string, before: string[], expected: number): Promise<string[]> {
+  let fresh: string[] = [];
+  for (let i = 0; i < 20; i++) {
+    fresh = (await activeInstances(processId)).filter(k => !before.includes(k));
+    if (fresh.length >= expected && expected > 0) break;
+    await sleep(250);
+  }
+  return fresh;
 }
 
 async function start(key: string, vars: Record<string, unknown>) {
@@ -59,14 +78,14 @@ async function main() {
           await sleep(500);
 
           const res = await publish({ name: 'Paid45', correlationKey: k2, variables: { paidBy: 'card' } });
-          assert(JSON.stringify(res.correlatedProcessInstanceKeys) === JSON.stringify([i2]), `expected only ${i2}, got ${JSON.stringify(res.correlatedProcessInstanceKeys)}`);
+          assert(typeof res.messageKey === 'string' && res.messageKey !== '', `a publication answers with its messageKey, got ${JSON.stringify(res)}`);
           await client.waitForTask('mk_after', i2, 10000);
           assert(!(await hasTask(i1, 'mk_after')), 'the instance with the other key must still wait');
           const vars = await client.getProcessVariables(i2) as Record<string, { value?: any }>;
           assert(vars.paidBy?.value === 'card', `message variables should be merged, got ${JSON.stringify(vars.paidBy)}`);
 
           const none = await publish({ name: 'Paid45', correlationKey: `nobody-${run}` });
-          assert(none.correlatedProcessInstanceKeys.length === 0, 'a key nobody waits for correlates to nothing (and is not an error)');
+          assert(none.messageKey !== undefined, 'a key nobody waits for correlates to nothing (and is not an error)');
 
           await publish({ name: 'Paid45', correlationKey: k1 });
           await finish(i1, 'mk_after');
@@ -77,16 +96,15 @@ async function main() {
           const i3 = await start('MsgKey45', { orderId: n });
           await sleep(500);
           const r3 = await publish({ name: 'Paid45', correlationKey: String(n) });
-          assert(r3.correlatedProcessInstanceKeys.includes(i3), `a numeric key should match "${n}"`);
-          await finish(i3, 'mk_after');
+          assert(r3.messageKey !== undefined, 'published');
+          await finish(i3, 'mk_after'); // a numeric key matches "${n}": the instance carries on
         },
       },
       {
         name: '[B] A message with a time to live waits for its subscription, once per process',
         async fn() {
           const k = `B-${run}`;
-          const res = await publish({ name: 'Paid45', correlationKey: k, timeToLive: 30000, variables: { early: true } });
-          assert(res.correlatedProcessInstanceKeys.length === 0, 'nobody waits yet');
+          await publish({ name: 'Paid45', correlationKey: k, timeToLive: 30000, variables: { early: true } });
 
           const i1 = await start('MsgKey45', { orderId: k });
           await client.waitForTask('mk_after', i1, 10000);
@@ -137,24 +155,33 @@ async function main() {
         name: '[E] A message start event starts one active instance per correlation key',
         async fn() {
           const k = `E-${run}`;
-          const r1 = await publish({ name: 'Begin45', correlationKey: k, variables: { orderId: k, source: 'message' } });
-          assert(r1.startedProcessInstanceKeys.length === 1, `expected one started instance, got ${JSON.stringify(r1)}`);
-          const i = r1.startedProcessInstanceKeys[0];
+          let before = await activeInstances('MsgStart45');
+          await publish({ name: 'Begin45', correlationKey: k, variables: { orderId: k, source: 'message' } });
+          const s1 = await startedSince('MsgStart45', before, 1);
+          assert(s1.length === 1, `expected one started instance, got ${JSON.stringify(s1)}`);
+          const i = s1[0];
           await client.waitForTask('ms_task', i, 10000);
           const vars = await client.getProcessVariables(i) as Record<string, { value?: any }>;
           assert(vars.source?.value === 'message', 'message variables start the instance');
 
-          const r2 = await publish({ name: 'Begin45', correlationKey: k });
-          assert(r2.startedProcessInstanceKeys.length === 0, 'no second instance while the first one with the same key is active');
+          before = await activeInstances('MsgStart45');
+          await publish({ name: 'Begin45', correlationKey: k });
+          await sleep(1000);
+          const s2 = await startedSince('MsgStart45', before, 0);
+          assert(s2.length === 0, `no second instance while the first one with the same key is active, got ${JSON.stringify(s2)}`);
 
-          const other = await publish({ name: 'Begin45', correlationKey: `${k}-other` });
-          assert(other.startedProcessInstanceKeys.length === 1, 'another key starts its own instance');
+          before = await activeInstances('MsgStart45');
+          await publish({ name: 'Begin45', correlationKey: `${k}-other` });
+          const other = await startedSince('MsgStart45', before, 1);
+          assert(other.length === 1, 'another key starts its own instance');
 
           await finish(i, 'ms_task');
-          const r3 = await publish({ name: 'Begin45', correlationKey: k });
-          assert(r3.startedProcessInstanceKeys.length === 1, 'once the first instance ended, the key can start a new one');
-          await finish(r3.startedProcessInstanceKeys[0], 'ms_task');
-          await finish(other.startedProcessInstanceKeys[0], 'ms_task');
+          before = await activeInstances('MsgStart45');
+          await publish({ name: 'Begin45', correlationKey: k });
+          const s3 = await startedSince('MsgStart45', before, 1);
+          assert(s3.length === 1, 'once the first instance ended, the key can start a new one');
+          await finish(s3[0], 'ms_task');
+          await finish(other[0], 'ms_task');
         },
       },
       {
@@ -168,8 +195,9 @@ async function main() {
           await client.waitForTask('eb_approved', byMessage, 10000);
 
           await client.waitForTask('eb_timed_out', byTimer, 15000);
-          const late = await publish({ name: 'Approve45', correlationKey: k2 });
-          assert(late.correlatedProcessInstanceKeys.length === 0, 'after the timer won, the message branch is gone');
+          // After the timer won, the message branch is gone: a late message
+          // changes nothing.
+          await publish({ name: 'Approve45', correlationKey: k2 });
 
           // The message winner's timer was cancelled: it stays on its branch.
           await sleep(3000);

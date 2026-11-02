@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/jeremielodi/bpmngo/internal/common"
@@ -73,7 +74,7 @@ func (r *Runtime) executeScriptTask(ctx context.Context, engineRepo *repository.
 	}
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(exec.ID, exec.ProcessInstanceID, node.ID, next, variables))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), exec.ID.String(), node.ID, next)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), node.ID, next)
 	}
 
 	return next, nil

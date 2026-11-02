@@ -18,15 +18,18 @@ import (
 // instance, instead of only the one that happened to run the workflow step.
 const JobAvailableChannel = "goflow_job_available"
 
-// NotifyJobAvailable announces, via Postgres NOTIFY, that a job of jobType
-// was created — waking a caller waiting for it on every BpmnGo instance
-// connected to this database (including this one, which receives its own
-// notification back through the same LISTEN connection started by
-// StartJobWakeListener). Must only be called after the job's creating
-// transaction has committed — waking a waiter before the row is visible
-// would just send it back to an empty query.
+// NotifyJobAvailable announces, via Postgres NOTIFY, that a committed job of
+// jobType is available. New write paths should prefer NotifyJobAvailableTx so
+// the notification and the job row share one transaction.
 func NotifyJobAvailable(db *sqlx.DB, jobType string) error {
-	_, err := db.Exec(`SELECT pg_notify($1, $2)`, JobAvailableChannel, jobType)
+	return NotifyJobAvailableTx(db, jobType)
+}
+
+// NotifyJobAvailableTx queues a transactional NOTIFY. PostgreSQL delivers it
+// only after tx commits, so a worker can never wake before the new job row is
+// visible and no extra autocommit is needed after the business transaction.
+func NotifyJobAvailableTx(tx sqlx.Execer, jobType string) error {
+	_, err := tx.Exec(`SELECT pg_notify($1, $2)`, JobAvailableChannel, jobType)
 	return err
 }
 

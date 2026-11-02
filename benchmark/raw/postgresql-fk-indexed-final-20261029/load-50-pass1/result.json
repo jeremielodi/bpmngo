@@ -1,0 +1,20 @@
+{
+  "engine": "postgresql-fk-indexed-final-20261029",
+  "generated_at": "2026-10-29T19:31:11.419942Z",
+  "clients": 50,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 10,
+  "seconds": 60.138636625,
+  "completed": 11767,
+  "instances_per_second": 195.66456209132593,
+  "errors": {},
+  "latency": {
+    "count": 11767,
+    "errors": 0,
+    "p50_us": 233646,
+    "p95_us": 482326,
+    "p99_us": 617434,
+    "mean_us": 255245.3316903204
+  }
+}

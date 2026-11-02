@@ -10,9 +10,32 @@ services:
   postgres:
     image: postgres:16
     container_name: bpmngo-postgres
-    # max_connections doit couvrir DB_MAX_OPEN_CONNS × le nombre d'instances
-    # BpmnGo (+ quelques connexions d'admin).
-    command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"]
+    # Les valeurs mémoire supposent au moins 1 Gio pour PostgreSQL. Ajuster
+    # ensemble POSTGRES_MEMORY_LIMIT, shared_buffers et effective_cache_size.
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-200}
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
+      - -c
+      - track_wal_io_timing=on
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      - -c
+      - effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-768MB}
+      - -c
+      - work_mem=${POSTGRES_WORK_MEM:-8MB}
+      - -c
+      - maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB}
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - max_wal_size=${POSTGRES_MAX_WAL_SIZE:-2GB}
     environment:
       POSTGRES_DB: goflow
       POSTGRES_USER: goflow
@@ -20,7 +43,7 @@ services:
     ports:
       # Publié sur 127.0.0.1 seulement : l'appli passe par le réseau Docker.
       # Pour y accéder depuis une autre machine, POSTGRES_BIND=0.0.0.0.
-      - "${POSTGRES_BIND:-127.0.0.1}:5432:5432"
+      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database:/docker-entrypoint-initdb.d:ro
@@ -96,6 +119,11 @@ services:
       DB_NAME: goflow
       # Taille du pool de connexions par instance BpmnGo
       DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-80}
+      RUNTIME_MAX_CONCURRENCY: ${RUNTIME_MAX_CONCURRENCY:-}
+      RUNTIME_MIN_CONCURRENCY: ${RUNTIME_MIN_CONCURRENCY:-}
+      ARCHIVER_BACKLOG_SOFT_LIMIT: ${ARCHIVER_BACKLOG_SOFT_LIMIT:-}
+      ARCHIVER_BACKLOG_HARD_LIMIT: ${ARCHIVER_BACKLOG_HARD_LIMIT:-}
+      ENGINE_NODE_ID: ${ENGINE_NODE_ID:-0}
 
       # Kafka : vide (défaut) en mode direct. Pour WRITE_PATH=partitioned ou
       # EVENT_LOG=shadow : KAFKA_BROKERS=redpanda:9092 et COMPOSE_PROFILES=kafka.
@@ -163,9 +191,9 @@ services:
       # avec le moteur FEEL natif journalisés), feel (moteur natif), cel
       FEEL_MODE: ${FEEL_MODE:-shadow}
 
-      # Clés dans les réponses /v2 : uuid (défaut) ou int (la clé int64 du
-      # gRPC, en chaîne, comme Camunda 8). /v2 accepte les deux en entrée.
-      REST_KEYS: ${REST_KEYS:-uuid}
+      # Clés dans les réponses /v2 : int par défaut (la clé int64 du gRPC,
+      # comme Camunda 8) ; uuid conserve l'ancien format BpmnGo.
+      REST_KEYS: ${REST_KEYS:-int}
     volumes:
       # Mode démo : la clé JWT générée, partagée par toutes les instances
       - bpmngo_data:/app/data

@@ -1,0 +1,20 @@
+{
+  "engine": "postgresql-bigint-context-endurance-20261029",
+  "generated_at": "2026-10-29T20:22:26.265004Z",
+  "clients": 100,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 60,
+  "seconds": 1800.2478805,
+  "completed": 419428,
+  "instances_per_second": 232.98347107816522,
+  "errors": {},
+  "latency": {
+    "count": 419428,
+    "errors": 0,
+    "p50_us": 396914,
+    "p95_us": 779892,
+    "p99_us": 1001576,
+    "mean_us": 429184.17689090857
+  }
+}

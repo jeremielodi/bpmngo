@@ -26,11 +26,11 @@ func SetDistributedClaims(on bool) { distributedClaims.Store(on) }
 // claimJobsTx is FetchAndLockJobsTx's claim on Citus.
 func claimJobsTx(tx *sqlx.Tx, jobType, workerID string, lockedUntil time.Time, max int) ([]LockedJob, error) {
 	var candidates []struct {
-		ID                string `db:"id"`
-		ProcessInstanceID string `db:"process_instance_id"`
+		ID                 int64 `db:"engine_key"`
+		ProcessInstanceKey int64 `db:"process_instance_key"`
 	}
 	if err := tx.Select(&candidates, `
-		SELECT id, process_instance_id FROM public.jobs
+		SELECT engine_key, process_instance_key FROM public.jobs
 		WHERE job_type = $1 AND status = 'pending'
 		  AND (locked_until IS NULL OR locked_until < $3)
 		ORDER BY random()
@@ -46,10 +46,12 @@ func claimJobsTx(tx *sqlx.Tx, jobType, workerID string, lockedUntil time.Time, m
 		if err := tx.Select(&claimed, `
 			UPDATE public.jobs
 			SET status = 'locked', locked_by = $1, locked_until = $2
-			WHERE process_instance_id = $3 AND id = $4 AND status = 'pending'
+			WHERE process_instance_key = $3 AND engine_key = $4 AND status = 'pending'
 			  AND (locked_until IS NULL OR locked_until < $5)
-			RETURNING id, payload, retries, execution_id, process_instance_id, status, created_at`,
-			workerID, lockedUntil, c.ProcessInstanceID, c.ID, time.Now()); err != nil {
+			RETURNING engine_key, payload, retries, execution_key, process_instance_key,
+			          (SELECT id FROM process_instances WHERE engine_key = jobs.process_instance_key) AS process_instance_id,
+			          status, created_at`,
+			workerID, lockedUntil, c.ProcessInstanceKey, c.ID, time.Now()); err != nil {
 			return nil, err
 		}
 		jobs = append(jobs, claimed...)
@@ -60,11 +62,11 @@ func claimJobsTx(tx *sqlx.Tx, jobType, workerID string, lockedUntil time.Time, m
 // claimDueTimers is ClaimDueTimers on Citus.
 func claimDueTimers(ctx context.Context, db *sqlx.DB, limit int) ([]models.TimerJob, error) {
 	var candidates []struct {
-		ID                string `db:"id"`
-		ProcessInstanceID string `db:"process_instance_id"`
+		ID                 int64 `db:"engine_key"`
+		ProcessInstanceKey int64 `db:"process_instance_key"`
 	}
 	if err := db.SelectContext(ctx, &candidates, `
-		SELECT id, process_instance_id FROM public.timer_jobs
+		SELECT engine_key, process_instance_key FROM public.timer_jobs
 		WHERE is_triggered = false AND due_at <= NOW()
 		ORDER BY due_at ASC
 		LIMIT $1`, limit); err != nil {
@@ -76,12 +78,14 @@ func claimDueTimers(ctx context.Context, db *sqlx.DB, limit int) ([]models.Timer
 		if err := db.SelectContext(ctx, &claimed, `
 			UPDATE public.timer_jobs
 			SET is_triggered = true, triggered_at = NOW()
-			WHERE process_instance_id = $1 AND id = $2 AND is_triggered = false
-			RETURNING id, process_instance_id, execution_id, event_type, due_at,
+			WHERE process_instance_key = $1 AND engine_key = $2 AND is_triggered = false
+			RETURNING engine_key,
+			          (SELECT id FROM process_instances WHERE engine_key = timer_jobs.process_instance_key) AS process_instance_id,
+			          execution_key, event_type, due_at,
 			          payload, is_triggered, created_at, triggered_at,
 			          COALESCE(cycle_count, 0) AS cycle_count, COALESCE(total_cycles, 1) AS total_cycles,
 			          COALESCE(repeat_interval, '') AS repeat_interval`,
-			c.ProcessInstanceID, c.ID); err != nil {
+			c.ProcessInstanceKey, c.ID); err != nil {
 			return nil, err
 		}
 		timers = append(timers, claimed...)

@@ -220,6 +220,14 @@ export class BpmnGoClient {
 
   // Process instances ─────────────────────────────────────────────────────────
 
+  // instanceKey is the key /v2 shows for an instance: its int64 key by
+  // default (REST_KEYS=int, as Camunda 8), its UUID with REST_KEYS=uuid.
+  // Other routes take either.
+  async instanceKey(id: string): Promise<string> {
+    const res = await this.api.get(`/v2/process-instances/${id}`);
+    return String(res.data.processInstanceKey);
+  }
+
   async startProcess(key: string, variables: Record<string, unknown> = {}): Promise<ProcessInstance> {
     const res = await this.api.post<ProcessInstance>(
       `/engine-rest/v2/process-definitions/${key}/start`,

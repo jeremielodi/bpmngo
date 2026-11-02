@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -153,7 +154,7 @@ func (pc *Camunda7ProcessController) Start(c *fiber.Ctx) error {
 		"links":          []interface{}{},
 		// BpmnGo
 		"processInstanceId": instanceID,
-		"executionId":       execID,
+		"executionId":       strconv.FormatInt(execID, 10),
 		"processKey":        def.ProcessKey,
 		"version":           def.Version,
 	}
@@ -161,7 +162,7 @@ func (pc *Camunda7ProcessController) Start(c *fiber.Ctx) error {
 		resp["ended"] = true // finished (and archived) while starting
 	}
 	if body.WithVariablesInReturn {
-		current, _ := repository.VariablesForExecution(pc.db, instanceID, uuid.Nil)
+		current, _ := repository.VariablesForExecution(pc.db, instanceID, 0)
 		if len(current) == 0 {
 			current = vars
 		}

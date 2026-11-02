@@ -6,11 +6,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/pkg/database"
 	"github.com/jmoiron/sqlx"
@@ -34,7 +36,11 @@ func NewTaskRepository(db *sqlx.DB, dispatcher *events.TaskEventDispatcher) *Tas
 func (r *TaskRepository) CreateTask(task models.Task) (sql.Result, error) {
 	adapter := database.NewDabaseAdapter(r.db)
 	now := time.Now()
-	id := uuid.New()
+	id := ids.NewEngineKey()
+	instanceKey, err := processInstanceEngineKey(r.db, task.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
 
 	// Convert form_data (if any) to JSONB
 	var formDataJSON []byte
@@ -48,9 +54,9 @@ func (r *TaskRepository) CreateTask(task models.Task) (sql.Result, error) {
 	task.CreatedAt = now
 
 	result, err := adapter.Insert("public.tasks", []database.QueryParameter{
-		{Key: "id", Value: id},
-		{Key: "process_instance_id", Value: task.ProcessInstanceID},
-		{Key: "execution_id", Value: task.ExecutionID},
+		{Key: "engine_key", Value: id},
+		{Key: "process_instance_key", Value: instanceKey},
+		{Key: "execution_key", Value: task.ExecutionID},
 		{Key: "task_definition_key", Value: task.TaskDefinitionKey},
 		{Key: "task_name", Value: task.TaskName},
 		{Key: "assignee", Value: task.Assignee},
@@ -76,26 +82,27 @@ func (r *TaskRepository) CreateTask(task models.Task) (sql.Result, error) {
 // FIND / QUERY
 // ============================================================
 
-// FindTaskByID returns a single task by its UUID.
-func (r *TaskRepository) FindTaskByID(id uuid.UUID) (models.Task, error) {
+// FindTaskByID returns a single task by its engine key.
+func (r *TaskRepository) FindTaskByID(id int64) (models.Task, error) {
 	var task models.Task
 	err := r.db.Get(&task, `
 		SELECT
-			id,
-			process_instance_id,
-			execution_id,
-			task_definition_key,
-			task_name,
-			assignee,
-			candidate_group,
-			status,
-			priority,
-			form_data,
-			created_at,
-			claimed_at,
-			completed_at
-		FROM public.tasks
-		WHERE id = $1
+			t.engine_key,
+			pi.id AS process_instance_id,
+			t.execution_key,
+			t.task_definition_key,
+			t.task_name,
+			t.assignee,
+			t.candidate_group,
+			t.status,
+			t.priority,
+			t.form_data,
+			t.created_at,
+			t.claimed_at,
+			t.completed_at
+		FROM public.tasks t
+		JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
+		WHERE t.engine_key = $1
 	`, id)
 	return task, err
 }
@@ -105,28 +112,29 @@ func (r *TaskRepository) FindTasksByAssignee(assignee string, status ...string) 
 	var tasks []models.Task
 	query := `
 		SELECT
-			id,
-			process_instance_id,
-			execution_id,
-			task_definition_key,
-			task_name,
-			assignee,
-			candidate_group,
-			status,
-			priority,
-			form_data,
-			created_at,
-			claimed_at,
-			completed_at
-		FROM public.tasks
-		WHERE assignee = $1
+			t.engine_key,
+			pi.id AS process_instance_id,
+			t.execution_key,
+			t.task_definition_key,
+			t.task_name,
+			t.assignee,
+			t.candidate_group,
+			t.status,
+			t.priority,
+			t.form_data,
+			t.created_at,
+			t.claimed_at,
+			t.completed_at
+		FROM public.tasks t
+		JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
+		WHERE t.assignee = $1
 	`
 	args := []interface{}{assignee}
 	if len(status) > 0 && status[0] != "" {
-		query += " AND status = $2"
+		query += " AND t.status = $2"
 		args = append(args, status[0])
 	}
-	query += " ORDER BY created_at ASC"
+	query += " ORDER BY t.created_at ASC"
 	err := r.db.Select(&tasks, query, args...)
 	return tasks, err
 }
@@ -136,36 +144,37 @@ func (r *TaskRepository) FindTasksByAssignee(assignee string, status ...string) 
 // caller didn't already filter explicitly by "status", so an explicit
 // ?status=completed request still works.
 func (r *TaskRepository) FindAll(params map[string]interface{}, excludeStatuses ...string) ([]models.Task, error) {
-	allowedColumns := map[string]bool{
-		"id": true, "process_instance_id": true, "execution_id": true,
-		"task_definition_key": true, "task_name": true, "assignee": true,
-		"candidate_group": true, "status": true, "form_data": true,
-		"priority": true, "created_at": true, "claimed_at": true, "completed_at": true,
+	allowedColumns := map[string]string{
+		"id": "t.engine_key", "process_instance_id": "pi.id", "execution_id": "t.execution_key",
+		"task_definition_key": "t.task_definition_key", "task_name": "t.task_name", "assignee": "t.assignee",
+		"candidate_group": "t.candidate_group", "status": "t.status", "form_data": "t.form_data",
+		"priority": "t.priority", "created_at": "t.created_at", "claimed_at": "t.claimed_at", "completed_at": "t.completed_at",
 	}
 
 	query := `
         SELECT
-            id,
-            process_instance_id,
-            execution_id,
-            task_definition_key,
-            task_name,
-            assignee,
-            candidate_group,
-            status,
-            priority,
-            form_data,
-            created_at,
-            claimed_at,
-            completed_at
-        FROM public.tasks
+			t.engine_key,
+			pi.id AS process_instance_id,
+			t.execution_key,
+	            t.task_definition_key,
+	            t.task_name,
+	            t.assignee,
+	            t.candidate_group,
+	            t.status,
+	            t.priority,
+	            t.form_data,
+	            t.created_at,
+	            t.claimed_at,
+	            t.completed_at
+		FROM public.tasks t
+		JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
     `
 	var conditions []string
 	var args []interface{}
 	i := 1
 	for key, value := range params {
-		if allowedColumns[key] {
-			conditions = append(conditions, fmt.Sprintf("%s = $%d", key, i))
+		if column, ok := allowedColumns[key]; ok {
+			conditions = append(conditions, fmt.Sprintf("%s = $%d", column, i))
 			args = append(args, value)
 			i++
 		}
@@ -177,12 +186,12 @@ func (r *TaskRepository) FindAll(params map[string]interface{}, excludeStatuses 
 			args = append(args, s)
 			i++
 		}
-		conditions = append(conditions, fmt.Sprintf("status NOT IN (%s)", strings.Join(placeholders, ", ")))
+		conditions = append(conditions, fmt.Sprintf("t.status NOT IN (%s)", strings.Join(placeholders, ", ")))
 	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	query += " ORDER BY created_at ASC"
+	query += " ORDER BY t.created_at ASC"
 
 	var tasks []models.Task
 	err := r.db.Select(&tasks, query, args...)
@@ -194,28 +203,29 @@ func (r *TaskRepository) FindTasksByCandidateGroup(group string, status ...strin
 	var tasks []models.Task
 	query := `
 		SELECT
-			id,
-			process_instance_id,
-			execution_id,
-			task_definition_key,
-			task_name,
-			assignee,
-			candidate_group,
-			status,
-			priority,
-			form_data,
-			created_at,
-			claimed_at,
-			completed_at
-		FROM public.tasks
-		WHERE candidate_group = $1
+			t.engine_key,
+			pi.id AS process_instance_id,
+			t.execution_key,
+			t.task_definition_key,
+			t.task_name,
+			t.assignee,
+			t.candidate_group,
+			t.status,
+			t.priority,
+			t.form_data,
+			t.created_at,
+			t.claimed_at,
+			t.completed_at
+		FROM public.tasks t
+		JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
+		WHERE t.candidate_group = $1
 	`
 	args := []interface{}{group}
 	if len(status) > 0 && status[0] != "" {
-		query += " AND status = $2"
+		query += " AND t.status = $2"
 		args = append(args, status[0])
 	}
-	query += " ORDER BY created_at ASC"
+	query += " ORDER BY t.created_at ASC"
 	err := r.db.Select(&tasks, query, args...)
 	return tasks, err
 }
@@ -225,22 +235,23 @@ func (r *TaskRepository) FindTasksByProcessInstance(instanceID uuid.UUID) ([]mod
 	var tasks []models.Task
 	err := r.db.Select(&tasks, `
 		SELECT
-			id,
-			process_instance_id,
-			execution_id,
-			task_definition_key,
-			task_name,
-			assignee,
-			candidate_group,
-			status,
-			priority,
-			form_data,
-			created_at,
-			claimed_at,
-			completed_at
-		FROM public.tasks
-		WHERE process_instance_id = $1
-		ORDER BY created_at DESC
+			t.engine_key,
+			pi.id AS process_instance_id,
+			t.execution_key,
+			t.task_definition_key,
+			t.task_name,
+			t.assignee,
+			t.candidate_group,
+			t.status,
+			t.priority,
+			t.form_data,
+			t.created_at,
+			t.claimed_at,
+			t.completed_at
+		FROM public.tasks t
+		JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key
+		WHERE pi.id = $1
+		ORDER BY t.created_at DESC
 	`, instanceID)
 	return tasks, err
 }
@@ -250,7 +261,7 @@ func (r *TaskRepository) FindTasksByProcessInstance(instanceID uuid.UUID) ([]mod
 // ============================================================
 
 // ClaimTask assigns a task to a user and updates status to 'claimed'.
-func (r *TaskRepository) ClaimTask(taskID uuid.UUID, assignee string) (sql.Result, error) {
+func (r *TaskRepository) ClaimTask(taskID int64, assignee string) (sql.Result, error) {
 	now := time.Now()
 
 	// Get task before update for event
@@ -265,8 +276,8 @@ func (r *TaskRepository) ClaimTask(taskID uuid.UUID, assignee string) (sql.Resul
 	result, err := r.db.Exec(`
 		UPDATE public.tasks
 		SET assignee = $1, status = 'claimed', claimed_at = $2
-		WHERE process_instance_id = $3 AND id = $4
-	`, assignee, now, taskBefore.ProcessInstanceID, taskID)
+		WHERE engine_key = $3
+	`, assignee, now, taskID)
 
 	if err != nil {
 		return result, err
@@ -281,7 +292,7 @@ func (r *TaskRepository) ClaimTask(taskID uuid.UUID, assignee string) (sql.Resul
 }
 
 // UnClaimTask removes assignee from a task and resets status to 'created'.
-func (r *TaskRepository) UnClaimTask(taskID uuid.UUID) (sql.Result, error) {
+func (r *TaskRepository) UnClaimTask(taskID int64) (sql.Result, error) {
 	// Get task before update for event
 	taskBefore, err := r.FindTaskByID(taskID)
 	if err != nil {
@@ -294,8 +305,8 @@ func (r *TaskRepository) UnClaimTask(taskID uuid.UUID) (sql.Result, error) {
 	result, err := r.db.Exec(`
 		UPDATE public.tasks
 		SET assignee = NULL, status = 'created', claimed_at = NULL
-		WHERE process_instance_id = $1 AND id = $2
-	`, taskBefore.ProcessInstanceID, taskID)
+		WHERE engine_key = $1
+	`, taskID)
 
 	if err != nil {
 		return result, err
@@ -307,12 +318,13 @@ func (r *TaskRepository) UnClaimTask(taskID uuid.UUID) (sql.Result, error) {
 }
 
 // UpdateTaskFormData merges new form data into the existing JSONB.
-func (r *TaskRepository) UpdateTaskFormData(processInstanceID, taskID uuid.UUID, formData map[string]interface{}) (sql.Result, error) {
+func (r *TaskRepository) UpdateTaskFormData(processInstanceID uuid.UUID, taskID int64, formData map[string]interface{}) (sql.Result, error) {
 	newJSON, _ := json.Marshal(formData)
 	_, err := r.db.Exec(`
 		UPDATE public.tasks
 		SET form_data = COALESCE(form_data, '{}'::jsonb) || $1::jsonb
-		WHERE process_instance_id = $2 AND id = $3
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $2)
+		  AND engine_key = $3
 	`, newJSON, processInstanceID, taskID)
 	if err != nil {
 		return nil, err
@@ -329,12 +341,13 @@ func (r *TaskRepository) UpdateTaskFormData(processInstanceID, taskID uuid.UUID,
 // terminated, so no task is left dangling in an "open" state for a process
 // that no longer runs. Returns the cancelled task IDs so the caller can
 // audit-log each one.
-func (r *TaskRepository) CancelOpenTasksByProcessInstanceTx(tx *sqlx.Tx, instanceID uuid.UUID) ([]uuid.UUID, error) {
-	var cancelledTaskIDs []uuid.UUID
+func (r *TaskRepository) CancelOpenTasksByProcessInstanceTx(tx *sqlx.Tx, instanceID uuid.UUID) ([]int64, error) {
+	var cancelledTaskIDs []int64
 	err := tx.Select(&cancelledTaskIDs, `
 		UPDATE public.tasks SET status = 'cancelled', updated_at = NOW()
-		WHERE process_instance_id = $1 AND status IN ('created', 'claimed')
-		RETURNING id
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+		  AND status IN ('created', 'claimed')
+		RETURNING engine_key
 	`, instanceID)
 	return cancelledTaskIDs, err
 }
@@ -344,7 +357,7 @@ func (r *TaskRepository) CancelOpenTasksByProcessInstanceTx(tx *sqlx.Tx, instanc
 // ============================================================
 
 // dispatchTaskEvent dispatches a task event to all registered listeners
-func (r *TaskRepository) dispatchTaskEvent(taskID uuid.UUID, task *models.Task, eventType events.TaskEventType, additionalData map[string]interface{}) {
+func (r *TaskRepository) dispatchTaskEvent(taskID int64, task *models.Task, eventType events.TaskEventType, additionalData map[string]interface{}) {
 	if r.dispatcher == nil {
 		return
 	}
@@ -365,9 +378,9 @@ func (r *TaskRepository) dispatchTaskEvent(taskID uuid.UUID, task *models.Task, 
 	event := &events.TaskEvent{
 		ID:                uuid.New().String(),
 		EventType:         eventType,
-		TaskID:            taskID.String(),
+		TaskID:            strconv.FormatInt(taskID, 10),
 		ProcessInstanceID: task.ProcessInstanceID.String(),
-		ExecutionID:       task.ExecutionID.String(),
+		ExecutionID:       optionalEngineKeyString(task.ExecutionID),
 		TaskName:          task.TaskName,
 		TaskDefinitionKey: task.TaskDefinitionKey,
 		Assignee:          task.Assignee,
@@ -391,6 +404,13 @@ func (r *TaskRepository) dispatchTaskEvent(taskID uuid.UUID, task *models.Task, 
 
 	// Dispatch in goroutine to not block
 	go r.dispatcher.Dispatch(context.Background(), event)
+}
+
+func optionalEngineKeyString(key *int64) string {
+	if key == nil {
+		return ""
+	}
+	return strconv.FormatInt(*key, 10)
 }
 
 // getStatusForEventType returns the status string for an event type

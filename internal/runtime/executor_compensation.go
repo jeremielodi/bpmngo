@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 )
@@ -68,9 +69,9 @@ func (r *Runtime) throwCompensation(ctx context.Context, engineRepo *repository.
 	}
 
 	pathID := repository.CompensationHandlerPathID(exec.ID)
-	var handlers []uuid.UUID
+	var handlers []int64
 	for _, p := range pending {
-		id := uuid.New()
+		id := ids.NewEngineKey()
 		if err := engineRepo.CreateExecutionTx(tx, &repository.Execution{
 			ID:                id,
 			ProcessInstanceID: exec.ProcessInstanceID,
@@ -95,7 +96,7 @@ func (r *Runtime) throwCompensation(ctx context.Context, engineRepo *repository.
 	for i, id := range handlers {
 		service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(id, exec.ProcessInstanceID, node.ID, pending[i].HandlerID, nil))
 		if p := eventlog.Global(); p != nil {
-			p.ExecutionMoved(exec.ProcessInstanceID.String(), id.String(), node.ID, pending[i].HandlerID)
+			p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(id, 10), node.ID, pending[i].HandlerID)
 		}
 		if err := r.ExecuteExecution(ctx, id); err != nil {
 			return false, fmt.Errorf("compensation handler %s: %w", pending[i].HandlerID, err)

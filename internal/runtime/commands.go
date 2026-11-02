@@ -13,6 +13,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
@@ -106,11 +107,11 @@ func register[A any, R any](op string, h func(ctx context.Context, args A) (R, e
 }
 
 // instanceOf returns a cmdbus.KeyFunc reading a row's process instance.
-func instanceOf(db *sqlx.DB, table string, id uuid.UUID, notFound error) cmdbus.KeyFunc {
+func instanceOf(db *sqlx.DB, table string, id int64, notFound error) cmdbus.KeyFunc {
 	return func() (uuid.UUID, error) {
 		var instanceID uuid.UUID
-		if err := db.Get(&instanceID, `SELECT process_instance_id FROM public.`+table+` WHERE id = $1`, id); err != nil {
-			return uuid.Nil, fmt.Errorf("%w: %s", notFound, id)
+		if err := db.Get(&instanceID, `SELECT pi.id FROM public.`+table+` h JOIN public.process_instances pi ON pi.engine_key = h.process_instance_key WHERE h.engine_key = $1`, id); err != nil {
+			return uuid.Nil, fmt.Errorf("%w: %d", notFound, id)
 		}
 		return instanceID, nil
 	}
@@ -122,10 +123,10 @@ func instanceOf(db *sqlx.DB, table string, id uuid.UUID, notFound error) cmdbus.
 // when a command delivered again after such a crash finds its own change
 // already applied.
 func (c *commands) resumeStranded(ctx context.Context, instanceID uuid.UUID) error {
-	var ids []uuid.UUID
+	var ids []int64
 	if err := c.db.Select(&ids, `
-		SELECT id FROM public.executions
-		WHERE process_instance_id = $1 AND status = 'active'
+		SELECT engine_key FROM public.executions
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1) AND status = 'active'
 		ORDER BY created_at`, instanceID); err != nil {
 		return err
 	}
@@ -150,7 +151,7 @@ func (c *commands) resumeStranded(ctx context.Context, instanceID uuid.UUID) err
 type StartInstanceArgs struct {
 	DefinitionID uuid.UUID              `json:"definitionId"`
 	InstanceID   uuid.UUID              `json:"instanceId"`
-	ExecutionID  uuid.UUID              `json:"executionId"`
+	ExecutionID  int64                  `json:"executionId"`
 	TenantID     *string                `json:"tenantId,omitempty"`
 	Variables    map[string]interface{} `json:"variables,omitempty"`
 	BusinessKey  string                 `json:"businessKey,omitempty"`
@@ -159,17 +160,17 @@ type StartInstanceArgs struct {
 // StartInstance creates an instance of a process definition and runs it
 // up to its first wait states. The ids are chosen here, before the
 // command travels: the instance id is its partition key.
-func StartInstance(ctx context.Context, definitionID uuid.UUID, tenantID *string, variables map[string]interface{}) (instanceID, execID uuid.UUID, err error) {
+func StartInstance(ctx context.Context, definitionID uuid.UUID, tenantID *string, variables map[string]interface{}) (instanceID uuid.UUID, execID int64, err error) {
 	return StartInstanceWithBusinessKey(ctx, definitionID, tenantID, variables, "")
 }
 
 // StartInstanceWithBusinessKey is StartInstance with a Camunda 7 business
 // key.
-func StartInstanceWithBusinessKey(ctx context.Context, definitionID uuid.UUID, tenantID *string, variables map[string]interface{}, businessKey string) (instanceID, execID uuid.UUID, err error) {
+func StartInstanceWithBusinessKey(ctx context.Context, definitionID uuid.UUID, tenantID *string, variables map[string]interface{}, businessKey string) (instanceID uuid.UUID, execID int64, err error) {
 	args := StartInstanceArgs{
 		DefinitionID: definitionID,
-		InstanceID:   uuid.New(),
-		ExecutionID:  uuid.New(),
+		InstanceID:   ids.NewGlobalID(),
+		ExecutionID:  ids.NewEngineKey(),
 		TenantID:     tenantID,
 		Variables:    variables,
 		BusinessKey:  businessKey,
@@ -199,7 +200,7 @@ func (c *commands) startInstance(ctx context.Context, a StartInstanceArgs) (stru
 // ── Jobs ────────────────────────────────────────────────────────────────
 
 type CompleteJobArgs struct {
-	JobID     uuid.UUID              `json:"jobId"`
+	JobID     int64                  `json:"jobId"`
 	Variables map[string]interface{} `json:"variables,omitempty"`
 }
 
@@ -209,7 +210,7 @@ type CompleteJobOutcome struct {
 }
 
 // CompleteJob completes a locked job and continues its process.
-func CompleteJob(ctx context.Context, db *sqlx.DB, jobID uuid.UUID, variables map[string]interface{}) (CompleteJobOutcome, error) {
+func CompleteJob(ctx context.Context, db *sqlx.DB, jobID int64, variables map[string]interface{}) (CompleteJobOutcome, error) {
 	var out CompleteJobOutcome
 	err := cmdbus.Do(ctx, instanceOf(db, "jobs", jobID, service.ErrJobNotFound), CmdCompleteJob,
 		CompleteJobArgs{JobID: jobID, Variables: variables}, &out)
@@ -225,7 +226,7 @@ func (c *commands) completeJob(ctx context.Context, a CompleteJobArgs) (Complete
 		return CompleteJobOutcome{}, err
 	}
 	out := CompleteJobOutcome{ProcessInstanceID: result.ProcessInstanceID, ProcessCompleted: result.ProcessCompleted}
-	if result.ProcessCompleted {
+	if result.ProcessCompleted || result.ExecutionWaiting {
 		return out, nil
 	}
 	if err := NewRuntime(result.Graph, c.db, c.dispatcher).ExecuteExecution(ctx, result.ExecutionID); err != nil {
@@ -234,19 +235,19 @@ func (c *commands) completeJob(ctx context.Context, a CompleteJobArgs) (Complete
 	return out, nil
 }
 
-func (c *commands) resumeJobInstance(ctx context.Context, jobID uuid.UUID) error {
+func (c *commands) resumeJobInstance(ctx context.Context, jobID int64) error {
 	var instanceID uuid.UUID
-	if err := c.db.Get(&instanceID, `SELECT process_instance_id FROM public.jobs WHERE id = $1`, jobID); err != nil {
+	if err := c.db.Get(&instanceID, `SELECT pi.id FROM public.jobs j JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key WHERE j.engine_key = $1`, jobID); err != nil {
 		return nil // archived with its instance: nothing left to resume
 	}
 	return c.resumeStranded(ctx, instanceID)
 }
 
 type FailJobArgs struct {
-	JobID            uuid.UUID `json:"jobId"`
-	RetriesRemaining int       `json:"retriesRemaining"`
-	ErrorMessage     string    `json:"errorMessage,omitempty"`
-	ErrorCode        string    `json:"errorCode,omitempty"`
+	JobID            int64  `json:"jobId"`
+	RetriesRemaining int    `json:"retriesRemaining"`
+	ErrorMessage     string `json:"errorMessage,omitempty"`
+	ErrorCode        string `json:"errorCode,omitempty"`
 	// Delay before a retried job can be fetched again, in milliseconds.
 	RetryBackoffMs int64 `json:"retryBackoffMs,omitempty"`
 	// Variables set with the failure, where VariableScope says.
@@ -286,19 +287,20 @@ func (c *commands) failJob(ctx context.Context, a FailJobArgs) (FailJobOutcome, 
 	var out FailJobOutcome
 	if cmdbus.Redelivered(ctx) {
 		var status string
-		if err := c.db.Get(&status, `SELECT status FROM public.jobs WHERE id = $1`, a.JobID); err == nil && status != "locked" {
+		if err := c.db.Get(&status, `SELECT status FROM public.jobs WHERE engine_key = $1`, a.JobID); err == nil && status != "locked" {
 			return out, c.resumeJobInstance(ctx, a.JobID)
 		}
 	}
 	if len(a.Variables) > 0 && a.VariableScope != VariablesOnCatchEvent {
 		var job struct {
 			InstanceID  uuid.UUID `db:"process_instance_id"`
-			ExecutionID uuid.UUID `db:"execution_id"`
+			ExecutionID int64     `db:"execution_key"`
 		}
-		if err := c.db.Get(&job, `SELECT process_instance_id, execution_id FROM public.jobs WHERE id = $1`, a.JobID); err != nil {
-			return out, fmt.Errorf("%w: %s", service.ErrJobNotFound, a.JobID)
+		if err := c.db.Get(&job, `SELECT pi.id AS process_instance_id, j.execution_key FROM public.jobs j JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key WHERE j.engine_key = $1`, a.JobID); err != nil {
+			return out, fmt.Errorf("%w: %d", service.ErrJobNotFound, a.JobID)
 		}
-		scope, local := uuid.Nil, false
+		var scope int64
+		local := false
 		if a.VariableScope == VariablesOnTask {
 			scope, local = job.ExecutionID, true
 		}
@@ -333,12 +335,12 @@ func (c *commands) failJob(ctx context.Context, a FailJobArgs) (FailJobOutcome, 
 }
 
 type SetJobRetriesArgs struct {
-	JobID   uuid.UUID `json:"jobId"`
-	Retries int       `json:"retries"`
+	JobID   int64 `json:"jobId"`
+	Retries int   `json:"retries"`
 }
 
 // SetJobRetries gives a job new retries and resolves its incident.
-func SetJobRetries(ctx context.Context, db *sqlx.DB, jobID uuid.UUID, retries int) error {
+func SetJobRetries(ctx context.Context, db *sqlx.DB, jobID int64, retries int) error {
 	return cmdbus.Do(ctx, instanceOf(db, "jobs", jobID, service.ErrJobNotFound), CmdSetJobRetries,
 		SetJobRetriesArgs{JobID: jobID, Retries: retries}, nil)
 }
@@ -353,7 +355,7 @@ func (c *commands) setJobRetries(ctx context.Context, a SetJobRetriesArgs) (stru
 var ErrIncidentNotFound = errors.New("incident not found")
 
 type ResolveIncidentArgs struct {
-	IncidentID uuid.UUID `json:"incidentId"`
+	IncidentID int64 `json:"incidentId"`
 }
 
 // ResolveIncidentOutcome.ResumeError is set when the incident was resolved
@@ -364,7 +366,7 @@ type ResolveIncidentOutcome struct {
 
 // ResolveIncident resolves an incident; one the runtime raised on an
 // element runs that element again.
-func ResolveIncident(ctx context.Context, db *sqlx.DB, incidentID uuid.UUID) (ResolveIncidentOutcome, error) {
+func ResolveIncident(ctx context.Context, db *sqlx.DB, incidentID int64) (ResolveIncidentOutcome, error) {
 	var out ResolveIncidentOutcome
 	err := cmdbus.Do(ctx, instanceOf(db, "incidents", incidentID, ErrIncidentNotFound), CmdResolveIncident,
 		ResolveIncidentArgs{IncidentID: incidentID}, &out)
@@ -375,7 +377,7 @@ func (c *commands) resolveIncident(ctx context.Context, a ResolveIncidentArgs) (
 	var out ResolveIncidentOutcome
 	inc, err := repository.NewIncidentRepository(c.db).GetByID(a.IncidentID)
 	if err != nil || inc == nil {
-		return out, fmt.Errorf("%w: %s", ErrIncidentNotFound, a.IncidentID)
+		return out, fmt.Errorf("%w: %d", ErrIncidentNotFound, a.IncidentID)
 	}
 	if err := service.ResolveIncident(c.db, a.IncidentID); err != nil {
 		return out, err
@@ -412,12 +414,12 @@ func (c *commands) terminate(ctx context.Context, a TerminateArgs) (struct{}, er
 var ErrUserTaskNotFound = errors.New("task not found")
 
 type CompleteUserTaskArgs struct {
-	TaskID    uuid.UUID              `json:"taskId"`
+	TaskID    int64                  `json:"taskId"`
 	Variables map[string]interface{} `json:"variables,omitempty"`
 }
 
 // CompleteUserTask completes a user task and continues its process.
-func CompleteUserTask(ctx context.Context, db *sqlx.DB, taskID uuid.UUID, variables map[string]interface{}) error {
+func CompleteUserTask(ctx context.Context, db *sqlx.DB, taskID int64, variables map[string]interface{}) error {
 	return cmdbus.Do(ctx, instanceOf(db, "tasks", taskID, ErrUserTaskNotFound), CmdCompleteUserTask,
 		CompleteUserTaskArgs{TaskID: taskID, Variables: variables}, nil)
 }
@@ -428,7 +430,7 @@ func (c *commands) completeUserTask(ctx context.Context, a CompleteUserTaskArgs)
 			Status            string    `db:"status"`
 			ProcessInstanceID uuid.UUID `db:"process_instance_id"`
 		}
-		if err := c.db.Get(&row, `SELECT status, process_instance_id FROM public.tasks WHERE id = $1`, a.TaskID); err == nil && row.Status == "completed" {
+		if err := c.db.Get(&row, `SELECT t.status, pi.id AS process_instance_id FROM public.tasks t JOIN public.process_instances pi ON pi.engine_key = t.process_instance_key WHERE t.engine_key = $1`, a.TaskID); err == nil && row.Status == "completed" {
 			return struct{}{}, c.resumeStranded(ctx, row.ProcessInstanceID)
 		}
 	}
@@ -439,7 +441,7 @@ func (c *commands) completeUserTask(ctx context.Context, a CompleteUserTaskArgs)
 
 type SetVariablesArgs struct {
 	InstanceID uuid.UUID              `json:"instanceId"`
-	ScopeID    uuid.UUID              `json:"scopeId"`
+	ScopeID    int64                  `json:"scopeId"`
 	Local      bool                   `json:"local"`
 	Variables  map[string]interface{} `json:"variables"`
 	Source     string                 `json:"source"`
@@ -460,12 +462,12 @@ func (c *commands) setVariables(ctx context.Context, a SetVariablesArgs) (struct
 // boundary hands on only what its output mappings take from them, and drops
 // the rest; an error event sub-process passes them on from its scope
 // outwards, the enclosing scope included.
-func (c *commands) applyCatchEventVariables(graph *engine.ProcessGraph, execID uuid.UUID, vars map[string]interface{}, source string) error {
+func (c *commands) applyCatchEventVariables(graph *engine.ProcessGraph, execID int64, vars map[string]interface{}, source string) error {
 	var exec struct {
 		InstanceID uuid.UUID `db:"process_instance_id"`
 		ElementID  string    `db:"current_element_id"`
 	}
-	if err := c.db.Get(&exec, `SELECT process_instance_id, current_element_id FROM public.executions WHERE id = $1`, execID); err != nil {
+	if err := c.db.Get(&exec, `SELECT pi.id AS process_instance_id, e.current_element_id FROM public.executions e JOIN public.process_instances pi ON pi.engine_key = e.process_instance_key WHERE e.engine_key = $1`, execID); err != nil {
 		return err
 	}
 	node := graph.Nodes[exec.ElementID]
@@ -493,13 +495,13 @@ func (c *commands) applyCatchEventVariables(graph *engine.ProcessGraph, execID u
 	return nil
 }
 
-func (c *commands) mergeVariables(instanceID, scopeID uuid.UUID, local bool, vars map[string]interface{}, source string) error {
+func (c *commands) mergeVariables(instanceID uuid.UUID, scopeID int64, local bool, vars map[string]interface{}, source string) error {
 	tx, err := c.db.Beginx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if local && scopeID != uuid.Nil {
+	if local && scopeID != 0 {
 		err = repository.SetLocalVariablesTx(tx, instanceID, scopeID, vars)
 	} else {
 		err = repository.SetVariablesTx(tx, instanceID, scopeID, vars)
@@ -523,13 +525,13 @@ type ModifyArgs struct {
 
 // Modify moves tokens of a running instance (see ModifyInstance) and
 // returns the new executions.
-func Modify(ctx context.Context, instanceID uuid.UUID, moves []MoveInstruction) ([]uuid.UUID, error) {
-	var out []uuid.UUID
+func Modify(ctx context.Context, instanceID uuid.UUID, moves []MoveInstruction) ([]int64, error) {
+	var out []int64
 	err := cmdbus.Do(ctx, cmdbus.Key(instanceID), CmdModify, ModifyArgs{InstanceID: instanceID, Moves: moves}, &out)
 	return out, err
 }
 
-func (c *commands) modify(ctx context.Context, a ModifyArgs) ([]uuid.UUID, error) {
+func (c *commands) modify(ctx context.Context, a ModifyArgs) ([]int64, error) {
 	graph, err := repository.NewEngineRepository(c.db, c.dispatcher).GetProcessGraphByInstanceID(a.InstanceID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", service.ErrProcessInstanceNotFound, a.InstanceID)
@@ -582,7 +584,7 @@ func (c *commands) broadcastSignal(ctx context.Context, a BroadcastSignalArgs) (
 // PostStartTimer fires a timer start event: a new instance, started on the
 // partition of the timer.
 func PostStartTimer(ctx context.Context, job models.TimerJob) error {
-	return cmdbus.Post(ctx, cmdbus.Key(job.ID), CmdFireStartTimer, job)
+	return cmdbus.Post(ctx, cmdbus.Key(cmdbus.NameKey("start-timer", fmt.Sprintf("%d", job.ID))), CmdFireStartTimer, job)
 }
 
 func (c *commands) fireStartTimer(ctx context.Context, job models.TimerJob) (struct{}, error) {

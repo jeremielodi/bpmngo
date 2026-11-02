@@ -35,6 +35,7 @@ async function run() {
             customer: 'alice',
           });
           const instanceId = inst.processInstanceId ?? inst.id;
+          
 
           // The "order_pizza" user task should appear immediately
           const task = await client.waitForTask('order_pizza', instanceId, 15000);

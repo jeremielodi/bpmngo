@@ -53,6 +53,16 @@ func EnsureReferenceTables(db *sqlx.DB, workers []string) error {
 	if !hasCitus {
 		return fmt.Errorf("citus: CITUS_ENABLED is set but the citus extension is not active on this database — is DB_HOST pointed at a Citus coordinator?")
 	}
+	// Citus 12 refuses both reference and distributed tables that have user
+	// triggers. Repositories now always supply engine_key and id, so the
+	// rolling-upgrade identity triggers from migration 009 are no longer needed
+	// in Citus mode. Drop each only before its first conversion: ALTER TRIGGER
+	// itself is rejected once a relation is already a reference table.
+	identityTriggers := map[string]string{
+		"deployments":         "trg_deployments_hybrid_identity",
+		"process_definitions": "trg_process_definitions_hybrid_identity",
+		"published_messages":  "trg_published_messages_hybrid_identity",
+	}
 
 	for _, addr := range workers {
 		host, portStr, err := net.SplitHostPort(addr)
@@ -89,6 +99,11 @@ func EnsureReferenceTables(db *sqlx.DB, workers []string) error {
 		if alreadyReference {
 			continue
 		}
+		if trigger := identityTriggers[table]; trigger != "" {
+			if _, err := db.Exec(fmt.Sprintf(`DROP TRIGGER IF EXISTS %s ON public.%s`, trigger, table)); err != nil {
+				return fmt.Errorf("citus: drop identity trigger %s: %w", trigger, err)
+			}
+		}
 		if _, err := db.Exec(`SELECT create_reference_table($1::regclass)`, "public."+table); err != nil {
 			return fmt.Errorf("citus: convert %s to a reference table: %w", table, err)
 		}
@@ -97,10 +112,9 @@ func EnsureReferenceTables(db *sqlx.DB, workers []string) error {
 	return nil
 }
 
-// distributedTables lists the per-instance colocation group, in dependency
-// order (process_instances first, as the colocation-group root distributed
-// by its own id — everything else follows, distributed by
-// process_instance_id and colocated with it). audit_logs,
+// distributedTables lists the direct-BIGINT per-instance colocation group in
+// dependency order. process_instances is distributed by engine_key; every
+// child uses that same value in process_instance_key. audit_logs,
 // event_subscriptions, boundary_events, event_subprocesses,
 // multi_instance_children, and execution_variables are deliberately absent
 // — see architecture/citus-distributed-storage-design.md for why each
@@ -108,37 +122,120 @@ func EnsureReferenceTables(db *sqlx.DB, workers []string) error {
 var distributedTables = []struct {
 	name               string
 	distributionColumn string
+	primaryKeyColumn   string
 }{
-	{"process_instances", "id"},
-	{"executions", "process_instance_id"},
-	{"tasks", "process_instance_id"},
-	{"variables", "process_instance_id"},
-	{"gateway_state", "process_instance_id"},
-	{"multi_instance_executions", "process_instance_id"},
-	{"incidents", "process_instance_id"},
+	{"process_instances", "engine_key", "engine_key"},
+	{"executions", "process_instance_key", "engine_key"},
+	{"tasks", "process_instance_key", "engine_key"},
+	{"variables", "process_instance_key", "engine_key"},
+	{"gateway_state", "process_instance_key", "id"},
+	{"multi_instance_executions", "process_instance_key", "id"},
+	{"incidents", "process_instance_key", "engine_key"},
 	// Jobs and timers: claimed without FOR UPDATE on Citus (see
 	// repository.SetDistributedClaims), so they can be distributed too.
-	{"jobs", "process_instance_id"},
-	{"timer_jobs", "process_instance_id"},
-	{"scope_variables", "process_instance_id"},
+	{"jobs", "process_instance_key", "engine_key"},
+	{"timer_jobs", "process_instance_key", "engine_key"},
+	{"scope_variables", "process_instance_key", "scope_key"},
 }
 
-// keyedByInstance makes a table's primary key (process_instance_id, id):
-// Citus requires the distribution column in every unique constraint. On
-// plain Postgres the key stays id alone.
-func keyedByInstance(db *sqlx.DB, table string) error {
-	var cols int
-	if err := db.Get(&cols, `
-		SELECT COALESCE(array_length(conkey, 1), 0) FROM pg_constraint
+// keyedByInstance adds the distribution column to a child's primary key.
+// Engine keys remain globally generated and indexed, but Citus can only
+// enforce their uniqueness within the process-instance shard.
+func keyedByInstance(db *sqlx.DB, table, distributionColumn, keyColumn string) error {
+	var definition string
+	if err := db.Get(&definition, `
+		SELECT pg_get_constraintdef(oid) FROM pg_constraint
 		WHERE conrelid = $1::regclass AND contype = 'p'`, "public."+table); err != nil {
 		return fmt.Errorf("citus: read the primary key of %s: %w", table, err)
 	}
-	if cols >= 2 {
+	wanted := fmt.Sprintf("PRIMARY KEY (%s, %s)", distributionColumn, keyColumn)
+	if definition == wanted || distributionColumn == keyColumn {
 		return nil
 	}
-	_, err := db.Exec(fmt.Sprintf(`ALTER TABLE public.%[1]s DROP CONSTRAINT IF EXISTS %[1]s_pkey, ADD PRIMARY KEY (process_instance_id, id)`, table))
+	_, err := db.Exec(fmt.Sprintf(
+		`ALTER TABLE public.%[1]s DROP CONSTRAINT IF EXISTS %[1]s_pkey, ADD PRIMARY KEY (%[2]s, %[3]s)`,
+		table, distributionColumn, keyColumn))
 	if err != nil {
 		return fmt.Errorf("citus: re-key %s by process instance: %w", table, err)
+	}
+	if keyColumn == "engine_key" {
+		if _, err := db.Exec(fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_%s_engine_key_lookup ON public.%s(engine_key)`, table, table)); err != nil {
+			return fmt.Errorf("citus: index %s engine key: %w", table, err)
+		}
+	}
+	return nil
+}
+
+// prepareBigintColocation removes constraints that cannot be represented by
+// Citus across shards. Runtime cleanup and the application-generated snowflake
+// keys preserve their semantics; the process_instance_key FKs remain and are
+// enforceable because parent and children are colocated on that key.
+func prepareBigintColocation(db *sqlx.DB) error {
+	var hasIdentityTrigger bool
+	if err := db.Get(&hasIdentityTrigger, `SELECT EXISTS (
+		SELECT 1 FROM pg_trigger
+		WHERE tgrelid = 'public.process_instances'::regclass
+		  AND tgname = 'trg_process_instances_hybrid_identity'
+	)`); err != nil {
+		return fmt.Errorf("citus: check process instance identity trigger: %w", err)
+	}
+	if hasIdentityTrigger {
+		if _, err := db.Exec(`DROP TRIGGER trg_process_instances_hybrid_identity ON public.process_instances`); err != nil {
+			return fmt.Errorf("citus: drop process instance identity trigger: %w", err)
+		}
+	}
+	statements := []string{
+		`ALTER TABLE public.process_instances DROP CONSTRAINT IF EXISTS process_instances_id_key`,
+		`CREATE INDEX IF NOT EXISTS idx_process_instances_id_lookup ON public.process_instances(id)`,
+		`ALTER TABLE public.process_instances DROP CONSTRAINT IF EXISTS process_instances_parent_process_instance_key_fkey`,
+		`ALTER TABLE public.process_instances DROP CONSTRAINT IF EXISTS process_instances_parent_execution_key_fkey`,
+		`ALTER TABLE public.executions DROP CONSTRAINT IF EXISTS executions_parent_execution_key_fkey`,
+		`ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_execution_key_fkey`,
+		`ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_execution_key_fkey`,
+		`ALTER TABLE public.timer_jobs DROP CONSTRAINT IF EXISTS timer_jobs_execution_key_fkey`,
+		`ALTER TABLE public.incidents DROP CONSTRAINT IF EXISTS incidents_job_key_fkey`,
+		`ALTER TABLE public.incidents DROP CONSTRAINT IF EXISTS incidents_execution_key_fkey`,
+		`ALTER TABLE public.executions DROP CONSTRAINT IF EXISTS executions_process_instance_key_fkey`,
+		`ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_process_instance_key_fkey`,
+		`ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS tasks_process_instance_key_fkey`,
+		`ALTER TABLE public.timer_jobs DROP CONSTRAINT IF EXISTS timer_jobs_process_instance_key_fkey`,
+		`ALTER TABLE public.incidents DROP CONSTRAINT IF EXISTS incidents_process_instance_key_fkey`,
+		`ALTER TABLE public.variables DROP CONSTRAINT IF EXISTS variables_process_instance_key_fkey`,
+		`ALTER TABLE public.gateway_state DROP CONSTRAINT IF EXISTS gateway_state_process_instance_key_fkey`,
+		`ALTER TABLE public.published_message_correlations DROP CONSTRAINT IF EXISTS published_message_correlations_instance_key_fkey`,
+		`ALTER TABLE public.published_message_correlations DROP CONSTRAINT IF EXISTS published_message_correlations_process_instance_key_fkey`,
+		`ALTER TABLE public.published_message_correlations DROP CONSTRAINT IF EXISTS published_message_correlations_message_key_fkey`,
+		`ALTER TABLE public.published_message_correlations DROP CONSTRAINT IF EXISTS published_message_correlations_published_message_key_fkey`,
+		`ALTER TABLE public.audit_logs DROP CONSTRAINT IF EXISTS audit_logs_user_id_fkey`,
+		`ALTER TABLE public.audit_logs DROP CONSTRAINT IF EXISTS audit_logs_user_id_fkey1`,
+	}
+	for _, statement := range statements {
+		if _, err := db.Exec(statement); err != nil {
+			return fmt.Errorf("citus: prepare BIGINT colocation (%s): %w", statement, err)
+		}
+	}
+	for _, table := range distributedTables {
+		if err := keyedByInstance(db, table.name, table.distributionColumn, table.primaryKeyColumn); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func restoreColocatedForeignKeys(db *sqlx.DB) error {
+	statements := []string{
+		`ALTER TABLE public.executions ADD CONSTRAINT executions_process_instance_key_fkey FOREIGN KEY (process_instance_key) REFERENCES public.process_instances(engine_key) ON DELETE CASCADE`,
+		`ALTER TABLE public.jobs ADD CONSTRAINT jobs_process_instance_key_fkey FOREIGN KEY (process_instance_key) REFERENCES public.process_instances(engine_key) ON DELETE CASCADE`,
+		`ALTER TABLE public.tasks ADD CONSTRAINT tasks_process_instance_key_fkey FOREIGN KEY (process_instance_key) REFERENCES public.process_instances(engine_key) ON DELETE CASCADE`,
+		`ALTER TABLE public.timer_jobs ADD CONSTRAINT timer_jobs_process_instance_key_fkey FOREIGN KEY (process_instance_key) REFERENCES public.process_instances(engine_key) ON DELETE CASCADE`,
+		`ALTER TABLE public.incidents ADD CONSTRAINT incidents_process_instance_key_fkey FOREIGN KEY (process_instance_key) REFERENCES public.process_instances(engine_key) ON DELETE CASCADE`,
+		`ALTER TABLE public.variables ADD CONSTRAINT variables_process_instance_key_fkey FOREIGN KEY (process_instance_key) REFERENCES public.process_instances(engine_key) ON DELETE CASCADE`,
+		`ALTER TABLE public.gateway_state ADD CONSTRAINT gateway_state_process_instance_key_fkey FOREIGN KEY (process_instance_key) REFERENCES public.process_instances(engine_key) ON DELETE CASCADE`,
+	}
+	for _, statement := range statements {
+		if _, err := db.Exec(statement); err != nil {
+			return fmt.Errorf("citus: restore colocated foreign key (%s): %w", statement, err)
+		}
 	}
 	return nil
 }
@@ -157,6 +254,9 @@ func EnsureDistributedTables(db *sqlx.DB) error {
 	}
 	if !hasCitus {
 		return fmt.Errorf("citus: CITUS_ENABLED is set but the citus extension is not active on this database — is DB_HOST pointed at a Citus coordinator?")
+	}
+	if err := prepareBigintColocation(db); err != nil {
+		return err
 	}
 
 	// Citus won't distribute a table with triggers, and a NOTIFY fired on
@@ -190,12 +290,6 @@ func EnsureDistributedTables(db *sqlx.DB) error {
 			continue
 		}
 
-		if t.name == "jobs" || t.name == "timer_jobs" {
-			if err := keyedByInstance(db, t.name); err != nil {
-				return err
-			}
-		}
-
 		var err error
 		if t.name == "process_instances" {
 			_, err = db.Exec(`SELECT create_distributed_table($1::regclass, $2, colocate_with => 'none')`, "public."+t.name, t.distributionColumn)
@@ -207,7 +301,7 @@ func EnsureDistributedTables(db *sqlx.DB) error {
 		}
 	}
 
-	return nil
+	return restoreColocatedForeignKeys(db)
 }
 
 // EnsureLocalTablesInMetadata adds every table still neither reference
@@ -237,7 +331,8 @@ func EnsureLocalTablesInMetadata(db *sqlx.DB, coordinatorHost string, coordinato
 	if err := db.Select(&tables, `
 		SELECT c.relname FROM pg_class c
 		JOIN pg_namespace n ON n.oid = c.relnamespace
-		WHERE n.nspname = 'public' AND c.relkind = 'r'
+		WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+		  AND NOT c.relispartition
 		  AND NOT EXISTS (SELECT 1 FROM citus_tables t WHERE t.table_name = c.oid::regclass)
 		ORDER BY c.relname`); err != nil {
 		return fmt.Errorf("citus: list local tables: %w", err)
@@ -251,7 +346,11 @@ func EnsureLocalTablesInMetadata(db *sqlx.DB, coordinatorHost string, coordinato
 		if known {
 			continue
 		}
-		if _, err := db.Exec(`SELECT citus_add_local_table_to_metadata($1::regclass, cascade_via_foreign_keys => true)`, "public."+table); err != nil {
+		// Tables are added in deterministic name order and reference/distributed
+		// tables are already known. Cascading here can walk *through* a reference
+		// table (for example audit_logs -> users -> process_instances) and Citus
+		// then incorrectly attempts an unsupported local-to-distributed cascade.
+		if _, err := db.Exec(`SELECT citus_add_local_table_to_metadata($1::regclass, cascade_via_foreign_keys => false)`, "public."+table); err != nil {
 			return fmt.Errorf("citus: add %s to the metadata: %w", table, err)
 		}
 	}

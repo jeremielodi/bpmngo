@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
@@ -40,7 +42,7 @@ func (r *Runtime) armBoundaryEventsTx(tx *sqlx.Tx, engineRepo *repository.Engine
 	// activity).
 	if activity.MultiInstance != nil && exec.ParentExecutionID != nil {
 		var parentNode string
-		if err := tx.Get(&parentNode, `SELECT current_element_id FROM public.executions WHERE process_instance_id = $1 AND id = $2`, exec.ProcessInstanceID, *exec.ParentExecutionID); err == nil && parentNode == activity.ID {
+		if err := tx.Get(&parentNode, `SELECT current_element_id FROM public.executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1) AND engine_key = $2`, exec.ProcessInstanceID, *exec.ParentExecutionID); err == nil && parentNode == activity.ID {
 			return nil
 		}
 	}
@@ -50,7 +52,7 @@ func (r *Runtime) armBoundaryEventsTx(tx *sqlx.Tx, engineRepo *repository.Engine
 		}
 		pathID := repository.BoundaryTriggerPathID(n.ID, exec.ID)
 		trigger := &repository.Execution{
-			ID:                uuid.New(),
+			ID:                ids.NewEngineKey(),
 			ProcessInstanceID: exec.ProcessInstanceID,
 			CurrentElementID:  n.ID,
 			Status:            "waiting",
@@ -71,6 +73,10 @@ func (r *Runtime) armBoundaryEventsTx(tx *sqlx.Tx, engineRepo *repository.Engine
 // boundary trigger on its boundary node.
 func (r *Runtime) subscribeBoundaryTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, trigger *repository.Execution, n *engine.Node) error {
 	var err error
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, trigger.ProcessInstanceID)
+	if err != nil {
+		return err
+	}
 	switch n.Type {
 	case engine.BoundaryTimerEventType:
 		_, err = r.createTimerTx(tx, engineRepo, trigger, n.TimerDefinition, n.ID, "boundary")
@@ -79,9 +85,9 @@ func (r *Runtime) subscribeBoundaryTx(tx *sqlx.Tx, engineRepo *repository.Engine
 	case engine.SignalBoundaryEventType:
 		_, err = tx.Exec(`
 			INSERT INTO event_subscriptions
-			  (process_instance_id, execution_id, event_type, event_name, target_element_id)
+			  (process_instance_key, execution_key, event_type, event_name, target_element_id)
 			VALUES ($1, $2, 'signal', $3, $4)
-		`, trigger.ProcessInstanceID, trigger.ID, n.SignalRef, n.ID)
+		`, instanceKey, trigger.ID, n.SignalRef, n.ID)
 	case engine.ConditionalBoundaryEventType:
 		err = insertConditionalSubscriptionTx(tx, trigger.ProcessInstanceID, trigger.ID, n.Condition, n.ID, false)
 	}
@@ -117,8 +123,8 @@ func (r *Runtime) fireBoundary(ctx context.Context, engineRepo *repository.Engin
 	}
 
 	if !node.CancelActivity {
-		tokenID := uuid.New()
-		pathID := tokenID.String()
+		tokenID := ids.NewEngineKey()
+		pathID := strconv.FormatInt(tokenID, 10)
 		if err := engineRepo.CreateExecutionTx(tx, &repository.Execution{
 			ID:                tokenID,
 			ProcessInstanceID: instanceID,
@@ -158,7 +164,7 @@ func (r *Runtime) fireBoundary(ctx context.Context, engineRepo *repository.Engin
 		return fmt.Errorf("boundary event %s: cancelling %s: %w", node.ID, node.AttachedToRef, err)
 	}
 	// An interrupted sub-process loses everything still running inside it.
-	scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, instanceID, act.ID, uuid.Nil)
+	scopeTasks, scopeJobs, err := engineRepo.CancelScopeTx(tx, instanceID, act.ID, 0)
 	if err != nil {
 		return fmt.Errorf("boundary event %s: interrupting %s: %w", node.ID, node.AttachedToRef, err)
 	}
@@ -179,7 +185,7 @@ func (r *Runtime) fireBoundary(ctx context.Context, engineRepo *repository.Engin
 	r.logCancelled(instanceID, append(tasks, scopeTasks...), append(jobs, scopeJobs...), reason)
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(act.ID, instanceID, node.AttachedToRef, node.ID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(instanceID.String(), act.ID.String(), node.AttachedToRef, node.ID)
+		p.ExecutionMoved(instanceID.String(), strconv.FormatInt(act.ID, 10), node.AttachedToRef, node.ID)
 	}
 	if attached, ok := graph.Nodes[node.AttachedToRef]; ok && attached.Type == engine.CallActivityType {
 		r.terminateCalledInstances(act.ID, reason)
@@ -189,12 +195,12 @@ func (r *Runtime) fireBoundary(ctx context.Context, engineRepo *repository.Engin
 
 // terminateCalledInstances ends the child process instances a call
 // activity started, when an interrupting boundary event cancels it.
-func (r *Runtime) terminateCalledInstances(callExecID uuid.UUID, reason string) {
+func (r *Runtime) terminateCalledInstances(callExecID int64, reason string) {
 	var children []uuid.UUID
 	if err := r.DB.Select(&children, `
-		SELECT id FROM process_instances WHERE parent_execution_id = $1 AND status = 'running'
+		SELECT id FROM process_instances WHERE parent_execution_key = $1 AND status = 'running'
 	`, callExecID); err != nil {
-		log.Printf("failed to find instances called by execution %s: %v", callExecID, err)
+		log.Printf("failed to find instances called by execution %d: %v", callExecID, err)
 		return
 	}
 	for _, id := range children {
