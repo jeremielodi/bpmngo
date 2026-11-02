@@ -1193,3 +1193,4 @@ ON CONFLICT (version) DO NOTHING;
 \ir migrations/018_parent_fk_indexes.sql
 \ir migrations/019_partition_retention.sql
 \ir migrations/020_hot_path_cpu.sql
+\ir migrations/021_eventlog_projected_jobs_bigint.sql

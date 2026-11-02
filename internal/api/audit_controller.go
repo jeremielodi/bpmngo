@@ -201,7 +201,7 @@ func (c *AuditController) GetTaskAuditLogs(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(fiber.Map{
-		"taskId": taskID,
+		"taskId": strconv.FormatInt(taskID, 10),
 		"logs":   logs,
 		"count":  len(logs),
 	})

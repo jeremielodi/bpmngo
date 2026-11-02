@@ -222,7 +222,7 @@ async function run() {
             name: 'PaymentReceived',
             variables: {},
           });
-          assert(res.data.correlatedProcessInstanceKeys.includes(instanceId), 'expected the message to correlate to our instance');
+          assert(res.data.messageKey !== undefined, `a publication answers with its messageKey (Camunda 8), got ${JSON.stringify(res.data)}`); // the correlation shows below: the instance carries on
 
           // Drain the rest of the process so it doesn't dangle.
           await sleep(300);
@@ -250,7 +250,7 @@ async function run() {
             signalName: 'RestockAlert',
             variables: { restockedProduct: 'v2-widget' },
           });
-          assert(res.data.resumed >= 1, `expected resumed >= 1, got ${res.data.resumed}`);
+          assert(res.data.signalKey !== undefined, `a broadcast answers with its signalKey (Camunda 8), got ${JSON.stringify(res.data)}`); // the instance resuming shows below
 
           await sleep(500);
           await client.pollExternalTask('update-inventory', async () => ({}), 10000, instanceId);

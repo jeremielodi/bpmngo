@@ -555,6 +555,10 @@ func main() {
 
 	app.Use(middleware.CombinedAuthMiddleware(db, jwcService, oidcService, util))
 
+	// The int64 keys /v2 and gRPC answer with also work where the routes
+	// outside /v2 take a process instance or definition UUID.
+	app.Use(apiv2.LegacyKeyTranslation(db))
+
 	// ============================================================
 	// EVENT STREAMING ENDPOINTS
 	// ============================================================

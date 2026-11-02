@@ -11,6 +11,7 @@ import (
 type MultiInstanceExecution struct {
 	ID                     uuid.UUID `db:"id"`
 	ProcessInstanceID      uuid.UUID `db:"process_instance_id"`
+	ProcessInstanceKey     int64     `db:"process_instance_key" json:"-"`
 	ExecutionID            int64     `db:"execution_key"`
 	ActivityID             string    `db:"activity_id"`
 	IsSequential           bool      `db:"is_sequential"`

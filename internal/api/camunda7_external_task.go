@@ -305,7 +305,7 @@ func (ctrl *ExternalTaskController) ExtendLock(c *fiber.Ctx) error {
 func (ctrl *ExternalTaskController) Unlock(c *fiber.Ctx) error {
 	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
-		return c7Error(c, fiber.StatusBadRequest, "InvalidRequestException", "invalid external task id")
+		return c7Error(c, fiber.StatusNotFound, "RestException", fmt.Sprintf("External task with id %s does not exist", c.Params("id")))
 	}
 	if _, err := ctrl.externalTaskRepo.LockOwner(jobID); errors.Is(err, sql.ErrNoRows) {
 		return c7Error(c, fiber.StatusNotFound, "RestException", fmt.Sprintf("External task with id %d does not exist", jobID))
