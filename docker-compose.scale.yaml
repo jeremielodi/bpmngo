@@ -137,18 +137,19 @@ services:
     restart: "no"
 
   postgres-replica:
-    image: postgres:16
+    image: postgres:18
     container_name: bpmngo-postgres-replica
     depends_on:
       replication-setup:
         condition: service_completed_successfully
     environment:
-      PGDATA: /var/lib/postgresql/data
+      # Postgres 18+ : même disposition que le primaire.
+      PGDATA: /var/lib/postgresql/18/docker
       REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-replicator}
       POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-200}
     entrypoint: ["/bin/bash", "/replica-entrypoint.sh"]
     volumes:
-      - replica_data:/var/lib/postgresql/data
+      - replica_data:/var/lib/postgresql
       - ./deploy/replica-entrypoint.sh:/replica-entrypoint.sh:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "goflow", "-d", "goflow"]

@@ -1,0 +1,20 @@
+{
+  "engine": "pg18-load-test",
+  "generated_at": "2026-11-02T13:14:43.0319784Z",
+  "clients": 100,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 60,
+  "seconds": 600.9589213,
+  "completed": 47129,
+  "instances_per_second": 78.42299752876636,
+  "errors": {},
+  "latency": {
+    "count": 47129,
+    "errors": 0,
+    "p50_us": 1193201,
+    "p95_us": 2363035,
+    "p99_us": 2892033,
+    "mean_us": 1274141.788431751
+  }
+}

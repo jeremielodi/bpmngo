@@ -1,7 +1,9 @@
 package database
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -362,4 +364,42 @@ func pgxOptions() string {
 	default:
 		return " default_query_exec_mode=cache_statement"
 	}
+}
+
+// engineNodeLockClass namespaces the advisory locks of ClaimEngineNode
+// (two-key form, so they never meet the archiver's or retention's).
+const engineNodeLockClass = 0x62706e67 // "bpng"
+
+// ClaimEngineNode reserves the lowest engine node number no other live
+// BpmnGo instance holds, with a session advisory lock on a connection of db
+// (a direct one: PgBouncer in transaction mode drops session locks), kept
+// for the whole life of the process. If that connection is lost the lock
+// is too, and another instance may take the number: the process stops
+// then, rather than risk issuing another instance's keys; it restarts with
+// a fresh claim.
+func ClaimEngineNode(db *sqlx.DB, maxNode int64) (int64, error) {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("engine node claim: %w", err)
+	}
+	for node := int64(0); node <= maxNode; node++ {
+		var locked bool
+		if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1::int, $2::int)`, engineNodeLockClass, node).Scan(&locked); err != nil {
+			conn.Close()
+			return 0, fmt.Errorf("engine node claim: %w", err)
+		}
+		if locked {
+			go func() {
+				for range time.Tick(15 * time.Second) {
+					if err := conn.PingContext(ctx); err != nil {
+						log.Fatalf("engine node %d: lost the connection holding its claim (%v); stopping so that no two instances issue the same keys", node, err)
+					}
+				}
+			}()
+			return node, nil
+		}
+	}
+	conn.Close()
+	return 0, fmt.Errorf("engine node claim: all %d node numbers are taken", maxNode+1)
 }

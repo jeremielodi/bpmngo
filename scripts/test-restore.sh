@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Vérifie qu'une sauvegarde se restaure, sans toucher à la base de prod :
-# restaure dans un Postgres jetable (conteneur postgres:16 supprimé à la
+# restaure dans un Postgres jetable (conteneur postgres:18 supprimé à la
 # fin), compte les lignes de quelques tables. Marche pareil pour une base
 # autonome et pour le cluster haute disponibilité.
 #
@@ -19,7 +19,7 @@ fi
 
 echo "restauration de $file dans un Postgres jetable…"
 docker run -d --rm --name "$CHECK" -e POSTGRES_USER=goflow -e POSTGRES_PASSWORD=check \
-  -e POSTGRES_DB=goflow postgres:16 > /dev/null
+  -e POSTGRES_DB=goflow postgres:18 > /dev/null
 trap 'docker rm -f "$CHECK" > /dev/null 2>&1' EXIT
 
 # Ready once the image's init (which restarts Postgres) is over.

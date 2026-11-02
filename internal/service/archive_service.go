@@ -155,6 +155,7 @@ func prepareArchiveSnapshot(db *sqlx.DB, instanceID uuid.UUID, deleteReason *str
 		instanceID: instanceID,
 		process: repository.HistoricProcessInstance{
 			ID:                       instance.ID,
+			EngineKey:                &instance.EngineKey,
 			ProcessDefinitionID:      instance.ProcessDefinitionID,
 			ProcessDefinitionKey:     instance.ProcessKey,
 			ProcessDefinitionVersion: version,
