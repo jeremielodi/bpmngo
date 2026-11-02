@@ -64,7 +64,10 @@ func (r *ProcessPermissionRepository) Create(processKey, granteeType string, gra
 		DO UPDATE SET resource_type = EXCLUDED.resource_type
 		RETURNING id
 	`, perm.ID, perm.ResourceType, perm.ProcessKey, perm.GranteeType, perm.GranteeID, perm.Permission)
-	return perm, err
+	if err != nil {
+		return perm, err
+	}
+	return perm, notifyACLChanged(r.db, processKey)
 }
 
 // ErrLastPermission: the grant is the process's last one. A process keeps
@@ -95,6 +98,9 @@ func (r *ProcessPermissionRepository) DeleteUnlessLast(processKey string, id uui
 		return false, ErrLastPermission
 	}
 	if _, err := tx.Exec(`DELETE FROM public.process_permissions WHERE id = $1 AND process_key = $2`, id, processKey); err != nil {
+		return false, err
+	}
+	if err := notifyACLChanged(tx, processKey); err != nil {
 		return false, err
 	}
 	return true, tx.Commit()

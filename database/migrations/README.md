@@ -62,6 +62,8 @@ des incidents déjà enregistrés.
 | 019 | `019_partition_retention.sql` | détache et supprime les partitions historiques expirées devenues vides | la purge ligne par ligne reste l'autorité pour ne pas perdre les audits non liés |
 | 020 | `020_hot_path_cpu.sql` | retire les index qui bloquaient les HOT updates (`executions.is_active`, `executions.current_element_id`, GIN `variables.data`), ajoute l'index partiel de l'archiver, retire la FK `process_definition_id` redondante, limite le NOTIFY des variables aux instances qui attendent une condition | CPU PostgreSQL du chemin chaud ; redémarrer BpmnGo après application (plans préparés) |
 | 021 | `021_eventlog_projected_jobs_bigint.sql` | passe `eventlog_projected_jobs.id` et `execution_id` en BIGINT (table vidée) | le projecteur du journal d'événements (mode shadow) ignorait tous les événements de job depuis les identifiants BIGINT |
+| 022 | `022_audit_writer_marks.sql` | table non journalisée `audit_writer_marks` | avec plusieurs instances BpmnGo, une lecture de l'audit (step back, historique des jetons, archivage) voit les lignes encore en file sur les autres instances |
+| 023 | `023_historic_instance_engine_key.sql` | colonne `historic_process_instances.engine_key` | une instance archivée se retrouve par sa clé entière (/v2, gRPC), et garde la même clé |
 
 Pour voir où en est une base :
 

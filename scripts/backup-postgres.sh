@@ -9,7 +9,7 @@
 #
 #   PGHOST=haproxy PGPORT=5000 PGPASSWORD=… ./scripts/backup-postgres.sh
 #
-# pg_dump tourne alors dans un conteneur postgres:16 jetable, sur le réseau
+# pg_dump tourne alors dans un conteneur postgres:18 jetable, sur le réseau
 # Docker de BpmnGo (DOCKER_NETWORK, goflow_bpmngo-network par défaut).
 #
 # Cron quotidien (3h du matin) :
@@ -32,7 +32,7 @@ NETWORK="${DOCKER_NETWORK:-goflow_bpmngo-network}"
 pg() {
   if [ -n "${PGHOST:-}" ]; then
     docker run --rm -i --network "$NETWORK" -e PGPASSWORD="${PGPASSWORD:-}" \
-      postgres:16 "$@" -h "$PGHOST" -p "${PGPORT:-5432}" -U "$DB_USER"
+      postgres:18 "$@" -h "$PGHOST" -p "${PGPORT:-5432}" -U "$DB_USER"
   else
     docker exec -i "$CONTAINER" "$@" -U "$DB_USER"
   fi
@@ -52,7 +52,7 @@ pg pg_dump -d "$DB_NAME" -Fc > "$tmp"
 
 # Un dump illisible ne doit jamais remplacer les bons : on vérifie avant de
 # le garder (pg_restore --list ne se connecte à aucune base).
-if ! docker run --rm -i postgres:16 pg_restore --list < "$tmp" > /dev/null; then
+if ! docker run --rm -i postgres:18 pg_restore --list < "$tmp" > /dev/null; then
   echo "ERREUR : le dump $tmp est illisible, conservé pour analyse" >&2
   exit 1
 fi

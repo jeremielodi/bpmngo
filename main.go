@@ -26,6 +26,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jeremielodi/bpmngo/internal/listeners"
 	"github.com/jeremielodi/bpmngo/internal/metrics"
@@ -197,6 +198,21 @@ func main() {
 	directDB, err := database.NewDirectPostgres(util)
 	if err != nil {
 		log.Fatalln("Postgres (direct): ", err)
+	}
+	// Engine keys carry a node number: instances sharing the database must
+	// each have their own. ENGINE_NODE_ID fixes it; otherwise each instance
+	// claims a free one.
+	if node, set, err := ids.ConfiguredNode(); err != nil {
+		log.Fatalln(err)
+	} else if !set {
+		node, err = database.ClaimEngineNode(directDB, ids.MaxNode())
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err := ids.SetNode(node); err != nil {
+			log.Fatalln(err)
+		}
+		log.Printf("✅ Engine node %d (claimed; set ENGINE_NODE_ID to fix it)", node)
 	}
 	// History and analytics read a replica when DB_READ_HOST
 	// is set (read-only, a few milliseconds behind), the primary otherwise.

@@ -81,21 +81,64 @@ var (
 	defaultGen  *Generator
 )
 
-func NewEngineKey() EngineKey {
+// ConfiguredNode returns ENGINE_NODE_ID, and false when it is not set.
+func ConfiguredNode() (int64, bool, error) {
+	raw := os.Getenv("ENGINE_NODE_ID")
+	if raw == "" {
+		return 0, false, nil
+	}
+	node, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, false, fmt.Errorf("parse ENGINE_NODE_ID: %w", err)
+	}
+	if node < 0 || node > maxNode {
+		return 0, false, fmt.Errorf("ENGINE_NODE_ID must be between 0 and %d", maxNode)
+	}
+	return node, true, nil
+}
+
+// Node is the node number of this process's keys. Call it only once the
+// node is settled (after SetNode, when the boot claims one).
+func Node() int64 {
+	ensureGenerator()
+	return defaultGen.node
+}
+
+// ensureGenerator makes sure the process's generator exists.
+func ensureGenerator() {
 	defaultOnce.Do(func() {
-		node := int64(0)
-		if raw := os.Getenv("ENGINE_NODE_ID"); raw != "" {
-			parsed, err := strconv.ParseInt(raw, 10, 64)
-			if err != nil {
-				panic(fmt.Errorf("parse ENGINE_NODE_ID: %w", err))
-			}
-			node = parsed
+		node, _, err := ConfiguredNode()
+		if err != nil {
+			panic(err)
 		}
-		var err error
 		defaultGen, err = NewGenerator(node)
 		if err != nil {
 			panic(err)
 		}
 	})
+}
+
+// MaxNode is the highest node number a key can carry.
+func MaxNode() int64 { return maxNode }
+
+// SetNode fixes the node number of this process's keys, claimed at boot
+// when ENGINE_NODE_ID is not set: instances sharing a database must never
+// share a node, or two of them would issue the same keys in the same
+// millisecond. It must run before the first key is issued.
+func SetNode(node int64) error {
+	if node < 0 || node > maxNode {
+		return fmt.Errorf("engine node %d out of range 0..%d", node, maxNode)
+	}
+	issued := true
+	defaultOnce.Do(func() { issued = false })
+	if issued && defaultGen != nil {
+		return fmt.Errorf("engine node set after keys were issued")
+	}
+	defaultGen, _ = NewGenerator(node)
+	return nil
+}
+
+func NewEngineKey() EngineKey {
+	ensureGenerator()
 	return defaultGen.Next()
 }

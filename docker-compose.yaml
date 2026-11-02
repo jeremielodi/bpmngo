@@ -45,7 +45,9 @@ services:
       # Pour y accéder depuis une autre machine, POSTGRES_BIND=0.0.0.0.
       - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Postgres 18+ : données dans /var/lib/postgresql/18/docker (PGDATA de
+      # l'image) ; le volume se monte sur le dossier parent.
+      - postgres_data:/var/lib/postgresql
       - ./database:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U goflow"]
@@ -123,7 +125,7 @@ services:
       RUNTIME_MIN_CONCURRENCY: ${RUNTIME_MIN_CONCURRENCY:-}
       ARCHIVER_BACKLOG_SOFT_LIMIT: ${ARCHIVER_BACKLOG_SOFT_LIMIT:-}
       ARCHIVER_BACKLOG_HARD_LIMIT: ${ARCHIVER_BACKLOG_HARD_LIMIT:-}
-      ENGINE_NODE_ID: ${ENGINE_NODE_ID:-0}
+      ENGINE_NODE_ID: ${ENGINE_NODE_ID:-}
 
       # Kafka : vide (défaut) en mode direct. Pour WRITE_PATH=partitioned ou
       # EVENT_LOG=shadow : KAFKA_BROKERS=redpanda:9092 et COMPOSE_PROFILES=kafka.
