@@ -258,8 +258,8 @@ func (ctrl *ProcessDefinitionController) GetActiveTokenCounts(c *fiber.Ctx) erro
 	err := ctrl.db.Select(&counts, `
 		SELECT e.current_element_id AS element_id, COUNT(*) AS count
 		FROM executions e
-		JOIN process_instances pi ON pi.id = e.process_instance_id
-		JOIN process_definitions pd ON pd.id = pi.process_definition_id
+		JOIN process_instances pi ON pi.engine_key = e.process_instance_key
+		JOIN process_definitions pd ON pd.engine_key = pi.process_definition_key
 		WHERE pd.process_key = $1
 		  AND pi.status IN ('running', 'suspended')
 		  AND e.status IN ('active', 'waiting')
@@ -299,10 +299,10 @@ func (ctrl *ProcessDefinitionController) GetInstancePositions(c *fiber.Ctx) erro
 
 	var positions []InstancePosition
 	err := ctrl.db.Select(&positions, `
-		SELECT e.process_instance_id AS process_instance_id, e.current_element_id AS element_id
+		SELECT pi.id AS process_instance_id, e.current_element_id AS element_id
 		FROM executions e
-		JOIN process_instances pi ON pi.id = e.process_instance_id
-		JOIN process_definitions pd ON pd.id = pi.process_definition_id
+		JOIN process_instances pi ON pi.engine_key = e.process_instance_key
+		JOIN process_definitions pd ON pd.engine_key = pi.process_definition_key
 		WHERE pd.process_key = $1
 		  AND pi.status IN ('running', 'suspended')
 		  AND e.status IN ('active', 'waiting')
@@ -317,4 +317,3 @@ func (ctrl *ProcessDefinitionController) GetInstancePositions(c *fiber.Ctx) erro
 
 	return c.JSON(positions)
 }
-

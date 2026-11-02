@@ -10,6 +10,7 @@ import (
 // Deployment model (matches table columns)
 type Deployment struct {
 	ID         uuid.UUID  `db:"id"`
+	EngineKey  int64      `db:"engine_key" json:"-"`
 	Name       string     `db:"name"`
 	DeployedBy *uuid.UUID `db:"deployed_by"`
 	Status     string     `db:"status"` // "active" | "inactive"
@@ -26,6 +27,7 @@ type DeploymentCreateModel struct {
 // ProcessDefinition model
 type ProcessDefinition struct {
 	ID           uuid.UUID       `db:"id"            json:"id"`
+	EngineKey    int64           `db:"engine_key"    json:"-"`
 	DeploymentID uuid.UUID       `db:"deployment_id" json:"deploymentId"`
 	ProcessKey   string          `db:"process_key"   json:"key"`
 	ProcessName  *string         `db:"process_name"  json:"name,omitempty"`

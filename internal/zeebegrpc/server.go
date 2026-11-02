@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/dmn"
 	"github.com/jeremielodi/bpmngo/internal/events"
+	"github.com/jeremielodi/bpmngo/internal/metrics"
 	"github.com/jeremielodi/bpmngo/internal/models"
 	"github.com/jeremielodi/bpmngo/internal/partition"
 	"github.com/jeremielodi/bpmngo/internal/repository"
@@ -160,15 +161,13 @@ func (s *Server) resolveDefinition(req *pb.CreateProcessInstanceRequest, tenant 
 		if err != nil {
 			return models.ProcessDefinition{}, fmt.Errorf("process definition key %d not found", req.ProcessDefinitionKey)
 		}
-		return s.processRepo.FindProcessDefinitionByID(id)
+		return s.processRepo.FindDefinitionHeaderForStart(id, "", 0, "")
 	}
 	if req.BpmnProcessId == "" {
 		return models.ProcessDefinition{}, fmt.Errorf("either processDefinitionKey or bpmnProcessId must be set")
 	}
-	if req.Version <= 0 {
-		return s.processRepo.FindLatestProcessDefinitionByKeyForTenant(req.BpmnProcessId, tenant)
-	}
-	return s.processRepo.FindProcessDefinitionByKeyAndVersion(req.BpmnProcessId, int(req.Version))
+	// No model: the runtime takes the graph from its cache.
+	return s.processRepo.FindDefinitionHeaderForStart(uuid.Nil, req.BpmnProcessId, int(req.Version), tenant)
 }
 
 func (s *Server) CreateProcessInstance(ctx context.Context, req *pb.CreateProcessInstanceRequest) (*pb.CreateProcessInstanceResponse, error) {
@@ -311,6 +310,8 @@ func (s *Server) fetchAndLockOneBatch(jobType, worker string, lockDuration, maxJ
 		return nil, err
 	}
 	defer tx.Rollback()
+	txStarted, committed := time.Now(), false
+	defer func() { metrics.ObserveEngineTransaction("claim_jobs", txStarted, committed, "operation_error") }()
 
 	topicJobs, err := s.externalTaskRepo.FetchAndLockJobsTx(tx, []repository.TopicConfig{
 		{TopicName: jobType, LockDuration: lockDuration},
@@ -319,6 +320,10 @@ func (s *Server) fetchAndLockOneBatch(jobType, worker string, lockDuration, maxJ
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	committed = true
+	if err := s.externalTaskRepo.HydrateLockedJobs(topicJobs); err != nil {
 		return nil, err
 	}
 
@@ -336,31 +341,13 @@ func (s *Server) fetchAndLockOneBatch(jobType, worker string, lockDuration, maxJ
 }
 
 func (s *Server) toActivatedJob(job repository.LockedJob, jobType, worker string) (*pb.ActivatedJob, error) {
-	jobKey, err := s.zeebeKeys.GetOrAssignKey("job", job.ID)
-	if err != nil {
-		return nil, err
-	}
+	jobKey := job.ID
 
-	inst, err := s.processInstanceRepo.FindByID(job.ProcessInstanceID)
-	if err != nil || inst == nil {
-		return nil, fmt.Errorf("process instance not found for job %s", job.ID)
-	}
-	instKey, err := s.zeebeKeys.GetOrAssignKey("process_instance", job.ProcessInstanceID)
-	if err != nil {
-		return nil, err
-	}
-	defKey, err := s.zeebeKeys.GetOrAssignKey("process_definition", inst.ProcessDefinitionID)
-	if err != nil {
-		return nil, err
-	}
 	// The activity's own key, so SetVariables can target its scope.
-	elementKey, err := s.zeebeKeys.GetOrAssignKey("element_instance", job.ExecutionID)
-	if err != nil {
-		return nil, err
-	}
+	elementKey := job.ExecutionID
 
 	customHeaders := "{}"
-	if graph, err := s.engineRepo.GetProcessGraphByInstanceID(job.ProcessInstanceID); err == nil && graph != nil {
+	if graph, err := s.engineRepo.GetProcessGraphByDefinitionID(job.ProcessDefinitionID); err == nil && graph != nil {
 		if n, ok := graph.Nodes[job.CurrentElementID]; ok && len(n.TaskHeaders) > 0 {
 			if b, err := json.Marshal(n.TaskHeaders); err == nil {
 				customHeaders = string(b)
@@ -373,13 +360,17 @@ func (s *Server) toActivatedJob(job repository.LockedJob, jobType, worker string
 		variablesJSON = string(job.Payload)
 	}
 
+	tenantID := ""
+	if job.TenantID != nil {
+		tenantID = *job.TenantID
+	}
 	return &pb.ActivatedJob{
 		Key:                      jobKey,
 		Type:                     jobType,
-		ProcessInstanceKey:       instKey,
-		BpmnProcessId:            inst.ProcessKey,
-		ProcessDefinitionVersion: int32(inst.Version),
-		ProcessDefinitionKey:     defKey,
+		ProcessInstanceKey:       job.ProcessInstanceKey,
+		BpmnProcessId:            job.ProcessKey,
+		ProcessDefinitionVersion: int32(job.ProcessVersion),
+		ProcessDefinitionKey:     job.ProcessDefinitionKey,
 		ElementId:                job.CurrentElementID,
 		ElementInstanceKey:       elementKey,
 		CustomHeaders:            customHeaders,
@@ -387,17 +378,14 @@ func (s *Server) toActivatedJob(job repository.LockedJob, jobType, worker string
 		Retries:                  int32(job.Retries),
 		Deadline:                 time.Now().Add(30 * time.Second).UnixMilli(),
 		Variables:                variablesJSON,
-		TenantId:                 "",
+		TenantId:                 tenantID,
 	}, nil
 }
 
 // ── CompleteJob ─────────────────────────────────────────────────────────
 
 func (s *Server) CompleteJob(ctx context.Context, req *pb.CompleteJobRequest) (*pb.CompleteJobResponse, error) {
-	jobID, err := s.zeebeKeys.ResolveKey("job", req.JobKey)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "job key %d not found", req.JobKey)
-	}
+	jobID := req.JobKey
 
 	var vars map[string]interface{}
 	if req.Variables != "" {
@@ -419,10 +407,7 @@ func (s *Server) CompleteJob(ctx context.Context, req *pb.CompleteJobRequest) (*
 // ── FailJob ─────────────────────────────────────────────────────────────
 
 func (s *Server) FailJob(ctx context.Context, req *pb.FailJobRequest) (*pb.FailJobResponse, error) {
-	jobID, err := s.zeebeKeys.ResolveKey("job", req.JobKey)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "job key %d not found", req.JobKey)
-	}
+	jobID := req.JobKey
 
 	// req.Retries is already "count to leave remaining after this
 	// failure" (Zeebe's own convention) — no extra decrement, unlike the
@@ -566,10 +551,7 @@ func (s *Server) EvaluateDecision(ctx context.Context, req *pb.EvaluateDecisionR
 // ── ResolveIncident ─────────────────────────────────────────────────────
 
 func (s *Server) ResolveIncident(ctx context.Context, req *pb.ResolveIncidentRequest) (*pb.ResolveIncidentResponse, error) {
-	incidentID, err := s.zeebeKeys.ResolveKey("incident", req.IncidentKey)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "incident key %d not found", req.IncidentKey)
-	}
+	incidentID := req.IncidentKey
 
 	out, err := runtime.ResolveIncident(ctx, s.db, incidentID)
 	if errors.Is(err, runtime.ErrIncidentNotFound) {
@@ -646,10 +628,7 @@ func (s *Server) UpdateJobRetries(ctx context.Context, req *pb.UpdateJobRetriesR
 	if req.Retries <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "retries must be positive")
 	}
-	jobID, err := s.zeebeKeys.ResolveKey("job", req.JobKey)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "job key %d not found", req.JobKey)
-	}
+	jobID := req.JobKey
 
 	if err := runtime.SetJobRetries(ctx, s.db, jobID, int(req.Retries)); err != nil {
 		return nil, mapJobError(err)

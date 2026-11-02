@@ -1,0 +1,37 @@
+es:
+  connection:
+    nodes:
+      - host: "${ELASTICSEARCH_HOST:host.docker.internal}"
+        httpPort: "${ELASTICSEARCH_PORT:9200}"
+  settings:
+    index:
+      number_of_replicas: 0
+
+zeebe:
+  enabled: true
+
+enterprise: false
+
+security:
+  auth:
+    cookie:
+      same-site:
+        enabled: false
+
+ui:
+  logoutHidden: true
+
+
+# Secure the Optimize public REST API against the local Keycloak.
+# Tokens must carry the optimize-api audience (Optimize API in Management Identity).
+api:
+  jwtSetUri: http://keycloak:18080/auth/realms/camunda-platform/protocol/openid-connect/certs
+  audience: optimize-api
+
+# Send alert notifications via the bundled Mailpit SMTP server.
+# Replace hostname/port to use your own SMTP server.
+email:
+  enabled: true
+  address: optimize@camunda.example.com
+  hostname: mailpit
+  port: 1025

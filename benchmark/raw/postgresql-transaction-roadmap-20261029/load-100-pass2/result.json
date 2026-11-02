@@ -1,0 +1,20 @@
+{
+  "engine": "postgresql-transaction-roadmap-20261029",
+  "generated_at": "2026-10-29T21:03:33.284394Z",
+  "clients": 100,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 10,
+  "seconds": 60.230740917,
+  "completed": 16915,
+  "instances_per_second": 280.83665819933117,
+  "errors": {},
+  "latency": {
+    "count": 16915,
+    "errors": 0,
+    "p50_us": 335236,
+    "p95_us": 647928,
+    "p99_us": 780958,
+    "mean_us": 355414.9043452557
+  }
+}

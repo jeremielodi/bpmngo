@@ -8,6 +8,7 @@ package v2
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,14 +61,32 @@ func processInstanceState(status string) string {
 }
 
 func toV2ProcessInstance(inst *models.ProcessInstance) fiber.Map {
+	tenantID := "<default>"
+	if inst.TenantID != nil && *inst.TenantID != "" {
+		tenantID = *inst.TenantID
+	}
+	var processDefinitionName interface{}
+	if inst.ProcessName != "" && inst.ProcessName != inst.ProcessKey {
+		processDefinitionName = inst.ProcessName
+	}
 	return fiber.Map{
-		"processInstanceKey":       inst.ID,
-		"processDefinitionId":      inst.ProcessKey,
-		"processDefinitionKey":     inst.ProcessDefinitionID,
-		"processDefinitionVersion": inst.Version,
-		"state":                    processInstanceState(inst.Status),
-		"startDate":                inst.StartedAt,
-		"endDate":                  inst.EndedAt,
+		"processInstanceKey":          inst.ID,
+		"rootProcessInstanceKey":      inst.ID,
+		"parentProcessInstanceKey":    nil,
+		"parentElementInstanceKey":    nil,
+		"processDefinitionId":         inst.ProcessKey,
+		"processDefinitionKey":        inst.ProcessDefinitionID,
+		"processDefinitionName":       processDefinitionName,
+		"processDefinitionVersion":    inst.Version,
+		"processDefinitionVersionTag": nil,
+		"state":                       processInstanceState(inst.Status),
+		"startDate":                   inst.StartedAt,
+		"endDate":                     inst.EndedAt,
+		"suspendedDate":               nil,
+		"businessId":                  inst.BusinessKey,
+		"hasIncident":                 false,
+		"tags":                        []string{},
+		"tenantId":                    tenantID,
 	}
 }
 
@@ -377,8 +396,7 @@ func (pc *ProcessInstanceController) StepBack(c *fiber.Ctx) error {
 	}
 	args := runtime.StepBackArgs{InstanceID: instanceID, ElementID: req.ElementId, Steps: req.Steps, DryRun: req.DryRun}
 	if req.ExecutionId != "" {
-		// Its UUID, or its elementInstanceKey (the int64 key).
-		if args.ExecutionID, err = resolveKey(pc.db, "element_instance", req.ExecutionId); err != nil {
+		if args.ExecutionID, err = strconv.ParseInt(req.ExecutionId, 10, 64); err != nil || args.ExecutionID <= 0 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"title": "INVALID_ARGUMENT", "detail": "invalid executionId",
 			})

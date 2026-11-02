@@ -39,16 +39,20 @@ const conditionalPollInterval = 10 * time.Second
 // insertConditionalSubscriptionTx makes execID wait for condition; when it
 // becomes true the watcher resumes execID on targetNodeID. lastTrue marks
 // the condition as currently true (for a re-armed trigger).
-func insertConditionalSubscriptionTx(tx *sqlx.Tx, instanceID, execID uuid.UUID, condition, targetNodeID string, lastTrue bool) error {
+func insertConditionalSubscriptionTx(tx *sqlx.Tx, instanceID uuid.UUID, execID int64, condition, targetNodeID string, lastTrue bool) error {
 	var payload interface{}
 	if lastTrue {
 		payload = `{"last": true}`
 	}
-	_, err := tx.Exec(`
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, instanceID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
 		INSERT INTO event_subscriptions
-		  (process_instance_id, execution_id, event_type, event_name, target_element_id, message_payload)
+		  (process_instance_key, execution_key, event_type, event_name, target_element_id, message_payload)
 		VALUES ($1, $2, 'conditional', $3, $4, $5)
-	`, instanceID, execID, condition, targetNodeID, payload)
+	`, instanceKey, execID, condition, targetNodeID, payload)
 	return err
 }
 
@@ -166,8 +170,9 @@ func recheckConditions(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 	}
 	if instances == nil {
 		if err := db.Select(&instances, `
-			SELECT DISTINCT process_instance_id FROM event_subscriptions
-			WHERE event_type = 'conditional' AND consumed_at IS NULL`); err != nil {
+			SELECT DISTINCT pi.id FROM event_subscriptions s
+			JOIN process_instances pi ON pi.engine_key = s.process_instance_key
+			WHERE s.event_type = 'conditional' AND s.consumed_at IS NULL`); err != nil {
 			return err
 		}
 	}
@@ -183,12 +188,13 @@ func recheckConditions(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 }
 
 type conditionalSubscription struct {
-	ID                uuid.UUID `db:"id"`
-	ProcessInstanceID uuid.UUID `db:"process_instance_id"`
-	ExecutionID       uuid.UUID `db:"execution_id"`
-	Condition         string    `db:"event_name"`
-	TargetElementID   string    `db:"target_element_id"`
-	Payload           []byte    `db:"message_payload"`
+	ID                 uuid.UUID `db:"id"`
+	ProcessInstanceID  uuid.UUID `db:"process_instance_id"`
+	ProcessInstanceKey int64     `db:"process_instance_key"`
+	ExecutionID        int64     `db:"execution_key"`
+	Condition          string    `db:"event_name"`
+	TargetElementID    string    `db:"target_element_id"`
+	Payload            []byte    `db:"message_payload"`
 }
 
 var (
@@ -215,13 +221,14 @@ func checkConditions(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, instan
 	}
 	var subs []conditionalSubscription
 	if err := tx.Select(&subs, `
-		SELECT id, process_instance_id, execution_id, event_name, COALESCE(target_element_id, '') AS target_element_id, message_payload
-		FROM event_subscriptions
-		WHERE event_type = 'conditional' AND consumed_at IS NULL AND execution_id IS NOT NULL
-		  AND ($1::uuid[] IS NULL OR process_instance_id = ANY($1::uuid[]))
-		ORDER BY created_at
+		SELECT s.id, pi.id AS process_instance_id, s.process_instance_key, s.execution_key, s.event_name,
+		       COALESCE(s.target_element_id, '') AS target_element_id, s.message_payload
+		FROM event_subscriptions s
+		JOIN process_instances pi ON pi.engine_key = s.process_instance_key
+		WHERE s.event_type = 'conditional' AND s.consumed_at IS NULL AND s.execution_key IS NOT NULL
+		  AND ($1::uuid[] IS NULL OR pi.id = ANY($1::uuid[]))
+		ORDER BY s.created_at
 		LIMIT 500
-		FOR UPDATE SKIP LOCKED
 	`, only); err != nil {
 		return err
 	}
@@ -230,7 +237,7 @@ func checkConditions(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, instan
 	}
 
 	engineRepo := repository.NewEngineRepository(db, dispatcher)
-	varsByScope := map[uuid.UUID]map[string]interface{}{}
+	varsByScope := map[int64]map[string]interface{}{}
 	var fired []conditionalSubscription
 	for _, s := range subs {
 		// Evaluated in the scope of the waiting element.
@@ -254,13 +261,16 @@ func checkConditions(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, instan
 		}
 		switch {
 		case now && (state.Last == nil || !*state.Last):
-			if _, err := tx.Exec(`UPDATE event_subscriptions SET consumed_at = NOW() WHERE id = $1`, s.ID); err != nil {
+			result, err := tx.Exec(`UPDATE event_subscriptions SET consumed_at = NOW() WHERE process_instance_key = $1 AND id = $2 AND consumed_at IS NULL`, s.ProcessInstanceKey, s.ID)
+			if err != nil {
 				return err
 			}
-			fired = append(fired, s)
+			if n, _ := result.RowsAffected(); n == 1 {
+				fired = append(fired, s)
+			}
 		case state.Last == nil || *state.Last != now:
 			b, _ := json.Marshal(map[string]bool{"last": now})
-			if _, err := tx.Exec(`UPDATE event_subscriptions SET message_payload = $2 WHERE id = $1`, s.ID, b); err != nil {
+			if _, err := tx.Exec(`UPDATE event_subscriptions SET message_payload = $3 WHERE process_instance_key = $1 AND id = $2`, s.ProcessInstanceKey, s.ID, b); err != nil {
 				return err
 			}
 		}
@@ -275,11 +285,11 @@ func checkConditions(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, instan
 			continue // its token moved on or was cancelled meanwhile
 		}
 		if err := repository.ResumeWaitingExecution(db, s.ProcessInstanceID, s.ExecutionID, s.TargetElementID); err != nil {
-			log.Printf("conditional watcher: resuming %s: %v", s.ExecutionID, err)
+			log.Printf("conditional watcher: resuming %d: %v", s.ExecutionID, err)
 			continue
 		}
 		if err := ResumeExecution(db, s.ExecutionID, dispatcher); err != nil {
-			log.Printf("conditional watcher: continuing %s: %v", s.ExecutionID, err)
+			log.Printf("conditional watcher: continuing %d: %v", s.ExecutionID, err)
 		}
 	}
 	return nil

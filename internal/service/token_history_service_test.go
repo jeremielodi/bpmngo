@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/models"
 )
 
@@ -42,7 +41,7 @@ func TestBuildTokenHistory_ExecutionMoved(t *testing.T) {
 }
 
 func TestBuildTokenHistory_TaskClaimedResolvesElementFromTask(t *testing.T) {
-	taskID := uuid.New()
+	taskID := int64(101)
 	logs := []models.AuditLog{
 		{
 			Action:    models.ActionTaskClaimed,
@@ -76,8 +75,8 @@ func TestBuildTokenHistory_TaskClaimedResolvesElementFromTask(t *testing.T) {
 // ExecutionID field so the frontend can group replay steps by token
 // (multi-token / parallel-branch replay).
 func TestBuildTokenHistory_TaskStepResolvesExecutionIdFromTask(t *testing.T) {
-	taskID := uuid.New()
-	execID := uuid.New()
+	taskID := int64(101)
+	execID := int64(201)
 	logs := []models.AuditLog{
 		{
 			Action:    models.ActionTaskCreated,
@@ -96,7 +95,7 @@ func TestBuildTokenHistory_TaskStepResolvesExecutionIdFromTask(t *testing.T) {
 		t.Fatalf("expected 1 step, got %d", len(steps))
 	}
 	if steps[0].ExecutionId == nil || *steps[0].ExecutionId != execID {
-		t.Errorf("expected executionId %s, got %v", execID, steps[0].ExecutionId)
+		t.Errorf("expected executionId %d, got %v", execID, steps[0].ExecutionId)
 	}
 }
 

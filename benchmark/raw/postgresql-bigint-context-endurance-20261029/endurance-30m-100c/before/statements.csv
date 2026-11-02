@@ -1,0 +1,11 @@
+calls,total_exec_ms,mean_exec_ms,rows,shared_blks_hit,shared_blks_read,shared_blks_dirtied,shared_blks_written,temp_blks_read,temp_blks_written,wal_records,wal_fpi,wal_bytes,query
+1,9.519,9.519042,123,10819,77,78,0,0,0,45,43,336534,"SELECT relname,n_live_tup,n_dead_tup,round($1*n_dead_tup/GREATEST(n_live_tup+n_dead_tup,$2),$3) AS dead_pct,pg_total_relation_size(relid) AS total_bytes,seq_scan,idx_scan,n_tup_ins,n_tup_upd,n_tup_del,n_tup_hot_upd,autovacuum_count,autoanalyze_count,last_autovacuum,last_autoanalyze FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC"
+1,0.120,0.120375,1,0,0,0,0,0,0,0,0,0,SELECT pg_stat_statements_reset()
+1,0.063,0.062625,30,3,0,0,0,0,0,0,0,0,"SELECT backend_type,object,context,reads,read_time,writes,write_time,writebacks,writeback_time,extends,extend_time,hits,evictions,reuses,fsyncs,fsync_time,stats_reset FROM pg_stat_io ORDER BY backend_type,object,context"
+1,0.040,0.039666,1,1,0,0,0,0,0,0,0,0,"SELECT datname,numbackends,xact_commit,xact_rollback,blks_read,blks_hit,temp_files,temp_bytes,deadlocks,blk_read_time,blk_write_time,session_time,active_time,idle_in_transaction_time,stats_reset FROM pg_stat_database WHERE datname=$1"
+1,0.023,0.022667,1,0,0,0,0,0,0,0,0,0,SELECT * FROM pg_stat_wal
+1,0.012,0.011584,0,4,0,0,0,0,0,0,0,0,"SELECT id, status FROM public.process_instances WHERE status IN ($2, $3) ORDER BY ended_at LIMIT $1"
+1,0.011,0.010792,1,0,0,0,0,0,0,0,0,0,SELECT * FROM pg_stat_bgwriter
+1,0.005,0.004958,0,0,0,0,0,0,0,0,0,0,"WITH to_claim AS ( SELECT engine_key FROM public.timer_jobs WHERE is_triggered = $2 AND due_at <= NOW() ORDER BY due_at ASC LIMIT $1 FOR UPDATE SKIP LOCKED ) UPDATE public.timer_jobs t SET is_triggered = $3, triggered_at = NOW() FROM to_claim WHERE t.engine_key = to_claim.engine_key RETURNING t.engine_key, (SELECT id FROM public.process_instances WHERE engine_key = t.process_instance_key) AS process_instance_id, t.execution_key, t.event_type, t.due_at, t.payload, t.is_triggered, t.created_at, t."
+1,0.005,0.004750,1,1,0,0,0,0,0,0,0,0,SELECT EXTRACT($1 FROM MIN(due_at) - NOW())::float8 FROM public.timer_jobs WHERE is_triggered = $2
+2,0.003,0.001397,2,0,0,0,0,0,0,0,0,0,SELECT pg_stat_reset_shared($1)

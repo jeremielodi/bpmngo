@@ -25,8 +25,13 @@ const BPMN = path.join(__dirname, 'bpmn', '53_step_back.bpmn');
 const PARALLEL_BPMN = path.join(__dirname, 'bpmn', '53_step_back_parallel.bpmn');
 const client = new BpmnGoClient();
 
+// GOFLOW_PG_CONTAINER names the Postgres container of the stack under test
+// (an isolated stack); by default, this repository's compose service.
 function psql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U goflow -d goflow -tAc "${sql}"`, {
+  const target = process.env.GOFLOW_PG_CONTAINER
+    ? `docker exec -i ${process.env.GOFLOW_PG_CONTAINER}`
+    : 'docker compose exec -T postgres';
+  return execSync(`${target} psql -U goflow -d goflow -tAc "${sql}"`, {
     cwd: path.join(__dirname, '..', '..'),
   }).toString().trim();
 }
@@ -103,7 +108,7 @@ async function run() {
         async fn() {
           const id = await startToApprove({ amount: 7 });
           const execId = await tokenAt(id, 'approve');
-          assert(psql(`SELECT count(*) FROM timer_jobs WHERE process_instance_id='${id}' AND is_triggered=false`) === '1',
+          assert(psql(`SELECT count(*) FROM timer_jobs WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = '${id}') AND is_triggered=false`) === '1',
             'expected the boundary timer of approve to be armed');
 
           const dry = await stepBack(client, id, { executionId: execId, dryRun: true });
@@ -118,9 +123,9 @@ async function run() {
           assert(res.data.executionId === execId, 'the token keeps its execution');
 
           assert(!(await openTasks(id)).some(t => t.taskDefinitionKey === 'approve'), 'approve task should be cancelled');
-          assert(psql(`SELECT count(*) FROM timer_jobs WHERE process_instance_id='${id}' AND is_triggered=false`) === '0',
+          assert(psql(`SELECT count(*) FROM timer_jobs WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = '${id}') AND is_triggered=false`) === '0',
             'the boundary timer of approve should be gone');
-          assert(psql(`SELECT status FROM tasks WHERE process_instance_id='${id}' AND task_definition_key='approve'`) === 'cancelled',
+          assert(psql(`SELECT status FROM tasks WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = '${id}') AND task_definition_key='approve'`) === 'cancelled',
             'approve task row should be cancelled');
 
           const vars: any = await client.getProcessVariables(id);

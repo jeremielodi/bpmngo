@@ -17,22 +17,29 @@ import (
 
 // Keys in the /v2 API. BpmnGo's objects are identified by UUIDs, the gRPC
 // gateway's by int64 keys (Zeebe's protocol), issued on first use in
-// zeebe_keys. /v2 accepts both forms of a key, and answers with the UUID —
-// or, with REST_KEYS=int, with the int64 key, as a string as Camunda does,
-// so a client sees one key whichever API it calls.
+// zeebe_keys. /v2 accepts both forms and answers with the int64 key by
+// default, as a string as Camunda does. REST_KEYS=uuid keeps the legacy
+// BpmnGo response format when explicitly requested.
 
-// RestIntKeys tells whether /v2 answers with int64 keys (REST_KEYS=int).
+// RestIntKeys tells whether /v2 answers with int64 keys. Camunda-compatible
+// int keys are the default; REST_KEYS=uuid is the explicit legacy opt-out.
 func RestIntKeys() bool {
 	restKeysOnce.Do(func() {
-		switch m := strings.ToLower(strings.TrimSpace(os.Getenv("REST_KEYS"))); m {
-		case "int":
-			restKeysInt = true
-		case "", "uuid":
-		default:
-			log.Printf("⚠️ unknown REST_KEYS %q — using \"uuid\"", m)
-		}
+		restKeysInt = restIntKeysMode(os.Getenv("REST_KEYS"))
 	})
 	return restKeysInt
+}
+
+func restIntKeysMode(value string) bool {
+	switch m := strings.ToLower(strings.TrimSpace(value)); m {
+	case "", "int":
+		return true
+	case "uuid":
+		return false
+	default:
+		log.Printf("⚠️ unknown REST_KEYS %q — using \"int\"", m)
+		return true
+	}
 }
 
 var (
@@ -45,6 +52,7 @@ var (
 // same key).
 var keyFields = map[string]string{
 	"processInstanceKey":       "process_instance",
+	"rootProcessInstanceKey":   "process_instance",
 	"parentProcessInstanceKey": "process_instance",
 	"processDefinitionKey":     "process_definition",
 	"jobKey":                   "job",
@@ -52,6 +60,10 @@ var keyFields = map[string]string{
 	"flowNodeInstanceKey":      "element_instance",
 	"incidentKey":              "incident",
 	"userTaskKey":              "user_task",
+	"messageKey":               "message",
+	"signalKey":                "signal",
+	"variableKey":              "variable",
+	"scopeKey":                 "process_instance",
 	"jobId":                    "job", // POST /v2/jobs/:key/completion, when the instance ended
 }
 
@@ -66,7 +78,7 @@ var keyListFields = map[string]string{
 // it's no key).
 var routeKeyFields = map[string]func(at []string) string{
 	"/v2/messages/publication": func(at []string) string {
-		if len(at) == 1 && at[0] == "key" {
+		if len(at) == 1 && (at[0] == "messageKey" || at[0] == "key") {
 			return "message"
 		}
 		return ""
@@ -86,9 +98,6 @@ var routeKeyFields = map[string]func(at []string) string{
 // pathKeys are the path segments followed by a key, with its resource type.
 var pathKeys = map[string]string{
 	"process-instances": "process_instance",
-	"jobs":              "job",
-	"user-tasks":        "user_task",
-	"incidents":         "incident",
 }
 
 // KeyTranslation, mounted on /v2 after authentication, lets the handlers
@@ -219,4 +228,71 @@ func intKeysInJSON(keys *repository.ZeebeKeyRepository, route string, body []byt
 		s.set(strconv.FormatInt(issued[s.ref], 10))
 	}
 	return json.Marshal(doc)
+}
+
+// legacyPathKeys are the paths, outside /v2, whose next segment holds a
+// UUID, with the zeebe_keys resource type of that UUID.
+var legacyPathKeys = []struct{ prefix, resourceType string }{
+	{"/engine-rest/process-instance/", "process_instance"},
+	{"/engine-rest/history/process-instance/", "process_instance"},
+	{"/engine-rest/audit/process/", "process_instance"},
+	{"/multi-instance/execution/", "process_instance"},
+	{"/engine-rest/process-definition/", "process_definition"},
+}
+
+// legacyQueryKeys are the query parameters, outside /v2, holding a UUID.
+var legacyQueryKeys = map[string]string{
+	"processInstanceId":   "process_instance",
+	"processDefinitionId": "process_definition",
+}
+
+// LegacyKeyTranslation, mounted after authentication, lets the routes
+// outside /v2 take the int64 key /v2 and gRPC answer with wherever they
+// take a process instance or definition UUID: in the path or in a query
+// parameter, the key is replaced by its UUID before routing. A key nothing
+// was issued for becomes uuid.Nil, which the handler doesn't find. The
+// int64 ids of tasks, jobs, timers and incidents are their own ids and are
+// left alone.
+func LegacyKeyTranslation(db *sqlx.DB) fiber.Handler {
+	keys := repository.NewZeebeKeyRepository(db)
+	resolve := func(resourceType, s string) (string, bool) {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return "", false // a UUID, or a word such as "key"
+		}
+		id, err := keys.ResolveKey(resourceType, n)
+		if err != nil {
+			id = uuid.Nil
+		}
+		return id.String(), true
+	}
+	return func(c *fiber.Ctx) error {
+		path := c.Path()
+		if strings.HasPrefix(path, "/v2/") {
+			return c.Next()
+		}
+		for _, p := range legacyPathKeys {
+			if !strings.HasPrefix(path, p.prefix) {
+				continue
+			}
+			rest := path[len(p.prefix):]
+			segment, tail, _ := strings.Cut(rest, "/")
+			if id, ok := resolve(p.resourceType, segment); ok {
+				if tail != "" || strings.HasSuffix(rest, "/") {
+					tail = "/" + tail
+				}
+				c.Path(p.prefix + id + tail)
+			}
+			break
+		}
+		args := c.Context().QueryArgs()
+		for param, resourceType := range legacyQueryKeys {
+			if raw := args.Peek(param); len(raw) > 0 {
+				if id, ok := resolve(resourceType, string(raw)); ok {
+					args.Set(param, id)
+				}
+			}
+		}
+		return c.Next()
+	}
 }

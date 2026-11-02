@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/jeremielodi/bpmngo/internal/common"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
@@ -31,7 +32,7 @@ func BroadcastSignal(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, name s
 	for _, sub := range subs {
 		// Node the execution is currently parked at, for audit purposes.
 		var currentNodeID string
-		db.QueryRow(`SELECT current_element_id FROM executions WHERE process_instance_id = $1 AND id = $2`, sub.ProcessInstanceID, sub.ExecutionID).Scan(&currentNodeID)
+		db.QueryRow(`SELECT current_element_id FROM executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1) AND engine_key = $2`, sub.ProcessInstanceID, sub.ExecutionID).Scan(&currentNodeID)
 
 		// Determine target element
 		targetElementID := ""
@@ -66,17 +67,17 @@ func BroadcastSignal(db *sqlx.DB, dispatcher *events.TaskEventDispatcher, name s
 		subRepo.Consume(sub.ID)
 
 		if err := repository.ResumeWaitingExecution(db, sub.ProcessInstanceID, sub.ExecutionID, targetElementID); err != nil {
-			errs = append(errs, fmt.Sprintf("exec %s: %v", sub.ExecutionID, err))
+			errs = append(errs, fmt.Sprintf("exec %d: %v", sub.ExecutionID, err))
 			continue
 		}
 		if currentNodeID != "" && targetElementID != "" {
 			service.LogAuditErr("execution moved", auditService.LogExecutionMoved(sub.ExecutionID, sub.ProcessInstanceID, currentNodeID, targetElementID, variables))
 			if p := eventlog.Global(); p != nil {
-				p.ExecutionMoved(sub.ProcessInstanceID.String(), sub.ExecutionID.String(), currentNodeID, targetElementID)
+				p.ExecutionMoved(sub.ProcessInstanceID.String(), strconv.FormatInt(sub.ExecutionID, 10), currentNodeID, targetElementID)
 			}
 		}
 		if err := ResumeExecution(db, sub.ExecutionID, dispatcher); err != nil {
-			errs = append(errs, fmt.Sprintf("resume %s: %v", sub.ExecutionID, err))
+			errs = append(errs, fmt.Sprintf("resume %d: %v", sub.ExecutionID, err))
 			continue
 		}
 		resumed++

@@ -1,0 +1,14 @@
+services:
+  postgres:
+    container_name: bpmngo-benchmark-postgres
+    cpuset: "0-1"
+    # The complete BpmnGo stack must stay within the benchmark's 2 GiB budget.
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-768m}
+  bpmngo:
+    container_name: bpmngo-benchmark-app
+    # CPU 1 is exclusively available to PostgreSQL; CPU 0 is shared. The
+    # complete stack still stays inside the same two-CPU budget.
+    cpuset: "0"
+    mem_limit: 1280m
+    environment:
+      RUNTIME_MAX_CONCURRENCY: ${RUNTIME_MAX_CONCURRENCY:-8}

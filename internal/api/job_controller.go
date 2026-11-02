@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/models"
@@ -20,27 +22,27 @@ func (c *JobController) GetJobs(ctx *fiber.Ctx) error {
 	jobType := ctx.Query("jobType")
 
 	var jobs []models.Job
-	query := `SELECT id, process_instance_id, execution_id, job_type, status, payload, retries, error_message, locked_by, locked_until, created_at, completed_at, updated_at 
-	          FROM public.jobs WHERE 1=1`
+	query := `SELECT j.engine_key, pi.id AS process_instance_id, j.execution_key, j.job_type, j.status, j.payload, j.retries, j.error_message, j.locked_by, j.locked_until, j.created_at, j.completed_at, j.updated_at
+	          FROM public.jobs j JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key WHERE 1=1`
 	args := []interface{}{}
 	argIndex := 1
 
 	if processInstanceID != "" {
 		pid, err := uuid.Parse(processInstanceID)
 		if err == nil {
-			query += " AND process_instance_id = $" + string(rune(argIndex+'0'))
+			query += " AND pi.id = $" + strconv.Itoa(argIndex)
 			args = append(args, pid)
 			argIndex++
 		}
 	}
 
 	if jobType != "" {
-		query += " AND job_type = $" + string(rune(argIndex+'0'))
+		query += " AND j.job_type = $" + strconv.Itoa(argIndex)
 		args = append(args, jobType)
 		argIndex++
 	}
 
-	query += " ORDER BY created_at DESC"
+	query += " ORDER BY j.created_at DESC"
 
 	err := c.db.Select(&jobs, query, args...)
 	if err != nil {

@@ -3,6 +3,7 @@ package eventlog
 import (
 	"context"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
@@ -137,7 +138,7 @@ func (c *Consumer) project(env *pb.Envelope) {
 			log.Printf("eventlog projector: UpdateInstanceStatus failed: %v", err)
 		}
 	case *pb.Envelope_JobCreated:
-		jobID, err := uuid.Parse(e.JobCreated.JobId)
+		jobID, err := strconv.ParseInt(e.JobCreated.JobId, 10, 64)
 		if err != nil {
 			return
 		}
@@ -145,15 +146,15 @@ func (c *Consumer) project(env *pb.Envelope) {
 		if err != nil {
 			return
 		}
-		var execID *uuid.UUID
-		if parsed, err := uuid.Parse(e.JobCreated.ExecutionId); err == nil {
+		var execID *int64
+		if parsed, err := strconv.ParseInt(e.JobCreated.ExecutionId, 10, 64); err == nil {
 			execID = &parsed
 		}
 		if err := c.projRepo.UpsertJob(jobID, instanceID, execID, e.JobCreated.JobType, "created"); err != nil {
 			log.Printf("eventlog projector: UpsertJob failed: %v", err)
 		}
 	case *pb.Envelope_JobCompleted:
-		jobID, err := uuid.Parse(e.JobCompleted.JobId)
+		jobID, err := strconv.ParseInt(e.JobCompleted.JobId, 10, 64)
 		if err != nil {
 			return
 		}
@@ -165,7 +166,7 @@ func (c *Consumer) project(env *pb.Envelope) {
 			log.Printf("eventlog projector: UpdateJobStatus failed: %v", err)
 		}
 	case *pb.Envelope_JobFailed:
-		jobID, err := uuid.Parse(e.JobFailed.JobId)
+		jobID, err := strconv.ParseInt(e.JobFailed.JobId, 10, 64)
 		if err != nil {
 			return
 		}

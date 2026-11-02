@@ -1,0 +1,18 @@
+calls,total_exec_ms,mean_exec_ms,rows,shared_blks_hit,shared_blks_read,shared_blks_dirtied,shared_blks_written,temp_blks_read,temp_blks_written,wal_records,wal_fpi,wal_bytes,query
+1,6.643,6.642750,123,10777,0,0,0,0,0,2,0,150,"SELECT relname,n_live_tup,n_dead_tup,round($1*n_dead_tup/GREATEST(n_live_tup+n_dead_tup,$2),$3) AS dead_pct,pg_total_relation_size(relid) AS total_bytes,seq_scan,idx_scan,n_tup_ins,n_tup_upd,n_tup_del,n_tup_hot_upd,autovacuum_count,autoanalyze_count,last_autovacuum,last_autoanalyze FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC"
+1,0.083,0.082833,1,0,0,0,0,0,0,0,0,0,SELECT pg_stat_statements_reset()
+1,0.063,0.063459,30,3,0,0,0,0,0,0,0,0,"SELECT backend_type,object,context,reads,read_time,writes,write_time,writebacks,writeback_time,extends,extend_time,hits,evictions,reuses,fsyncs,fsync_time,stats_reset FROM pg_stat_io ORDER BY backend_type,object,context"
+1,0.046,0.046499,1,0,0,0,0,0,0,0,0,0,SELECT pg_stat_reset()
+1,0.038,0.038167,1,1,0,0,0,0,0,0,0,0,"SELECT datname,numbackends,xact_commit,xact_rollback,blks_read,blks_hit,temp_files,temp_bytes,deadlocks,blk_read_time,blk_write_time,session_time,active_time,idle_in_transaction_time,stats_reset FROM pg_stat_database WHERE datname=$1"
+1,0.017,0.017334,1,0,0,0,0,0,0,0,0,0,SELECT * FROM pg_stat_wal
+1,0.015,0.015125,0,2,0,0,0,0,0,0,0,0,"SELECT s.id, pi.id AS process_instance_id, s.process_instance_key, s.execution_key, s.event_name, COALESCE(s.target_element_id, $2) AS target_element_id, s.message_payload FROM event_subscriptions s JOIN process_instances pi ON pi.engine_key = s.process_instance_key WHERE s.event_type = $3 AND s.consumed_at IS NULL AND s.execution_key IS NOT NULL AND ($1::uuid[] IS NULL OR pi.id = ANY($1::uuid[])) ORDER BY s.created_at LIMIT $4"
+1,0.009,0.009459,0,1,0,0,0,0,0,0,0,0,"SELECT id, status FROM public.process_instances WHERE status IN ($2, $3) ORDER BY ended_at LIMIT $1"
+1,0.009,0.008959,1,0,0,0,0,0,0,0,0,0,SELECT * FROM pg_stat_bgwriter
+2,0.004,0.002208,2,0,0,0,0,0,0,0,0,0,SELECT pg_stat_reset_shared($1)
+1,0.004,0.004208,0,1,0,0,0,0,0,0,0,0,"WITH expired AS ( SELECT engine_key FROM published_messages WHERE expires_at <= $1 ), deleted_correlations AS ( DELETE FROM published_message_correlations WHERE published_message_key IN (SELECT engine_key FROM expired) ) DELETE FROM published_messages WHERE engine_key IN (SELECT engine_key FROM expired)"
+1,0.003,0.003125,1,1,0,0,0,0,0,0,0,0,SELECT COUNT(*) FROM published_messages
+1,0.003,0.003042,0,1,0,0,0,0,0,0,0,0,SELECT c.id FROM public.process_instances c LEFT JOIN public.executions e ON e.process_instance_key = c.parent_process_instance_key AND e.engine_key = c.parent_execution_key WHERE c.status = $1 AND c.parent_execution_key IS NOT NULL AND (e.engine_key IS NULL OR e.status <> $2) LIMIT $3
+1,0.003,0.002791,0,0,0,0,0,0,0,0,0,0,"WITH to_claim AS ( SELECT engine_key FROM public.timer_jobs WHERE is_triggered = $2 AND due_at <= NOW() ORDER BY due_at ASC LIMIT $1 FOR UPDATE SKIP LOCKED ) UPDATE public.timer_jobs t SET is_triggered = $3, triggered_at = NOW() FROM to_claim WHERE t.engine_key = to_claim.engine_key RETURNING t.engine_key, (SELECT id FROM public.process_instances WHERE engine_key = t.process_instance_key) AS process_instance_id, t.execution_key, t.event_type, t.due_at, t.payload, t.is_triggered, t.created_at, t."
+1,0.003,0.002542,1,0,0,0,0,0,0,0,0,0,SELECT EXTRACT($1 FROM MIN(due_at) - NOW())::float8 FROM public.timer_jobs WHERE is_triggered = $2
+1,0.000,0.000459,0,0,0,0,0,0,0,0,0,0,begin
+1,0.000,0.000209,0,0,0,0,0,0,0,0,0,0,rollback

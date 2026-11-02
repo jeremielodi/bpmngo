@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -66,7 +67,7 @@ func NewPostgres(util common.Util) (*sqlx.DB, error) {
 		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions)
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -98,7 +99,7 @@ func NewPostgresWithPool(util common.Util, config PoolConfig) (*sqlx.DB, error) 
 		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions)
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -127,7 +128,7 @@ func NewPostgresDev(util common.Util) (*sqlx.DB, error) {
 		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions)
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -155,7 +156,7 @@ func NewPostgresHighPerf(util common.Util) (*sqlx.DB, error) {
 		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions)
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -255,7 +256,7 @@ func directConnString(util common.Util) string {
 // directConnString), for session-level work: the advisory locks of the
 // archiver and the retention job.
 func NewDirectPostgres(util common.Util) (*sqlx.DB, error) {
-	db, err := sqlx.Connect(driverName, directConnString(util)+" connect_timeout=10"+pgxOptions)
+	db, err := sqlx.Connect(driverName, directConnString(util)+" connect_timeout=10"+pgxOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database directly: %w", err)
 	}
@@ -325,7 +326,7 @@ func NewReadPostgres(util common.Util) (*sqlx.DB, error) {
 		"host=%s port=%v user=%s password=%s dbname=%s sslmode=%s connect_timeout=10 statement_timeout=60000",
 		host, port, env("DB_USER"), env("DB_PASS"), env("DB_NAME"), sslMode(env),
 	)
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions)
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the read replica: %w", err)
 	}
@@ -342,7 +343,23 @@ func NewReadPostgres(util common.Util) (*sqlx.DB, error) {
 // connection.
 const driverName = "pgx"
 
-// pgxOptions: describe a statement once per connection, then send each
-// execution in one round trip with the unnamed statement — safe through
-// PgBouncer, unlike cached named statements.
-const pgxOptions = " default_query_exec_mode=cache_describe"
+// pgxOptions picks how pgx sends queries (DB_QUERY_EXEC_MODE).
+//
+// The default, cache_statement, prepares each query once per connection
+// under a name and reuses its plan: Postgres neither parses nor plans it
+// again. On the engine's multi-join lookups planning costs 5 to 12 times
+// the execution itself, so re-planning every call (cache_describe, which
+// runs the unnamed statement) roughly doubled Postgres's CPU on the hot
+// path. PgBouncer in transaction mode keeps named statements working from
+// 1.21 on (max_prepared_statements > 0); set DB_QUERY_EXEC_MODE=
+// cache_describe behind an older pooler or one without that support.
+// After a manual schema migration, restart BpmnGo: a cached plan whose
+// result columns changed fails once.
+func pgxOptions() string {
+	switch mode := os.Getenv("DB_QUERY_EXEC_MODE"); mode {
+	case "cache_describe", "describe_exec", "exec", "simple_protocol":
+		return " default_query_exec_mode=" + mode
+	default:
+		return " default_query_exec_mode=cache_statement"
+	}
+}

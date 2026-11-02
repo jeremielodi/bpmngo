@@ -60,7 +60,7 @@ async function run() {
             filter: { processInstanceKey: instanceId, name: 'amount' },
           });
           assert(onlyAmount.data.items.length === 1, `expected exactly 1 variable, got ${onlyAmount.data.items.length}`);
-          assert(onlyAmount.data.items[0].value === 42, `expected value 42, got ${onlyAmount.data.items[0].value}`);
+          assert(JSON.parse(onlyAmount.data.items[0].value) === 42 /* Camunda 8: values are JSON */, `expected value 42, got ${onlyAmount.data.items[0].value}`);
 
           const flowNodes = await client.api.post('/v2/flownode-instances/search', {
             filter: { processInstanceKey: instanceId },

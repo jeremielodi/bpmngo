@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/common"
@@ -41,7 +42,7 @@ func (r *Runtime) advance(ctx context.Context, engineRepo *repository.EngineRepo
 	}
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(exec.ID, exec.ProcessInstanceID, node.ID, next, variables))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), exec.ID.String(), node.ID, next)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(exec.ID, 10), node.ID, next)
 	}
 	return next, nil
 }
@@ -113,7 +114,7 @@ func (r *Runtime) executeTerminateEnd(ctx context.Context, engineRepo *repositor
 	if err != nil {
 		return fmt.Errorf("terminate end event %s: %w", node.ID, err)
 	}
-	tasks, jobs, err := engineRepo.CancelScopeTx(tx, exec.ProcessInstanceID, scopeID, uuid.Nil)
+	tasks, jobs, err := engineRepo.CancelScopeTx(tx, exec.ProcessInstanceID, scopeID, 0)
 	if err != nil {
 		return fmt.Errorf("terminate end event %s: %w", node.ID, err)
 	}
@@ -139,7 +140,7 @@ func (r *Runtime) executeTerminateEnd(ctx context.Context, engineRepo *repositor
 	r.logCancelled(exec.ProcessInstanceID, tasks, jobs, "terminate end event "+node.ID)
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(scopeID, exec.ProcessInstanceID, subNode.ID, next, variables))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), scopeID.String(), subNode.ID, next)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(scopeID, 10), subNode.ID, next)
 	}
 	return r.ExecuteExecution(ctx, scopeID)
 }
@@ -218,13 +219,13 @@ func (r *Runtime) catchError(ctx context.Context, engineRepo *repository.EngineR
 	}
 
 	catchingID, fromNode := thrower.ID, throwerID
-	var tasks, jobs []uuid.UUID
+	var tasks, jobs []int64
 	if catcher.AttachedToRef != throwerID {
 		if catchingID, err = engineRepo.FindScopeExecutionTx(tx, instanceID, thrower.ID, scope); err != nil {
 			return fmt.Errorf("%s: %w", reason, err)
 		}
 		fromNode = scope
-		if tasks, jobs, err = engineRepo.CancelScopeTx(tx, instanceID, catchingID, uuid.Nil); err != nil {
+		if tasks, jobs, err = engineRepo.CancelScopeTx(tx, instanceID, catchingID, 0); err != nil {
 			return fmt.Errorf("%s: %w", reason, err)
 		}
 	}
@@ -244,7 +245,7 @@ func (r *Runtime) catchError(ctx context.Context, engineRepo *repository.EngineR
 	r.logCancelled(instanceID, tasks, jobs, reason)
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(catchingID, instanceID, fromNode, catcher.ID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(instanceID.String(), catchingID.String(), fromNode, catcher.ID)
+		p.ExecutionMoved(instanceID.String(), strconv.FormatInt(catchingID, 10), fromNode, catcher.ID)
 	}
 	return r.ExecuteExecution(ctx, catchingID)
 }
@@ -276,7 +277,7 @@ func (r *Runtime) PropagateErrorToCaller(ctx context.Context, instanceID uuid.UU
 	engineRepo := repository.NewEngineRepository(r.DB, r.dispatcher)
 	callExec, err := engineRepo.GetExecutionByID(caller.ExecID)
 	if err != nil || callExec == nil {
-		return true, fmt.Errorf("call activity execution %s: %v", caller.ExecID, err)
+		return true, fmt.Errorf("call activity execution %d: %v", caller.ExecID, err)
 	}
 	parentRT := NewRuntime(caller.Graph, r.DB, r.dispatcher)
 	return true, parentRT.catchError(ctx, engineRepo, caller.Graph, callExec, caller.Node.ID, catcher, scope, reason)
@@ -285,7 +286,7 @@ func (r *Runtime) PropagateErrorToCaller(ctx context.Context, instanceID uuid.UU
 // logCancelled records what an interruption cancelled. It also
 // terminates the processes started by call activities the interruption
 // left (see service.TerminateOrphanedCalledInstances).
-func (r *Runtime) logCancelled(instanceID uuid.UUID, tasks, jobs []uuid.UUID, reason string) {
+func (r *Runtime) logCancelled(instanceID uuid.UUID, tasks, jobs []int64, reason string) {
 	service.TerminateOrphanedCalledInstances(r.DB, r.dispatcher, &instanceID)
 	for _, id := range tasks {
 		service.LogAuditErr("task cancelled", r.auditService.LogTaskCancelled(id, instanceID, reason))

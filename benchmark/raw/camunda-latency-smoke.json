@@ -1,0 +1,117 @@
+{
+  "engine": "camunda-8.10.7-smoke",
+  "generated_at": "2026-10-29T14:44:47.404974Z",
+  "iterations": 2,
+  "calls": {
+    "CompleteJob": [
+      {
+        "duration_us": 13119,
+        "code": "OK"
+      },
+      {
+        "duration_us": 7537,
+        "code": "OK"
+      }
+    ],
+    "CreateProcessInstance": [
+      {
+        "duration_us": 29081,
+        "code": "OK"
+      },
+      {
+        "duration_us": 6954,
+        "code": "OK"
+      }
+    ],
+    "CreateProcessInstanceWithResult": [
+      {
+        "duration_us": 15603,
+        "code": "OK"
+      },
+      {
+        "duration_us": 11713,
+        "code": "OK"
+      }
+    ],
+    "DeployResource": [
+      {
+        "duration_us": 139473,
+        "code": "OK"
+      },
+      {
+        "duration_us": 12939,
+        "code": "OK"
+      }
+    ],
+    "JobDelivery": [
+      {
+        "duration_us": 33727,
+        "code": "OK"
+      },
+      {
+        "duration_us": 21959,
+        "code": "OK"
+      }
+    ],
+    "Topology": [
+      {
+        "duration_us": 3550,
+        "code": "OK"
+      },
+      {
+        "duration_us": 2352,
+        "code": "OK"
+      }
+    ]
+  },
+  "summary": {
+    "CompleteJob": {
+      "count": 2,
+      "errors": 0,
+      "p50_us": 7537,
+      "p95_us": 13119,
+      "p99_us": 13119,
+      "mean_us": 10328
+    },
+    "CreateProcessInstance": {
+      "count": 2,
+      "errors": 0,
+      "p50_us": 6954,
+      "p95_us": 29081,
+      "p99_us": 29081,
+      "mean_us": 18017.5
+    },
+    "CreateProcessInstanceWithResult": {
+      "count": 2,
+      "errors": 0,
+      "p50_us": 11713,
+      "p95_us": 15603,
+      "p99_us": 15603,
+      "mean_us": 13658
+    },
+    "DeployResource": {
+      "count": 2,
+      "errors": 0,
+      "p50_us": 12939,
+      "p95_us": 139473,
+      "p99_us": 139473,
+      "mean_us": 76206
+    },
+    "JobDelivery": {
+      "count": 2,
+      "errors": 0,
+      "p50_us": 21959,
+      "p95_us": 33727,
+      "p99_us": 33727,
+      "mean_us": 27843
+    },
+    "Topology": {
+      "count": 2,
+      "errors": 0,
+      "p50_us": 2352,
+      "p95_us": 3550,
+      "p99_us": 3550,
+      "mean_us": 2951
+    }
+  }
+}

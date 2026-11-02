@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,7 +29,7 @@ type TaskService struct {
 }
 
 // ResumeExecutionFunc is a function type for resuming execution
-type ResumeExecutionFunc func(ctx context.Context, graph *engine.ProcessGraph, execID uuid.UUID) error
+type ResumeExecutionFunc func(ctx context.Context, graph *engine.ProcessGraph, execID int64) error
 
 // NewTaskService creates a new TaskService
 func NewTaskService(db *sqlx.DB, dispatcher *events.TaskEventDispatcher) *TaskService {
@@ -48,7 +49,7 @@ func (s *TaskService) SetResumeExecutor(fn ResumeExecutionFunc) {
 }
 
 // CompleteTask handles the full task completion flow with a transaction.
-func (s *TaskService) CompleteTask(ctx context.Context, taskID uuid.UUID, userVars map[string]interface{}) error {
+func (s *TaskService) CompleteTask(ctx context.Context, taskID int64, userVars map[string]interface{}) error {
 
 	// 1. Load the task
 	task, err := s.taskRepo.FindTaskByID(taskID)
@@ -96,7 +97,8 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID uuid.UUID, userVa
 
 	res, err := sqlTx.Exec(`
 		UPDATE public.tasks SET status = 'completed', completed_at = NOW()
-		WHERE process_instance_id = $1 AND id = $2 AND status NOT IN ('completed', 'cancelled')
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+		  AND engine_key = $2 AND status NOT IN ('completed', 'cancelled')
 	`, task.ProcessInstanceID, task.ID)
 	if err != nil {
 		return err
@@ -116,7 +118,8 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID uuid.UUID, userVa
 	}
 	if _, err := sqlTx.Exec(`
 		UPDATE public.executions SET current_element_id = $3, status = 'active', updated_at = NOW()
-		WHERE process_instance_id = $1 AND id = $2
+		WHERE process_instance_key = (SELECT engine_key FROM public.process_instances WHERE id = $1)
+		  AND engine_key = $2
 	`, task.ProcessInstanceID, *task.ExecutionID, nextID); err != nil {
 		return err
 	}
@@ -128,7 +131,7 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID uuid.UUID, userVa
 		}
 	}
 
-	currentVars, err := repository.VariablesForExecution(sqlTx, task.ProcessInstanceID, uuid.Nil)
+	currentVars, err := repository.VariablesForExecution(sqlTx, task.ProcessInstanceID, 0)
 	if err != nil {
 		return err
 	}
@@ -150,13 +153,12 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID uuid.UUID, userVa
 	}
 	s.disarmBoundaryEvents(task.ProcessInstanceID, *task.ExecutionID)
 	LogAuditErr("task completed", s.auditService.LogTaskCompleted(task.ID, task.ProcessInstanceID, nil, userVars))
-	if len(userVars) > 0 {
-		LogAuditErr("variables merged", s.auditService.LogVariablesMerged(task.ProcessInstanceID, userVars, "taskComplete"))
-	}
+	// TASK_COMPLETED already carries formData; avoid a duplicate
+	// VARIABLES_MERGED row for the exact same user-variable write.
 	LogAuditErr("execution moved", s.auditService.LogExecutionMoved(*task.ExecutionID, task.ProcessInstanceID, task.TaskDefinitionKey, nextID, currentVars))
 	if p := eventlog.Global(); p != nil {
-		p.TaskCompleted(task.ProcessInstanceID.String(), task.ID.String())
-		p.ExecutionMoved(task.ProcessInstanceID.String(), task.ExecutionID.String(), task.TaskDefinitionKey, nextID)
+		p.TaskCompleted(task.ProcessInstanceID.String(), strconv.FormatInt(task.ID, 10))
+		p.ExecutionMoved(task.ProcessInstanceID.String(), strconv.FormatInt(*task.ExecutionID, 10), task.TaskDefinitionKey, nextID)
 	}
 
 	// Dispatch TASK_COMPLETED event
@@ -174,9 +176,9 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID uuid.UUID, userVa
 		event := &events.TaskEvent{
 			ID:                uuid.New().String(),
 			EventType:         events.TaskCompleted,
-			TaskID:            taskID.String(),
+			TaskID:            strconv.FormatInt(taskID, 10),
 			ProcessInstanceID: task.ProcessInstanceID.String(),
-			ExecutionID:       task.ExecutionID.String(),
+			ExecutionID:       strconv.FormatInt(*task.ExecutionID, 10),
 			TaskName:          task.TaskName,
 			TaskDefinitionKey: task.TaskDefinitionKey,
 			Assignee:          &assignee,
@@ -204,18 +206,18 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID uuid.UUID, userVa
 // disarmBoundaryEvents removes the boundary event triggers of the user task
 // its execution just left. Best-effort: a trigger that survives a failure
 // here is discarded when it fires, since its task is no longer active.
-func (s *TaskService) disarmBoundaryEvents(instanceID, execID uuid.UUID) {
+func (s *TaskService) disarmBoundaryEvents(instanceID uuid.UUID, execID int64) {
 	tx, err := s.db.Beginx()
 	if err != nil {
-		log.Printf("disarming boundary events of execution %s: %v", execID, err)
+		log.Printf("disarming boundary events of execution %d: %v", execID, err)
 		return
 	}
 	defer tx.Rollback()
 	if err := repository.NewEngineRepository(s.db, nil).DisarmBoundaryTriggersTx(tx, instanceID, execID); err != nil {
-		log.Printf("disarming boundary events of execution %s: %v", execID, err)
+		log.Printf("disarming boundary events of execution %d: %v", execID, err)
 		return
 	}
 	if err := tx.Commit(); err != nil {
-		log.Printf("disarming boundary events of execution %s: %v", execID, err)
+		log.Printf("disarming boundary events of execution %d: %v", execID, err)
 	}
 }

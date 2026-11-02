@@ -13,24 +13,25 @@ import (
 
 // CallerLink is the call activity that started a process instance.
 type CallerLink struct {
-	InstanceID uuid.UUID          // the calling instance
-	ExecID     uuid.UUID          // its execution waiting on the call activity
-	Node       *engine.Node       // the call activity
+	InstanceID uuid.UUID    // the calling instance
+	ExecID     int64        // its execution waiting on the call activity
+	Node       *engine.Node // the call activity
 	Graph      *engine.ProcessGraph
 }
 
 // CallerOf returns the call activity that started instanceID, or nil for an
 // instance nobody called (or whose caller has moved on).
 func CallerOf(q sqlx.Queryer, instanceID uuid.UUID) *CallerLink {
-	var parentInstanceID, parentExecID *uuid.UUID
-	if err := q.QueryRowx(`SELECT parent_instance_id, parent_execution_id FROM public.process_instances WHERE id = $1`, instanceID).Scan(&parentInstanceID, &parentExecID); err != nil || parentInstanceID == nil || parentExecID == nil {
+	var parentInstanceID *uuid.UUID
+	var parentExecID *int64
+	if err := q.QueryRowx(`SELECT parent_instance_id, parent_execution_key FROM public.process_instances WHERE id = $1`, instanceID).Scan(&parentInstanceID, &parentExecID); err != nil || parentInstanceID == nil || parentExecID == nil {
 		return nil
 	}
 	var at struct {
 		Node   string `db:"current_element_id"`
 		Status string `db:"status"`
 	}
-	if err := sqlx.Get(q, &at, `SELECT current_element_id, status FROM public.executions WHERE process_instance_id = $1 AND id = $2`, *parentInstanceID, *parentExecID); err != nil || at.Status != "waiting" {
+	if err := sqlx.Get(q, &at, `SELECT current_element_id, status FROM public.executions WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1) AND engine_key = $2`, *parentInstanceID, *parentExecID); err != nil || at.Status != "waiting" {
 		return nil
 	}
 	var graphJSON []byte
@@ -88,9 +89,9 @@ func TerminateOrphanedCalledInstances(db *sqlx.DB, dispatcher *events.TaskEventD
 	} else {
 		err = db.Select(&children, `
 			SELECT c.id FROM public.process_instances c
-			LEFT JOIN public.executions e ON e.process_instance_id = c.parent_instance_id AND e.id = c.parent_execution_id
-			WHERE c.status = 'running' AND c.parent_execution_id IS NOT NULL
-			  AND (e.id IS NULL OR e.status <> 'waiting')
+			LEFT JOIN public.executions e ON e.process_instance_key = c.parent_process_instance_key AND e.engine_key = c.parent_execution_key
+			WHERE c.status = 'running' AND c.parent_execution_key IS NOT NULL
+			  AND (e.engine_key IS NULL OR e.status <> 'waiting')
 			LIMIT 100
 		`)
 	}

@@ -3,10 +3,12 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
@@ -30,7 +32,7 @@ import (
 // armEventSubProcessesTx arms every timer/message/signal event sub-process
 // directly inside scope ("" = the process itself). parentExecID is the
 // scope's execution (nil at process level).
-func (r *Runtime) armEventSubProcessesTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, graph *engine.ProcessGraph, scope string, instanceID uuid.UUID, parentExecID *uuid.UUID) error {
+func (r *Runtime) armEventSubProcessesTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, graph *engine.ProcessGraph, scope string, instanceID uuid.UUID, parentExecID *int64) error {
 	for _, n := range graph.Nodes {
 		if n.Type != engine.EventSubProcessType || n.ParentScope != scope || !armable(n) {
 			continue
@@ -47,8 +49,12 @@ func (r *Runtime) armEventSubProcessesTx(tx *sqlx.Tx, engineRepo *repository.Eng
 // rearmed marks a non-interrupting trigger armed again right after it
 // fired (a conditional one then waits for its condition to turn false and
 // true again).
-func (r *Runtime) armTriggerTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, node *engine.Node, instanceID uuid.UUID, parentExecID *uuid.UUID, rearmed bool) error {
+func (r *Runtime) armTriggerTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, node *engine.Node, instanceID uuid.UUID, parentExecID *int64, rearmed bool) error {
 	trigger, err := r.createTriggerExecutionTx(tx, engineRepo, node, instanceID, parentExecID, "waiting")
+	if err != nil {
+		return err
+	}
+	instanceKey, err := repository.ProcessInstanceEngineKey(tx, instanceID)
 	if err != nil {
 		return err
 	}
@@ -60,9 +66,9 @@ func (r *Runtime) armTriggerTx(tx *sqlx.Tx, engineRepo *repository.EngineReposit
 	case engine.TriggerSignal:
 		_, err = tx.Exec(`
 			INSERT INTO event_subscriptions
-			  (process_instance_id, execution_id, event_type, event_name, target_element_id)
+			  (process_instance_key, execution_key, event_type, event_name, target_element_id)
 			VALUES ($1, $2, 'signal', $3, $4)
-		`, instanceID, trigger.ID, node.SignalRef, node.ID)
+		`, instanceKey, trigger.ID, node.SignalRef, node.ID)
 	case engine.TriggerConditional:
 		err = insertConditionalSubscriptionTx(tx, instanceID, trigger.ID, node.Condition, node.ID, rearmed)
 	default:
@@ -73,9 +79,9 @@ func (r *Runtime) armTriggerTx(tx *sqlx.Tx, engineRepo *repository.EngineReposit
 
 // createTriggerExecutionTx creates an execution parked on an event
 // sub-process node, under the scope's execution.
-func (r *Runtime) createTriggerExecutionTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, node *engine.Node, instanceID uuid.UUID, parentExecID *uuid.UUID, status string) (*repository.Execution, error) {
-	id := uuid.New()
-	pathID := id.String() + "_" + node.ID
+func (r *Runtime) createTriggerExecutionTx(tx *sqlx.Tx, engineRepo *repository.EngineRepository, node *engine.Node, instanceID uuid.UUID, parentExecID *int64, status string) (*repository.Execution, error) {
+	id := ids.NewEngineKey()
+	pathID := strconv.FormatInt(id, 10) + "_" + node.ID
 	exec := &repository.Execution{
 		ID:                id,
 		ProcessInstanceID: instanceID,
@@ -100,7 +106,7 @@ func (r *Runtime) executeEventSubProcess(ctx context.Context, engineRepo *reposi
 	}
 	defer tx.Rollback()
 
-	var tasks, jobs []uuid.UUID
+	var tasks, jobs []int64
 	if node.CancelActivity {
 		// Interrupting: everything else in the enclosing scope stops.
 		if node.ParentScope == "" {
@@ -131,7 +137,7 @@ func (r *Runtime) executeEventSubProcess(ctx context.Context, engineRepo *reposi
 	if !node.CancelActivity && node.TriggerType == engine.TriggerTimer {
 		var cycling bool
 		if err := tx.Get(&cycling, `
-			SELECT EXISTS (SELECT 1 FROM timer_jobs WHERE execution_id = $1 AND is_triggered = false)
+			SELECT EXISTS (SELECT 1 FROM timer_jobs WHERE execution_key = $1 AND is_triggered = false)
 		`, exec.ID); err != nil {
 			return fmt.Errorf("event sub-process %s: %w", node.ID, err)
 		}
@@ -142,8 +148,8 @@ func (r *Runtime) executeEventSubProcess(ctx context.Context, engineRepo *reposi
 		}
 	}
 
-	childID := uuid.New()
-	pathID := run.ID.String() + "_" + node.ID
+	childID := ids.NewEngineKey()
+	pathID := strconv.FormatInt(run.ID, 10) + "_" + node.ID
 	if err := engineRepo.CreateExecutionTx(tx, &repository.Execution{
 		ID:                childID,
 		ProcessInstanceID: exec.ProcessInstanceID,
@@ -162,7 +168,7 @@ func (r *Runtime) executeEventSubProcess(ctx context.Context, engineRepo *reposi
 	r.logCancelled(exec.ProcessInstanceID, tasks, jobs, "interrupted by event sub-process "+node.ID)
 	service.LogAuditErr("execution moved", r.auditService.LogExecutionMoved(childID, exec.ProcessInstanceID, node.ID, node.StartNodeID, nil))
 	if p := eventlog.Global(); p != nil {
-		p.ExecutionMoved(exec.ProcessInstanceID.String(), childID.String(), node.ID, node.StartNodeID)
+		p.ExecutionMoved(exec.ProcessInstanceID.String(), strconv.FormatInt(childID, 10), node.ID, node.StartNodeID)
 	}
 	return r.ExecuteExecution(ctx, childID)
 }
@@ -172,7 +178,7 @@ func (r *Runtime) executeEventSubProcess(ctx context.Context, engineRepo *reposi
 // that token in the enclosing scope, which completes the scope — the
 // process, or the enclosing sub-process — if nothing else is running
 // there. After an interrupting trigger nothing else is.
-func (r *Runtime) finishEventSubProcess(ctx context.Context, engineRepo *repository.EngineRepository, tx *sqlx.Tx, instanceID, scopeID uuid.UUID, subNode *engine.Node, graph *engine.ProcessGraph, variables map[string]interface{}) error {
+func (r *Runtime) finishEventSubProcess(ctx context.Context, engineRepo *repository.EngineRepository, tx *sqlx.Tx, instanceID uuid.UUID, scopeID int64, subNode *engine.Node, graph *engine.ProcessGraph, variables map[string]interface{}) error {
 	if err := engineRepo.CloseScopeTx(tx, instanceID, scopeID); err != nil {
 		return fmt.Errorf("failed to close event sub-process executions: %w", err)
 	}

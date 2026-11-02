@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/jeremielodi/bpmngo/internal/events"
@@ -44,24 +46,75 @@ func userTaskState(status string) string {
 
 func (uc *UserTaskController) toV2UserTask(t *models.Task) fiber.Map {
 	var formKey string
+	var processDefinitionID interface{}
+	processDefinitionKey := ""
+	processDefinitionVersion := 0
+	processName := interface{}(nil)
+	tenantID := "<default>"
 	if graph, err := uc.engineRepo.GetProcessGraphByInstanceID(t.ProcessInstanceID); err == nil && graph != nil {
 		if n, ok := graph.Nodes[t.TaskDefinitionKey]; ok {
 			formKey = n.FormKey
 		}
 	}
+	if inst, err := repository.NewProcessInstanceRepository(uc.db).FindByID(t.ProcessInstanceID); err == nil && inst != nil {
+		processDefinitionID = inst.ProcessDefinitionID
+		processDefinitionKey = inst.ProcessKey
+		processDefinitionVersion = inst.Version
+		if inst.ProcessName != "" && inst.ProcessName != inst.ProcessKey {
+			processName = inst.ProcessName
+		}
+		if inst.TenantID != nil && *inst.TenantID != "" {
+			tenantID = *inst.TenantID
+		}
+	}
+	candidateGroups := []string{}
+	if t.CandidateGroup != nil && *t.CandidateGroup != "" {
+		candidateGroups = append(candidateGroups, *t.CandidateGroup)
+	}
+
+	name := t.TaskName
+	if name == "" {
+		name = t.TaskDefinitionKey
+	}
+	var responseFormKey interface{}
+	if formKey != "" {
+		responseFormKey = formKey
+	}
 
 	return fiber.Map{
-		"userTaskKey":        t.ID,
-		"elementId":          t.TaskDefinitionKey,
-		"name":               t.TaskName,
-		"processInstanceKey": t.ProcessInstanceID,
-		"assignee":           t.Assignee,
-		"candidateGroups":    t.CandidateGroup,
-		"state":              userTaskState(t.Status),
-		"creationDate":       t.CreatedAt,
-		"formKey":            formKey,
-		"priority":           t.Priority,
+		"userTaskKey":              strconv.FormatInt(t.ID, 10),
+		"elementInstanceKey":       int64String(t.ExecutionID),
+		"elementId":                t.TaskDefinitionKey,
+		"name":                     name,
+		"processInstanceKey":       t.ProcessInstanceID,
+		"assignee":                 t.Assignee,
+		"candidateGroups":          candidateGroups,
+		"candidateUsers":           []string{},
+		"state":                    userTaskState(t.Status),
+		"creationDate":             t.CreatedAt,
+		"completionDate":           t.CompletedAt,
+		"formKey":                  responseFormKey,
+		"priority":                 t.Priority,
+		"processDefinitionId":      processDefinitionKey,
+		"processDefinitionKey":     processDefinitionID,
+		"processDefinitionVersion": processDefinitionVersion,
+		"processName":              processName,
+		"rootProcessInstanceKey":   t.ProcessInstanceID,
+		"tenantId":                 tenantID,
+		"businessId":               nil,
+		"customHeaders":            fiber.Map{},
+		"dueDate":                  nil,
+		"externalFormReference":    nil,
+		"followUpDate":             nil,
+		"tags":                     []string{},
 	}
+}
+
+func int64String(v *int64) interface{} {
+	if v == nil {
+		return nil
+	}
+	return strconv.FormatInt(*v, 10)
 }
 
 // SearchUserTasksRequest matches the (simplified) Camunda 8 search body.
