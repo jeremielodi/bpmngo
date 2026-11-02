@@ -120,7 +120,7 @@ services:
   # lecture : l'historique et l'analytics la lisent
   # (DB_READ_HOST), quelques millisecondes derrière le primaire.
   replication-setup:
-    image: postgres:16
+    image: postgres:18
     depends_on:
       postgres:
         condition: service_healthy

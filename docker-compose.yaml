@@ -8,7 +8,7 @@ name: goflow
 services:
   # PostgreSQL
   postgres:
-    image: postgres:16
+    image: postgres:18
     container_name: bpmngo-postgres
     # Les valeurs mémoire supposent au moins 1 Gio pour PostgreSQL. Ajuster
     # ensemble POSTGRES_MEMORY_LIMIT, shared_buffers et effective_cache_size.
