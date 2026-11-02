@@ -51,8 +51,13 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { BpmnGoClient, runSuite, assert } from './client';
 
+// GOFLOW_PG_CONTAINER names the Postgres container of the stack under test
+// (an isolated stack); by default, this repository's compose service.
 function psql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U goflow -d goflow -tAc "${sql}"`, {
+  const target = process.env.GOFLOW_PG_CONTAINER
+    ? `docker exec -i ${process.env.GOFLOW_PG_CONTAINER}`
+    : 'docker compose exec -T postgres';
+  return execSync(`${target} psql -U goflow -d goflow -tAc "${sql}"`, {
     cwd: path.join(__dirname, '..', '..'),
   }).toString().trim();
 }
@@ -316,7 +321,7 @@ async function run() {
           const instanceId = (inst as any).processInstanceId ?? (inst as any).id;
           // PermissionProcess raises no incident on its own: add one so the
           // incident search has a row to hide.
-          psql(`INSERT INTO incidents (process_instance_id, incident_type, activity_id, error_message) VALUES ('${instanceId}', 'executionError', 'reviewTask', 'v2 permission test')`);
+          psql(`INSERT INTO incidents (process_instance_key, incident_type, activity_id, error_message) SELECT engine_key, 'executionError', 'reviewTask', 'v2 permission test' FROM process_instances WHERE id = '${instanceId}'`);
 
           const { id: strangerId, client: stranger } = await createUser(`v2-stranger-${Date.now()}@goflow.com`);
           const { id: granteeId, client: grantee } = await createUser(`v2-grantee-${Date.now()}@goflow.com`);
@@ -356,7 +361,7 @@ async function run() {
           const gFlow = await search(grantee, 'flownode-instances', { processInstanceKey: instanceId });
           assert(gFlow.status === 200 && gFlow.data.items.length > 0, `grantee flow-node search failed: ${gFlow.status}`);
           const gVars = await search(grantee, 'variables', { processInstanceKey: instanceId, name: 'secret' });
-          assert(gVars.status === 200 && gVars.data.items[0]?.value === 'only-for-viewers', `grantee variable search failed: ${JSON.stringify(gVars.data)}`);
+          assert(gVars.status === 200 && JSON.parse(gVars.data.items[0]?.value ?? 'null') === 'only-for-viewers' /* Camunda 8: values are JSON */, `grantee variable search failed: ${JSON.stringify(gVars.data)}`);
 
           await superuser.api.delete(`/engine-rest/process-instance/${instanceId}`);
         },

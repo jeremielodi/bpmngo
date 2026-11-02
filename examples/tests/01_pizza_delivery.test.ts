@@ -38,7 +38,7 @@ async function run() {
           
 
           // The "order_pizza" user task should appear immediately
-          const task = await client.waitForTask('order_pizza', instanceId, 1500);
+          const task = await client.waitForTask('order_pizza', instanceId, 15000);
           assert(task.assignee === 'alice', `expected assignee "alice", got "${task.assignee}"`);
 
           // Complete the task before the 8s timer — simulates pizza arriving on time

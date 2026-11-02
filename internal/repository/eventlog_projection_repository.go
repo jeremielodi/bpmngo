@@ -60,7 +60,7 @@ func (r *EventLogProjectionRepository) UpdateInstanceStatus(id uuid.UUID, status
 }
 
 // UpsertJob creates or refreshes a projected job row — called on JobCreated.
-func (r *EventLogProjectionRepository) UpsertJob(id, processInstanceID uuid.UUID, executionID *uuid.UUID, jobType, status string) error {
+func (r *EventLogProjectionRepository) UpsertJob(id int64, processInstanceID uuid.UUID, executionID *int64, jobType, status string) error {
 	_, err := execNoSync(r.db, `
 		INSERT INTO public.eventlog_projected_jobs
 			(id, process_instance_id, execution_id, job_type, status, updated_at)
@@ -75,7 +75,7 @@ func (r *EventLogProjectionRepository) UpsertJob(id, processInstanceID uuid.UUID
 // UpdateJobStatus marks a projected job completed/failed — called on
 // JobCompleted/JobFailed. Same insert-if-missing rationale as
 // UpdateInstanceStatus.
-func (r *EventLogProjectionRepository) UpdateJobStatus(id, processInstanceID uuid.UUID, status, errorMessage string, retriesRemaining *int32) error {
+func (r *EventLogProjectionRepository) UpdateJobStatus(id int64, processInstanceID uuid.UUID, status, errorMessage string, retriesRemaining *int32) error {
 	_, err := execNoSync(r.db, `
 		INSERT INTO public.eventlog_projected_jobs (id, process_instance_id, status, error_message, retries_remaining, updated_at)
 		VALUES ($1, $2, $3, NULLIF($4, ''), $5, NOW())
@@ -101,13 +101,13 @@ type ProjectedInstance struct {
 }
 
 type ProjectedJob struct {
-	ID                uuid.UUID  `db:"id" json:"id"`
-	ProcessInstanceID uuid.UUID  `db:"process_instance_id" json:"processInstanceId"`
-	ExecutionID       *uuid.UUID `db:"execution_id" json:"executionId,omitempty"`
-	JobType           *string    `db:"job_type" json:"jobType,omitempty"`
-	Status            string     `db:"status" json:"status"`
-	ErrorMessage      *string    `db:"error_message" json:"errorMessage,omitempty"`
-	RetriesRemaining  *int32     `db:"retries_remaining" json:"retriesRemaining,omitempty"`
+	ID                int64     `db:"id" json:"id,string"`
+	ProcessInstanceID uuid.UUID `db:"process_instance_id" json:"processInstanceId"`
+	ExecutionID       *int64    `db:"execution_id" json:"executionId,string,omitempty"`
+	JobType           *string   `db:"job_type" json:"jobType,omitempty"`
+	Status            string    `db:"status" json:"status"`
+	ErrorMessage      *string   `db:"error_message" json:"errorMessage,omitempty"`
+	RetriesRemaining  *int32    `db:"retries_remaining" json:"retriesRemaining,omitempty"`
 }
 
 func (r *EventLogProjectionRepository) ListInstances() ([]ProjectedInstance, error) {

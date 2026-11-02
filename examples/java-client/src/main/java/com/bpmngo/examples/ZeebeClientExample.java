@@ -125,7 +125,8 @@ public class ZeebeClientExample {
         for (JsonNode t : tasks) {
             JsonNode vars = bpmngo.post("/v2/variables/search", Map.of("filter", Map.of(
                     "processInstanceKey", t.path("processInstanceKey").asText(), "name", "orderId"))).path("items");
-            if (vars.size() == 1 && orderId.equals(vars.get(0).path("value").asText())) {
+            // As in Camunda 8, a variable's value comes as JSON: a string is quoted.
+            if (vars.size() == 1 && ("\"" + orderId + "\"").equals(vars.get(0).path("value").asText())) {
                 return Optional.of(t);
             }
         }

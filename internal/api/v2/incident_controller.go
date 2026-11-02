@@ -89,10 +89,10 @@ func (ic *IncidentController) SearchIncidents(c *fiber.Ctx) error {
 			continue
 		}
 		item := fiber.Map{
-			"incidentKey":            inc.ID,
+			"incidentKey":            int64String(&inc.ID),
 			"processInstanceKey":     inc.ProcessInstanceID,
 			"rootProcessInstanceKey": inc.ProcessInstanceID,
-			"jobKey":                 inc.JobID,
+			"jobKey":                 int64String(inc.JobID),
 			"errorType":              inc.IncidentType,
 			"errorMessage":           inc.ErrorMessage.String,
 			"elementId":              inc.ActivityID,

@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/models"
@@ -61,12 +62,13 @@ func StepBackPath(logs []models.AuditLog, graph *engine.ProcessGraph, execID int
 			continue
 		}
 		var d struct {
-			ExecutionID string `json:"executionId"`
-			FromNode    string `json:"fromNode"`
-			ToNode      string `json:"toNode"`
-			StepBack    bool   `json:"stepBack"`
+			// An int64, written as a number or (older entries) a string.
+			ExecutionID json.RawMessage `json:"executionId"`
+			FromNode    string          `json:"fromNode"`
+			ToNode      string          `json:"toNode"`
+			StepBack    bool            `json:"stepBack"`
 		}
-		if json.Unmarshal(l.NewData, &d) != nil || d.ExecutionID != strconv.FormatInt(execID, 10) {
+		if json.Unmarshal(l.NewData, &d) != nil || strings.Trim(string(d.ExecutionID), `"`) != strconv.FormatInt(execID, 10) {
 			continue
 		}
 		// An execution created right at an element (a parallel branch)

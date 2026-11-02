@@ -229,3 +229,70 @@ func intKeysInJSON(keys *repository.ZeebeKeyRepository, route string, body []byt
 	}
 	return json.Marshal(doc)
 }
+
+// legacyPathKeys are the paths, outside /v2, whose next segment holds a
+// UUID, with the zeebe_keys resource type of that UUID.
+var legacyPathKeys = []struct{ prefix, resourceType string }{
+	{"/engine-rest/process-instance/", "process_instance"},
+	{"/engine-rest/history/process-instance/", "process_instance"},
+	{"/engine-rest/audit/process/", "process_instance"},
+	{"/multi-instance/execution/", "process_instance"},
+	{"/engine-rest/process-definition/", "process_definition"},
+}
+
+// legacyQueryKeys are the query parameters, outside /v2, holding a UUID.
+var legacyQueryKeys = map[string]string{
+	"processInstanceId":   "process_instance",
+	"processDefinitionId": "process_definition",
+}
+
+// LegacyKeyTranslation, mounted after authentication, lets the routes
+// outside /v2 take the int64 key /v2 and gRPC answer with wherever they
+// take a process instance or definition UUID: in the path or in a query
+// parameter, the key is replaced by its UUID before routing. A key nothing
+// was issued for becomes uuid.Nil, which the handler doesn't find. The
+// int64 ids of tasks, jobs, timers and incidents are their own ids and are
+// left alone.
+func LegacyKeyTranslation(db *sqlx.DB) fiber.Handler {
+	keys := repository.NewZeebeKeyRepository(db)
+	resolve := func(resourceType, s string) (string, bool) {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return "", false // a UUID, or a word such as "key"
+		}
+		id, err := keys.ResolveKey(resourceType, n)
+		if err != nil {
+			id = uuid.Nil
+		}
+		return id.String(), true
+	}
+	return func(c *fiber.Ctx) error {
+		path := c.Path()
+		if strings.HasPrefix(path, "/v2/") {
+			return c.Next()
+		}
+		for _, p := range legacyPathKeys {
+			if !strings.HasPrefix(path, p.prefix) {
+				continue
+			}
+			rest := path[len(p.prefix):]
+			segment, tail, _ := strings.Cut(rest, "/")
+			if id, ok := resolve(p.resourceType, segment); ok {
+				if tail != "" || strings.HasSuffix(rest, "/") {
+					tail = "/" + tail
+				}
+				c.Path(p.prefix + id + tail)
+			}
+			break
+		}
+		args := c.Context().QueryArgs()
+		for param, resourceType := range legacyQueryKeys {
+			if raw := args.Peek(param); len(raw) > 0 {
+				if id, ok := resolve(resourceType, string(raw)); ok {
+					args.Set(param, id)
+				}
+			}
+		}
+		return c.Next()
+	}
+}

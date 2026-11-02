@@ -73,7 +73,8 @@ const varsOf = (job: any) => JSON.parse(job.variables || '{}');
 /** The instance's variables over /v2, live or archived. */
 async function v2Variables(instanceKey: string): Promise<Record<string, unknown>> {
   const res = await rest.api.post('/v2/variables/search', { filter: { processInstanceKey: instanceKey } });
-  return Object.fromEntries((res.data.items as any[]).map(v => [v.name, v.value]));
+  // Camunda 8 answers each value as JSON.
+  return Object.fromEntries((res.data.items as any[]).map(v => [v.name, JSON.parse(v.value)]));
 }
 
 async function waitEnded(instanceKey: string) {

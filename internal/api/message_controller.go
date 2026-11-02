@@ -104,7 +104,7 @@ func (mc *MessageController) CorrelateMessage(c *fiber.Ctx) error {
 		}
 		result := fiber.Map{
 			"resultType":      "Execution",
-			"execution":       fiber.Map{"id": executionID, "processInstanceId": instanceID, "ended": false, "tenantId": nil},
+			"execution":       fiber.Map{"id": strconv.FormatInt(executionID, 10), "processInstanceId": instanceID, "ended": false, "tenantId": nil},
 			"processInstance": nil,
 		}
 		if req.VariablesInResultEnabled {

@@ -104,7 +104,7 @@ async function main() {
   const suites = [
     '00_auth.test.ts',
     '01_pizza_delivery.test.ts',
-    /*'02_recipe_selection.test.ts',
+    '02_recipe_selection.test.ts',
     ...(noTimers ? [] : ['03_meal_preparation.test.ts', '04_oven_timer.test.ts']),
     '05_inclusive_gateway.test.ts',
     '06_error_boundary.test.ts',
@@ -153,7 +153,7 @@ async function main() {
     '56_instance_lifecycle_and_variables.test.ts',
     '57_ops_and_legacy_routes.test.ts',
     '58_camunda_parity.test.ts',
-    '59_rest_int_keys.test.ts',*/
+    '59_rest_int_keys.test.ts',
   ];
 
   const exitCodes: number[] = [];

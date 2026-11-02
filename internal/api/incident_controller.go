@@ -62,7 +62,7 @@ func (ctrl *IncidentController) withZeebeKey(inc *models.Incident) (map[string]i
 	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, err
 	}
-	m["zeebeKey"] = zeebeKey
+	m["zeebeKey"] = strconv.FormatInt(zeebeKey, 10) // past float64's exact range: a string
 	// incidentType keeps the Camunda 7 era name; errorType is the precise
 	// Camunda 8 type stored.
 	m["incidentType"] = models.LegacyIncidentType(inc.IncidentType, inc.JobID != nil)
