@@ -11,16 +11,16 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 ## Contents
 
-- [Current State](#current-state-v103)
+- [Current State](#current-state-v104)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Documentation](#documentation)
 
 ---
 
-## Current State (v1.0.3)
+## Current State (v1.0.4)
 
-**BpmnGo 1.0.3 is production ready.** What backs this:
+**BpmnGo 1.0.4 is production ready.** What backs this:
 
 - **Tested end to end:** 53 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
 - **Same behaviour as Camunda 8:** the [benchmark](benchmark/README.md) drives BpmnGo and Camunda 8.10.7 with the same Zeebe gRPC and `/v2` client code, and all 87 scenarios (gateways, joins, loops, nested and interrupted sub-processes, multi-instance, events, timers, compensation, FEEL, DMN, models exported by Camunda Modeler…) behave the same. Where Camunda 8 departs from BPMN 2.0 — an exclusive gateway with several true conditions takes the last one, in file order — BpmnGo follows Camunda by default (`EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the BPMN 2.0 rule).
