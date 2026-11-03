@@ -1,3 +1,0 @@
-state,wait_event_type,wait_event,sessions,oldest_transaction_seconds
-idle,Client,ClientRead,42,
-active,,,2,0.001396

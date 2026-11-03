@@ -1,0 +1,14 @@
+# What a run produces stays out of git: results/<date>/ (reports, traces,
+# load figures), the npm dependencies, and the Camunda stack's local files.
+node_modules/
+results/
+dist/
+*.log
+
+# Camunda 8.10.7 stack: its .env (versions, local endpoints), the data it
+# writes, the JDBC drivers dropped in for other databases.
+camunda-8.10.7/.env
+camunda-8.10.7/camunda-data/*
+!camunda-8.10.7/camunda-data/.gitkeep
+camunda-8.10.7/driver-lib/*
+!camunda-8.10.7/driver-lib/.gitkeep
