@@ -98,7 +98,7 @@ The ports come from `SERVER_PORT` and `FRONTEND_PORT` in `.env`. Kafka (Redpanda
 
 Every request goes through the same parser/engine/runtime and lands in the same PostgreSQL database. What the deployment chooses (`WRITE_PATH`) is *where* each command runs: right where it arrives (`direct`, the default), or — like Camunda 8 — on the one BpmnGo instance owning the Kafka partition of its process instance (`partitioned`).
 
-![BpmnGo process command flow: commands go straight to the command handlers (WRITE_PATH=direct) or through the Kafka partition owner (WRITE_PATH=partitioned), then to PostgreSQL](docs/bpmn_process_command_flow.png)
+![BpmnGo process command flow: commands go straight to the command handlers (WRITE_PATH=direct) or through the Kafka partition owner (WRITE_PATH=partitioned), then to PostgreSQL](docs/bpmn_process_cmd_flow.png)
 
 Design decisions and the partitioned write path: [docs/architecture.md](docs/architecture.md).
 
