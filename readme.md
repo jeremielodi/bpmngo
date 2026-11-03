@@ -42,7 +42,7 @@ Versioning, FEEL, job workers, incidents, DMN, multi-tenancy, authentication, au
 
 ## Quick Start
 
-Requires Docker with Compose v2.
+Requires Docker with Compose v2 (the default stack works from Compose 2.19; the multi-replica and high-availability files, `docker-compose.scale.yaml` and `deploy/ha/`, need 2.24.4 or later for their `!reset` / `!override` tags).
 
 ### Try it — no configuration
 

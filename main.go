@@ -339,8 +339,19 @@ func main() {
 				eventlog.TopicSpec{Name: partition.CommandsTopic, Partitions: kafkaPartitions, Fixed: true},
 				eventlog.TopicSpec{Name: partition.RepliesTopic, Partitions: kafkaPartitions, Fixed: true})
 		}
-		if err := eventlog.EnsureTopics(kafkaBrokers, replicationFactor, topics...); err != nil {
-			log.Fatalln("Kafka topics: ", err)
+		// Redpanda may still be starting: the compose file can't make BpmnGo
+		// wait for it (an optional dependency needs Compose 2.20.2), so
+		// BpmnGo waits itself.
+		for deadline := time.Now().Add(2 * time.Minute); ; {
+			err := eventlog.EnsureTopics(kafkaBrokers, replicationFactor, topics...)
+			if err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				log.Fatalln("Kafka topics: ", err)
+			}
+			log.Printf("⏳ Kafka not ready yet (%v), retrying", err)
+			time.Sleep(2 * time.Second)
 		}
 	}
 

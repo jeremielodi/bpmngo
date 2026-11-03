@@ -109,9 +109,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redpanda: # only with the "kafka" profile
-        condition: service_healthy
-        required: false
+      # No dependency on redpanda (the "kafka" profile): an optional one
+      # needs Compose 2.20.2. With Kafka, BpmnGo waits for it at boot.
     environment:
       # Database
       DB_HOST: postgres
