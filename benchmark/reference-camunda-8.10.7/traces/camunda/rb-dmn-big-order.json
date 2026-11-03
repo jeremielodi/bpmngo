@@ -1,0 +1,45 @@
+{
+  "scenario": "rb-dmn-big-order",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-dmn-show",
+        "elementId": "dm_show",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "tier": "silver",
+          "amount": 5000,
+          "discount": 0.2
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "tier": "silver",
+      "amount": 5000,
+      "applied": 0.2,
+      "discount": 0.2
+    },
+    "instances": [
+      {
+        "process": "rb_dmn",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2519,
+    "errors": [],
+    "restNotes": []
+  }
+}

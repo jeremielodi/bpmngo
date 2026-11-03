@@ -1,0 +1,45 @@
+{
+  "scenario": "rb-dmn-gold-customer",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-dmn-show",
+        "elementId": "dm_show",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "tier": "gold",
+          "amount": 500,
+          "discount": 0.15
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "tier": "gold",
+      "amount": 500,
+      "applied": 0.15,
+      "discount": 0.15
+    },
+    "instances": [
+      {
+        "process": "rb_dmn",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2742,
+    "errors": [],
+    "restNotes": []
+  }
+}

@@ -171,6 +171,11 @@ func (r *Runtime) startMultiInstanceBody(ctx context.Context, engineRepo *reposi
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	// Parallel instances: their jobs are announced together once all are
+	// created, as Camunda creates them in one step — a worker then gets
+	// them in one batch instead of the first one alone.
+	ctx, wakeJobs := batchJobWakes(ctx)
+	defer wakeJobs(r.DB)
 	for _, id := range inners {
 		if err := r.ExecuteExecution(ctx, id); err != nil {
 			return fmt.Errorf("multi-instance %s, instance %d: %w", node.ID, id, err)

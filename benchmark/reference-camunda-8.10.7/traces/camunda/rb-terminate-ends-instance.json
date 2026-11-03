@@ -1,0 +1,50 @@
+{
+  "scenario": "rb-terminate-ends-instance",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-long",
+        "elementId": "tm_long",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "after 3000 ms: complete",
+        "result": "NOT_FOUND"
+      },
+      {
+        "instance": "main",
+        "type": "rb-quick",
+        "elementId": "tm_quick",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "quick": true
+    },
+    "instances": [
+      {
+        "process": "rb_terminate",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 5043,
+    "errors": [
+      "answer rb-long at tm_long: NOT_FOUND Command 'COMPLETE' rejected with code 'NOT_FOUND': Expected to complete job with key '2251799813687967', but no such job was found"
+    ],
+    "restNotes": []
+  }
+}

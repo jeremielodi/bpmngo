@@ -568,20 +568,20 @@ func (r *EngineRepository) CompleteExecutionByKeyTx(tx *sqlx.Tx, instanceKey, ex
 }
 
 // CreateJob creates a new service task job
-func (r *EngineRepository) CreateJobTx(tx *sqlx.Tx, jobID int64, processInstanceID uuid.UUID, executionID int64, jobType string, payload []byte) error {
+func (r *EngineRepository) CreateJobTx(tx *sqlx.Tx, jobID int64, processInstanceID uuid.UUID, executionID int64, jobType string, payload []byte, retries int) error {
 	instanceKey, err := processInstanceEngineKey(tx, processInstanceID)
 	if err != nil {
 		return err
 	}
-	return r.CreateJobByKeyTx(tx, jobID, instanceKey, executionID, jobType, payload)
+	return r.CreateJobByKeyTx(tx, jobID, instanceKey, executionID, jobType, payload, retries)
 }
 
-func (r *EngineRepository) CreateJobByKeyTx(tx *sqlx.Tx, jobID, instanceKey, executionID int64, jobType string, payload []byte) error {
+func (r *EngineRepository) CreateJobByKeyTx(tx *sqlx.Tx, jobID, instanceKey, executionID int64, jobType string, payload []byte, retries int) error {
 	_, err := tx.Exec(`
 		INSERT INTO public.jobs
 		(engine_key, process_instance_key, execution_key, job_type, status, payload, retries, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, 'pending', $5, 3, NOW(), NOW())
-	`, jobID, instanceKey, executionID, jobType, payload)
+		VALUES ($1, $2, $3, $4, 'pending', $5, $6, NOW(), NOW())
+	`, jobID, instanceKey, executionID, jobType, payload, retries)
 	return err
 }
 

@@ -1,0 +1,38 @@
+{
+  "scenario": "rb-subprocess-error-end-not-reached",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-validate",
+        "elementId": "sv_check",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "valid": true
+    },
+    "instances": [
+      {
+        "process": "rb_sub_error_end",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 1986,
+    "errors": [],
+    "restNotes": []
+  }
+}

@@ -431,6 +431,11 @@ func main() {
 	} else if n > 0 {
 		log.Printf("✅ Sequence-flow file order added to %d stored process graphs", n)
 	}
+	if n, err := service.BackfillJobRetries(db); err != nil {
+		log.Println("⚠️ job retries backfill:", err)
+	} else if n > 0 {
+		log.Printf("✅ Task retries added to %d stored process graphs", n)
+	}
 
 	retentionCfg, err := retention.ConfigFromEnv(util.DotEnvVariable)
 	if err != nil {

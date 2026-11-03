@@ -103,6 +103,9 @@ type Node struct {
 	// when no other flow's condition is true (BPMN "default" attribute).
 	DefaultFlow   string               `json:"defaultFlow,omitempty"`
 	JobType       *string              // for service tasks
+	// JobRetries is zeebe:taskDefinition's retries: a number, a FEEL
+	// expression ("=..."), or empty for the default (3).
+	JobRetries string `json:"jobRetries,omitempty"`
 	MultiInstance *MultiInstanceConfig `json:"multiInstance,omitempty"`
 	// Timer support
 	TimerDefinition string `json:"timerDefinition,omitempty"` // Raw XML timer definition

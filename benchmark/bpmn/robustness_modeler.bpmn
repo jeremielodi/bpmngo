@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- An order process as Camunda Modeler 5 writes it: diagram interchange,
+     documentation, modeler attributes, zeebe:properties, input/output
+     mappings, explicit <incoming>/<outgoing>, a default flow. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_rb_modeler" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.40.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.0">
+  <bpmn:process id="rb_modeler_order" name="Order fulfilment" isExecutable="true">
+    <bpmn:documentation>Checks stock, reserves it, and ships big orders by freight.</bpmn:documentation>
+    <bpmn:extensionElements>
+      <zeebe:properties>
+        <zeebe:property name="owner" value="logistics" />
+      </zeebe:properties>
+    </bpmn:extensionElements>
+    <bpmn:startEvent id="StartEvent_order" name="Order received">
+      <bpmn:outgoing>Flow_to_stock</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_to_stock" sourceRef="StartEvent_order" targetRef="Activity_stock" />
+    <bpmn:serviceTask id="Activity_stock" name="Check stock">
+      <bpmn:documentation>Asks the warehouse.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="rb-md-stock" retries="5" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="warehouse" value="north" />
+        </zeebe:taskHeaders>
+        <zeebe:ioMapping>
+          <zeebe:input source="=order.lines" target="lines" />
+          <zeebe:output source="=available" target="inStock" />
+        </zeebe:ioMapping>
+        <zeebe:properties>
+          <zeebe:property name="sla" value="PT5M" />
+        </zeebe:properties>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_to_stock</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_to_gw" sourceRef="Activity_stock" targetRef="Gateway_stock" />
+    <bpmn:exclusiveGateway id="Gateway_stock" name="In stock?" default="Flow_out_of_stock">
+      <bpmn:incoming>Flow_to_gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_in_stock</bpmn:outgoing>
+      <bpmn:outgoing>Flow_out_of_stock</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_in_stock" name="yes" sourceRef="Gateway_stock" targetRef="Activity_reserve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=inStock = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_out_of_stock" name="no" sourceRef="Gateway_stock" targetRef="Activity_backorder" />
+    <bpmn:serviceTask id="Activity_reserve" name="Reserve stock">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="rb-md-reserve" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_in_stock</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_ship_gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_backorder" name="Back-order">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="rb-md-backorder" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_out_of_stock</bpmn:incoming>
+      <bpmn:outgoing>Flow_backorder_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_to_ship_gw" sourceRef="Activity_reserve" targetRef="Gateway_ship" />
+    <bpmn:exclusiveGateway id="Gateway_ship" name="How to ship?" default="Flow_parcel">
+      <bpmn:incoming>Flow_to_ship_gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_freight</bpmn:outgoing>
+      <bpmn:outgoing>Flow_parcel</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_freight" name="heavy" sourceRef="Gateway_ship" targetRef="Activity_freight">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=sum(for l in order.lines return l.kg) &gt; 30</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_parcel" sourceRef="Gateway_ship" targetRef="Activity_parcel" />
+    <bpmn:serviceTask id="Activity_freight" name="Ship by freight">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="rb-md-freight" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_freight</bpmn:incoming>
+      <bpmn:outgoing>Flow_freight_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_parcel" name="Ship as parcel">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="rb-md-parcel" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_parcel</bpmn:incoming>
+      <bpmn:outgoing>Flow_parcel_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_freight_end" sourceRef="Activity_freight" targetRef="EndEvent_shipped" />
+    <bpmn:sequenceFlow id="Flow_parcel_end" sourceRef="Activity_parcel" targetRef="EndEvent_shipped" />
+    <bpmn:sequenceFlow id="Flow_backorder_end" sourceRef="Activity_backorder" targetRef="EndEvent_backordered" />
+    <bpmn:endEvent id="EndEvent_shipped" name="Shipped">
+      <bpmn:incoming>Flow_freight_end</bpmn:incoming>
+      <bpmn:incoming>Flow_parcel_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_backordered" name="Back-ordered">
+      <bpmn:incoming>Flow_backorder_end</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="rb_modeler_order">
+      <bpmndi:BPMNShape id="StartEvent_order_di" bpmnElement="StartEvent_order">
+        <dc:Bounds x="152" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="133" y="225" width="75" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_stock_di" bpmnElement="Activity_stock"><dc:Bounds x="240" y="160" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_stock_di" bpmnElement="Gateway_stock" isMarkerVisible="true"><dc:Bounds x="395" y="175" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_reserve_di" bpmnElement="Activity_reserve"><dc:Bounds x="500" y="160" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_backorder_di" bpmnElement="Activity_backorder"><dc:Bounds x="500" y="300" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ship_di" bpmnElement="Gateway_ship" isMarkerVisible="true"><dc:Bounds x="655" y="175" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_freight_di" bpmnElement="Activity_freight"><dc:Bounds x="760" y="100" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_parcel_di" bpmnElement="Activity_parcel"><dc:Bounds x="760" y="220" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_shipped_di" bpmnElement="EndEvent_shipped"><dc:Bounds x="922" y="182" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_backordered_di" bpmnElement="EndEvent_backordered"><dc:Bounds x="662" y="322" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_to_stock_di" bpmnElement="Flow_to_stock"><di:waypoint x="188" y="200" /><di:waypoint x="240" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_gw_di" bpmnElement="Flow_to_gw"><di:waypoint x="340" y="200" /><di:waypoint x="395" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_in_stock_di" bpmnElement="Flow_in_stock"><di:waypoint x="445" y="200" /><di:waypoint x="500" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_out_of_stock_di" bpmnElement="Flow_out_of_stock"><di:waypoint x="420" y="225" /><di:waypoint x="420" y="340" /><di:waypoint x="500" y="340" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_ship_gw_di" bpmnElement="Flow_to_ship_gw"><di:waypoint x="600" y="200" /><di:waypoint x="655" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_freight_di" bpmnElement="Flow_freight"><di:waypoint x="680" y="175" /><di:waypoint x="680" y="140" /><di:waypoint x="760" y="140" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_parcel_di" bpmnElement="Flow_parcel"><di:waypoint x="680" y="225" /><di:waypoint x="680" y="260" /><di:waypoint x="760" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_freight_end_di" bpmnElement="Flow_freight_end"><di:waypoint x="860" y="140" /><di:waypoint x="940" y="140" /><di:waypoint x="940" y="182" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_parcel_end_di" bpmnElement="Flow_parcel_end"><di:waypoint x="860" y="260" /><di:waypoint x="940" y="260" /><di:waypoint x="940" y="218" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_backorder_end_di" bpmnElement="Flow_backorder_end"><di:waypoint x="600" y="340" /><di:waypoint x="662" y="340" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

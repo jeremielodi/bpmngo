@@ -145,6 +145,14 @@ func CompleteJob(db *sqlx.DB, jobID int64, variables map[string]interface{}) (*C
 	fastNext := currentNode.MultiInstance == nil &&
 		nextNode != nil && nextNode.Type == engine.ServiceTaskType && nextNode.JobType != nil &&
 		nextNode.MultiInstance == nil && len(nextNode.InputMappings) == 0 && !hasAttachedBoundary(graph, nextNode.ID)
+	// Retries from an expression (or an invalid value, an incident) go the
+	// general way.
+	nextRetries := 0
+	if fastNext {
+		var static bool
+		nextRetries, static = common.StaticJobRetries(nextNode)
+		fastNext = static
+	}
 	var nextJobID int64
 	if fastNext {
 		visible, err := repository.VariablesForExecutionByKey(tx, processInstanceKey, executionID)
@@ -156,7 +164,7 @@ func CompleteJob(db *sqlx.DB, jobID int64, variables map[string]interface{}) (*C
 			return nil, fmt.Errorf("failed to marshal next job variables: %w", err)
 		}
 		nextJobID = ids.NewEngineKey()
-		if err := completionRepo.CreateJobByKeyTx(tx, nextJobID, processInstanceKey, executionID, *nextNode.JobType, payload); err != nil {
+		if err := completionRepo.CreateJobByKeyTx(tx, nextJobID, processInstanceKey, executionID, *nextNode.JobType, payload, nextRetries); err != nil {
 			return nil, fmt.Errorf("failed to create next job: %w", err)
 		}
 		if err := completionRepo.UpdateExecutionStatusAndNodeByKeyTx(tx, processInstanceKey, executionID, "waiting", nextNodeID); err != nil {

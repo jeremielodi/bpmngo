@@ -1,0 +1,65 @@
+{
+  "scenario": "rb-nested-subprocess",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-inner",
+        "elementId": "ns_i_task",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-middle",
+        "elementId": "ns_o_task",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "inner": "done"
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-outer",
+        "elementId": "ns_task",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "inner": "done",
+          "middleSaw": "done"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "inner": "done",
+      "outerSaw": "done",
+      "middleSaw": "done"
+    },
+    "instances": [
+      {
+        "process": "rb_nested_sub",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3593,
+    "errors": [],
+    "restNotes": []
+  }
+}

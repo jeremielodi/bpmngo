@@ -7,7 +7,7 @@ for BpmnGo) and call by call (`npm run latency`).
 
 | Command | What |
 |---|---|
-| `npm run compare` | behaviour: 62 scenarios, every difference shown section by section |
+| `npm run compare` | behaviour: 87 scenarios, every difference shown section by section |
 | `npm run load` | load: clients and fixed-rate levels, CPU and memory per instance, BpmnGo's PostgreSQL statements, commits and WAL per instance; a long `--duration` is an endurance run |
 | `npm run latency` | one call at a time, p50/p95 per call, two passes |
 | `npm run experiment` | `experiments/exclusive-order.ts`: which flow an exclusive gateway takes when several conditions are true |
@@ -27,18 +27,32 @@ the outcome; the final variables; the end state. Then it compares Camunda
 
 ## Latest results
 
-**2026-11-03, BpmnGo `main` (43edbd7, PostgreSQL 18) against the Camunda
-8.10.7 traces of `reference-camunda-8.10.7/`** (recorded 2026-10-30 on the
-same suite): **62 of the 62 scenarios behave the same.**
+**2026-11-03, BpmnGo `main` (PostgreSQL 18) against a fresh Camunda 8.10.7,
+both run live, each on two physical cores and 2 GiB: 87 of the 87 scenarios
+behave the same.** Their traces are `reference-camunda-8.10.7/`.
 
-The last difference was the exclusive gateway with several conditions true.
-`npm run experiment` on Camunda 8.10.7 showed its rule: the **last** true
-flow, in the order of the `sequenceFlow` elements of the file, whatever the
-gateway's `<outgoing>` list says (its documentation says "the first").
-BpmnGo now does the same (`EXCLUSIVE_GATEWAY_ORDER=camunda`, the default);
-`EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the BPMN 2.0 rule (the first, in
-`<outgoing>` order). The experiment gives the same answers on both engines
-for its 11 variants.
+The 25 scenarios of the *Robustness* group cover the shapes real models
+are made of: loops back to a gateway; sub-processes nested, interrupted by
+an error, a timer or a terminate end, raising escalations and error end
+events; five and nested parallel branches; inclusive joins; link events;
+several end events; FEEL script tasks; DMN decisions; 200 KB, nested and
+non-ASCII variables; event-based gateways; correlation on a nested key;
+multi-instance sub-processes with a gateway inside; a non-interrupting
+boundary firing twice; a call activity waiting on a timer; and models as
+Camunda Modeler exports them (diagram, documentation, properties).
+
+They found two defects, fixed the same day: `zeebe:taskDefinition retries`
+was ignored (every job started with 3), and the jobs of a parallel
+multi-instance were announced one at a time instead of in one batch.
+
+Over the whole suite, BpmnGo used 0.27× Camunda's CPU time and 0.22× its
+peak memory, and ran it in 0.81× the time.
+
+The exclusive gateway with several conditions true follows Camunda: the
+**last** true flow, in the order of the `sequenceFlow` elements of the file,
+whatever the gateway's `<outgoing>` list says (`npm run experiment`; its
+documentation says "the first"). `EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the
+BPMN 2.0 rule instead.
 
 This bench found the parallel/inclusive join and multi-instance defects
 fixed in 8adbdd5 (the 2026-10-30 runs), which the earlier Go behaviour suite
@@ -432,7 +446,7 @@ the original names.
 
 ## 9. Scope and limits
 
-- 57 scenarios in 11 groups, plus 5 API checks (gRPC key usable in REST,
+- 82 scenarios in 12 groups, plus 5 API checks (gRPC key usable in REST,
   `/v2/element-instances/search`, searching finished instances, deploy
   response, timer accuracy).
 - Not the web UIs, not the Camunda 7 REST API (that needs a Camunda 7 next

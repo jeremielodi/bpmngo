@@ -1,0 +1,51 @@
+{
+  "scenario": "rb-subprocess-error-end-caught",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-validate",
+        "elementId": "sv_check",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-recover",
+        "elementId": "sv_recover",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "valid": false
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "valid": false,
+      "recovered": true
+    },
+    "instances": [
+      {
+        "process": "rb_sub_error_end",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2423,
+    "errors": [],
+    "restNotes": []
+  }
+}

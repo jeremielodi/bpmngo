@@ -1,0 +1,62 @@
+{
+  "scenario": "rb-call-activity-child-timer",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "child:rb_call_timer_child",
+        "type": "rb-child-work",
+        "elementId": "cc_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "amount": 21,
+          "doubled": 42
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-call-after",
+        "elementId": "ct_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "amount": 21,
+          "fromChild": 43
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "got": 43,
+      "amount": 21,
+      "fromChild": 43
+    },
+    "instances": [
+      {
+        "process": "rb_call_timer_child",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      },
+      {
+        "process": "rb_call_timer",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 4426,
+    "errors": [],
+    "restNotes": []
+  }
+}

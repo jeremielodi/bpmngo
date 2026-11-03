@@ -2,7 +2,7 @@
   "name": "bpmngo-benchmark",
   "version": "1.0.0",
   "private": true,
-  "description": "BpmnGo ⇄ Camunda 8: behaviour (62 scenarios), load, latency per call, through the Zeebe gRPC API and REST /v2.",
+  "description": "BpmnGo ⇄ Camunda 8: behaviour (87 scenarios), load, latency per call, through the Zeebe gRPC API and REST /v2.",
   "engines": {
     "node": ">=20"
   },

@@ -1,0 +1,49 @@
+{
+  "scenario": "rb-subprocess-escalation",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-esc-continue",
+        "elementId": "sz_go_on",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "after 1000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-esc-notify",
+        "elementId": "sz_notify",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "notified": true,
+      "continued": true
+    },
+    "instances": [
+      {
+        "process": "rb_sub_escalation",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2728,
+    "errors": [],
+    "restNotes": []
+  }
+}

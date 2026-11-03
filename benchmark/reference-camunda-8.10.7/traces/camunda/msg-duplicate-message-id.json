@@ -56,7 +56,7 @@
     ]
   },
   "info": {
-    "durationMs": 5400,
+    "durationMs": 5142,
     "errors": [
       "after 300 ms: publish msg-paid key=A4 ttl=10000 id=m-1: ALREADY_EXISTS Command 'PUBLISH' rejected with code 'ALREADY_EXISTS': Expected to publish a new message with id 'm-1', but a message with that id was already published"
     ],

@@ -1,0 +1,46 @@
+{
+  "scenario": "rb-event-gateway-signal-wins",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-by-signal",
+        "elementId": "eg_by_signal",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "signalled": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after 1000 ms: signal rb-go",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "by": "signal",
+      "signalled": true
+    },
+    "instances": [
+      {
+        "process": "rb_event_gw_signal",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3896,
+    "errors": [],
+    "restNotes": []
+  }
+}
