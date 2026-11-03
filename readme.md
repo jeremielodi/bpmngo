@@ -1,7 +1,7 @@
 # BpmnGo — Cloud-Native BPMN Workflow Engine
 
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![BPMN 2.0](https://img.shields.io/badge/BPMN-2.0-orange)
 ![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)
@@ -23,10 +23,11 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 **BpmnGo 1.0.3 is production ready.** What backs this:
 
 - **Tested end to end:** 53 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
+- **Same behaviour as Camunda 8:** the [benchmark](benchmark/README.md) drives BpmnGo and Camunda 8.10.7 with the same Zeebe gRPC and `/v2` client code, and all 62 scenarios (gateways, joins, multi-instance, events, timers, compensation, FEEL…) behave the same. Where Camunda 8 departs from BPMN 2.0 — an exclusive gateway with several true conditions takes the last one, in file order — BpmnGo follows Camunda by default (`EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the BPMN 2.0 rule).
 - **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
 - **Backups:** `pg_dump` backups, with a script that checks each backup restores. See [Operations](docs/operations.md#backups).
 - **Secure defaults:** with `GOFLOW_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
-- **Operable:** Prometheus metrics, history retention, manual SQL migrations from a baseline, load-testing script. See [Operations](docs/operations.md).
+- **Operable:** Prometheus metrics, history retention, manual SQL migrations from a baseline, load and endurance tests that report PostgreSQL's own figures (statements, commits and WAL per instance). See [Operations](docs/operations.md).
 
 What BpmnGo does not cover yet compared with Camunda is listed in [Comparison to Camunda 7 / Camunda 8](docs/comparison.md).
 
@@ -117,6 +118,7 @@ Design decisions and the partitioned write path: [docs/architecture.md](docs/arc
 - [Operations](docs/operations.md) — migrations, metrics, backups, scaling, high availability
 - [Ajouter des serveurs](docs/adding-servers.md) — de 1 à 4 serveurs et plus : quels fichiers, et ce qu'il faut faire côté base de données à chaque étape
 - [Integration Tests](docs/testing.md) — the suites and how to run them
+- [Benchmark](benchmark/README.md) — BpmnGo against Camunda 8: behaviour (62 scenarios), load, endurance, per-call latency
 - [Roadmap](docs/roadmap.md) — what's done and what's next
 - [`architecture/`](architecture/) — design documents (partitioned write path, Citus storage, history of the event-sourced phases)
 - [`database/migrations/`](database/migrations/README.md) — the SQL migrations, applied by hand
