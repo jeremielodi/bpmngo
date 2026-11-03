@@ -21,7 +21,7 @@ function args(argv: string[]) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const engines: Record<string, EngineConfig> = {
     camunda: { name: 'camunda', grpc: get('camunda-grpc', 'localhost:26500')!, rest: get('camunda-rest', 'http://localhost:8080')!, user: get('camunda-user'), password: get('camunda-password') },
-    bpmngo: { name: 'bpmngo', grpc: get('bpmngo-grpc', 'localhost:26600')!, rest: get('bpmngo-rest', 'http://localhost:9080')!, user: get('bpmngo-user', 'admin@goflow.com'), password: get('bpmngo-password', 'admin123') },
+    bpmngo: { name: 'bpmngo', grpc: get('bpmngo-grpc', 'localhost:26600')!, rest: get('bpmngo-rest', 'http://localhost:9080')!, user: get('bpmngo-user', 'admin@bpmngo.com'), password: get('bpmngo-password', 'admin123') },
   };
   return {
     engines,

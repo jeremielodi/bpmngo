@@ -234,9 +234,9 @@ async function run() {
           assert((await positions()).length === 0, 'no positions left');
 
           // Restricted to someone else: 404, as the definition itself.
-          const email = `pos08-${runId}@goflow.com`;
+          const email = `pos08-${runId}@bpmngo.com`;
           await client.api.post('/users', { email, full_name: email, password: 'password123' });
-          const other = await client.api.post('/users', { email: `pos08b-${runId}@goflow.com`, full_name: 'x', password: 'password123' });
+          const other = await client.api.post('/users', { email: `pos08b-${runId}@bpmngo.com`, full_name: 'x', password: 'password123' });
           await client.api.post(`/engine-rest/process-definition/key/${key}/permissions`, { granteeType: 'user', granteeId: other.data.user.id, permission: 'VIEW' });
           const outsider = new BpmnGoClient();
           await outsider.login(email, 'password123');

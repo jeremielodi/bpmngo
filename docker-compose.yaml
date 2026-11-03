@@ -167,13 +167,13 @@ services:
       # Super User (valeurs lues depuis .env)
       CREATE_SUPER_USER: ${CREATE_SUPER_USER:-true}
       SUPER_USER_NAME: ${SUPER_USER_NAME:-admin}
-      SUPER_USER_EMAIL: ${SUPER_USER_EMAIL:-admin@goflow.com}
+      SUPER_USER_EMAIL: ${SUPER_USER_EMAIL:-admin@bpmngo.com}
       SUPER_USER_PASSWORD: ${SUPER_USER_PASSWORD:-admin123}
       
       # Mode : production (défaut dès que JWT_SECRET_KEY est fixé : refuse les
       # secrets d'exemple, avertit sur /metrics ouvert et le mot de passe
       # admin123) ou demo (défaut sans JWT_SECRET_KEY : secret généré).
-      GOFLOW_ENV: ${GOFLOW_ENV:-}
+      BPMNGO_ENV: ${BPMNGO_ENV:-}
 
       # Observabilité : jeton Bearer exigé sur GET /metrics (vide = ouvert)
       METRICS_TOKEN: ${METRICS_TOKEN:-}

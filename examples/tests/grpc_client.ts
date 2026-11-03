@@ -20,7 +20,7 @@ export const GRPC_ADDR = process.env.GRPC_ADDR ?? '127.0.0.1:26500';
 // The gateway refuses calls without valid credentials (see
 // internal/zeebegrpc/auth.go). The suites authenticate as the seeded
 // superuser with HTTP Basic, as zeebe-node's basicAuth option does.
-export const GRPC_BASIC_AUTH = { username: 'admin@goflow.com', password: 'admin123' };
+export const GRPC_BASIC_AUTH = { username: 'admin@bpmngo.com', password: 'admin123' };
 
 /**
  * One unary call on a fresh client that sends exactly the given

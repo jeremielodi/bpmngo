@@ -25,7 +25,7 @@ import { BASE_URL, runSuite, assert } from './client';
 
 const PROJECT = path.join(__dirname, '..', 'java-client');
 const SPRING_PROJECT = path.join(__dirname, '..', 'java-client-spring');
-const GRPC = process.env.GOFLOW_GRPC ?? `${new URL(BASE_URL).hostname}:26500`;
+const GRPC = process.env.BPMNGO_GRPC ?? `${new URL(BASE_URL).hostname}:26500`;
 
 function mvnw(args: string[], env: Record<string, string> = {}, timeoutMs = 300_000, project = PROJECT): Promise<{ code: number; out: string }> {
   const windows = process.platform === 'win32';
@@ -35,7 +35,7 @@ function mvnw(args: string[], env: Record<string, string> = {}, timeoutMs = 300_
     const child = spawn(wrapper, ['-q', '-B', ...args], {
       cwd: project,
       shell: windows,
-      env: { ...process.env, GOFLOW_URL: BASE_URL, GOFLOW_GRPC: GRPC, ...env },
+      env: { ...process.env, BPMNGO_URL: BASE_URL, BPMNGO_GRPC: GRPC, ...env },
     });
     let out = '';
     child.stdout.on('data', d => (out += d));
@@ -71,11 +71,11 @@ async function run() {
       },
       {
         name: '[C] ExternalTaskWorkerExample: Camunda 7 client, HTTP Basic',
-        fn: () => runExample('ExternalTaskWorkerExample', { GOFLOW_WORKER_AUTH: 'basic' }),
+        fn: () => runExample('ExternalTaskWorkerExample', { BPMNGO_WORKER_AUTH: 'basic' }),
       },
       {
         name: '[D] ExternalTaskWorkerExample: Camunda 7 client, JWT',
-        fn: () => runExample('ExternalTaskWorkerExample', { GOFLOW_WORKER_AUTH: 'jwt' }),
+        fn: () => runExample('ExternalTaskWorkerExample', { BPMNGO_WORKER_AUTH: 'jwt' }),
       },
       {
         name: '[E] ZeebeClientExample: Camunda 8 Java client over gRPC',

@@ -34,7 +34,7 @@ async function start(key: string) {
 
 // A logged-in user with no role beyond the default one.
 async function plainUser(tag: string) {
-  const email = `ops57-${tag}-${runId}@goflow.com`;
+  const email = `ops57-${tag}-${runId}@bpmngo.com`;
   const res = await client.api.post('/users', { email, full_name: email, password: 'password123' });
   const c = new BpmnGoClient();
   await c.login(email, 'password123');
@@ -59,7 +59,7 @@ async function main() {
           assert(metrics.status === 200, `/metrics: ${metrics.status}`);
           const text = String(metrics.data);
           assert(text.includes('# HELP') && text.includes('# TYPE'), 'Prometheus exposition format expected');
-          assert(text.includes('goflow_worker_pool_queue_length'), 'a known BpmnGo gauge must be exported');
+          assert(text.includes('bpmngo_worker_pool_queue_length'), 'a known BpmnGo gauge must be exported');
 
           const pool = await client.api.get('/metrics/pool', ok);
           assert(pool.status === 200 && typeof pool.data.queue_length === 'number' && typeof pool.data.healthy === 'boolean',

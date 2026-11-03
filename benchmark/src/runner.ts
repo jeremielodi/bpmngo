@@ -49,6 +49,8 @@ export function isolate(xml: string, suffix: string): string {
   let out = xml;
   for (const id of ids) {
     out = out.replace(new RegExp(`(<(?:\\w+:)?process\\b[^>]*\\bid=")${escapeRe(id)}"`, 'g'), `$1${id}${suffix}"`);
+    // Pools and the diagram point at the process by id.
+    out = out.replace(new RegExp(`(\\b(?:processRef|bpmnElement)=")${escapeRe(id)}"`, 'g'), `$1${id}${suffix}"`);
   }
   // Called process ids, job types, message and signal names.
   out = out.replace(/(\bprocessId=")([^"=][^"]*)"/g, (_, a, v) => `${a}${v}${suffix}"`);

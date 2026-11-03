@@ -47,7 +47,7 @@ func SetTopologySource(brokers []string, partitions, replicationFactor int) {
 func clientID() string {
 	host, err := os.Hostname()
 	if err != nil || host == "" {
-		return "goflow"
+		return "bpmngo"
 	}
 	return host
 }

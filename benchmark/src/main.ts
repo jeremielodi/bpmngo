@@ -50,7 +50,7 @@ function parseArgs(argv: string[]): Options {
       name: 'bpmngo',
       grpc: get('bpmngo-grpc', 'localhost:26600')!,
       rest: get('bpmngo-rest', 'http://localhost:9080')!,
-      user: get('bpmngo-user', 'admin@goflow.com'),
+      user: get('bpmngo-user', 'admin@bpmngo.com'),
       password: get('bpmngo-password', 'admin123'),
     },
     engines: get('engines', 'camunda,bpmngo')!.split(',').map(s => s.trim()).filter(Boolean),

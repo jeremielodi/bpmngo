@@ -476,7 +476,7 @@ async function main() {
     const testType = process.argv[2];
     
     console.log('\n' + '='.repeat(60));
-    console.log('🚀 GOFLOW LOAD TEST SUITE');
+    console.log('🚀 BPMNGO LOAD TEST SUITE');
     console.log('='.repeat(60));
     console.log(`Server: ${API_URL}`);
     console.log(`CPU Cores: ${os.cpus().length}`);

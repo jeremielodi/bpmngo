@@ -120,7 +120,7 @@ services:
     depends_on: [haproxy]
     environment:
       PG_SUPERUSER_PASSWORD: ${PG_SUPERUSER_PASSWORD:-postgres-ha}
-      GOFLOW_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
+      BPMNGO_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
     entrypoint: ["/bin/bash", "/ha-init.sh"]
     volumes:
       - ./deploy/ha/ha-init.sh:/ha-init.sh:ro

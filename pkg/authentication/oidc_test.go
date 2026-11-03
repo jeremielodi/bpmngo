@@ -86,12 +86,12 @@ func TestOIDCService_ValidToken(t *testing.T) {
 	idp := newTestIdP(t)
 	defer idp.close()
 
-	svc := NewOIDCService(idp.issuer, "goflow-api", idp.jwksURL())
+	svc := NewOIDCService(idp.issuer, "bpmngo-api", idp.jwksURL())
 	if svc == nil {
 		t.Fatal("expected a non-nil OIDCService when issuer+jwksURL are set")
 	}
 
-	token := idp.signToken(t, validClaims(idp.issuer, "goflow-api"))
+	token := idp.signToken(t, validClaims(idp.issuer, "bpmngo-api"))
 
 	claims, err := svc.ValidateToken(token)
 	if err != nil {
@@ -109,8 +109,8 @@ func TestOIDCService_WrongIssuerRejected(t *testing.T) {
 	idp := newTestIdP(t)
 	defer idp.close()
 
-	svc := NewOIDCService(idp.issuer, "goflow-api", idp.jwksURL())
-	token := idp.signToken(t, validClaims("https://not-the-configured-issuer.example.com", "goflow-api"))
+	svc := NewOIDCService(idp.issuer, "bpmngo-api", idp.jwksURL())
+	token := idp.signToken(t, validClaims("https://not-the-configured-issuer.example.com", "bpmngo-api"))
 
 	if _, err := svc.ValidateToken(token); err == nil {
 		t.Fatal("expected an error for a token with the wrong issuer")
@@ -121,7 +121,7 @@ func TestOIDCService_WrongAudienceRejected(t *testing.T) {
 	idp := newTestIdP(t)
 	defer idp.close()
 
-	svc := NewOIDCService(idp.issuer, "goflow-api", idp.jwksURL())
+	svc := NewOIDCService(idp.issuer, "bpmngo-api", idp.jwksURL())
 	token := idp.signToken(t, validClaims(idp.issuer, "some-other-api"))
 
 	if _, err := svc.ValidateToken(token); err == nil {
@@ -133,8 +133,8 @@ func TestOIDCService_ExpiredTokenRejected(t *testing.T) {
 	idp := newTestIdP(t)
 	defer idp.close()
 
-	svc := NewOIDCService(idp.issuer, "goflow-api", idp.jwksURL())
-	claims := validClaims(idp.issuer, "goflow-api")
+	svc := NewOIDCService(idp.issuer, "bpmngo-api", idp.jwksURL())
+	claims := validClaims(idp.issuer, "bpmngo-api")
 	claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-1 * time.Minute))
 	token := idp.signToken(t, claims)
 
@@ -147,8 +147,8 @@ func TestOIDCService_TamperedSignatureRejected(t *testing.T) {
 	idp := newTestIdP(t)
 	defer idp.close()
 
-	svc := NewOIDCService(idp.issuer, "goflow-api", idp.jwksURL())
-	token := idp.signToken(t, validClaims(idp.issuer, "goflow-api"))
+	svc := NewOIDCService(idp.issuer, "bpmngo-api", idp.jwksURL())
+	token := idp.signToken(t, validClaims(idp.issuer, "bpmngo-api"))
 
 	// Flip a character in the middle of the signature segment. Flipping the
 	// very last base64url character is flaky: depending on byte alignment,
@@ -172,9 +172,9 @@ func TestOIDCService_UnknownKidRejected(t *testing.T) {
 	idp := newTestIdP(t)
 	defer idp.close()
 
-	svc := NewOIDCService(idp.issuer, "goflow-api", idp.jwksURL())
+	svc := NewOIDCService(idp.issuer, "bpmngo-api", idp.jwksURL())
 
-	claims := validClaims(idp.issuer, "goflow-api")
+	claims := validClaims(idp.issuer, "bpmngo-api")
 	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	tok.Header["kid"] = "some-unknown-key-id"
 	signed, err := tok.SignedString(idp.privateKey)

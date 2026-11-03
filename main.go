@@ -71,12 +71,16 @@ func configuredJWTSecret(util common.Util) string {
 	return secret
 }
 
-// goflowEnv is GOFLOW_ENV when set. Unset, it is "production" when a JWT
-// secret is configured (a deployment that set one keeps every production
-// check), and "demo" otherwise: a first `docker compose up` with no .env
-// at all just works.
-func goflowEnv(util common.Util) string {
+// bpmngoEnv is BPMNGO_ENV (or the legacy GOFLOW_ENV) when set. Unset, it is
+// "production" when a JWT secret is configured (a deployment that set one
+// keeps every production check), and "demo" otherwise: a first
+// `docker compose up` with no .env at all just works.
+func bpmngoEnv(util common.Util) string {
+	if env := strings.TrimSpace(util.DotEnvVariable("BPMNGO_ENV")); env != "" {
+		return env
+	}
 	if env := strings.TrimSpace(util.DotEnvVariable("GOFLOW_ENV")); env != "" {
+		log.Println("⚠️ GOFLOW_ENV is deprecated — rename it to BPMNGO_ENV")
 		return env
 	}
 	if configuredJWTSecret(util) != "" {
@@ -161,8 +165,8 @@ func main() {
 
 	// Initialize utility functions using the root directory
 	var util = *common.NewUtil(&rootDirPath)
-	env := goflowEnv(util)
-	log.Printf("Environment: %s (GOFLOW_ENV)", env)
+	env := bpmngoEnv(util)
+	log.Printf("Environment: %s (BPMNGO_ENV)", env)
 	if env == "production" && util.DotEnvVariable("SUPER_USER_PASSWORD") == "admin123" {
 		log.Println("⚠️ SUPER_USER_PASSWORD is the sample admin123 — set a real password for the admin account")
 	}
@@ -414,11 +418,11 @@ func main() {
 	// ============================================================
 
 	metrics.Register(db)
-	metrics.RegisterGaugeFunc("goflow_worker_pool_queue_length", "Requests waiting in the async worker pool queue.",
+	metrics.RegisterGaugeFunc("bpmngo_worker_pool_queue_length", "Requests waiting in the async worker pool queue.",
 		func() float64 { return float64(workerPool.GetMetrics().QueueLength) })
-	metrics.RegisterGaugeFunc("goflow_worker_pool_active_workers", "Async worker pool workers currently busy.",
+	metrics.RegisterGaugeFunc("bpmngo_worker_pool_active_workers", "Async worker pool workers currently busy.",
 		func() float64 { return float64(workerPool.GetMetrics().ActiveWorkers) })
-	metrics.RegisterGaugeFunc("goflow_worker_pool_jobs_failed", "Async worker pool requests that failed since startup.",
+	metrics.RegisterGaugeFunc("bpmngo_worker_pool_jobs_failed", "Async worker pool requests that failed since startup.",
 		func() float64 { return float64(workerPool.GetMetrics().JobsFailed) })
 
 	if n, err := service.BackfillGatewayDefaults(db); err != nil {

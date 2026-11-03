@@ -5,13 +5,13 @@
 # autonome et pour le cluster haute disponibilité.
 #
 #   ./scripts/test-restore.sh                       # dernière sauvegarde de ./backups
-#   ./scripts/test-restore.sh backups/goflow_20261017_030000.dump
+#   ./scripts/test-restore.sh backups/bpmngo_20261017_030000.dump
 set -eu
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
-CHECK="goflow-restore-check-$$"
+CHECK="bpmngo-restore-check-$$"
 
-file="${1:-$(ls -t "$BACKUP_DIR"/goflow_*.dump 2>/dev/null | head -1)}"
+file="${1:-$(ls -t "$BACKUP_DIR"/bpmngo_*.dump "$BACKUP_DIR"/goflow_*.dump 2>/dev/null | head -1)}"
 if [ -z "$file" ] || [ ! -f "$file" ]; then
   echo "aucune sauvegarde trouvée (dossier $BACKUP_DIR)" >&2
   exit 1

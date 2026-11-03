@@ -405,9 +405,9 @@ async function run() {
 
           // Restricted process, user without a grant: neither route shows it.
           const run = Date.now().toString(36);
-          const email = `audit22-${run}@goflow.com`;
+          const email = `audit22-${run}@bpmngo.com`;
           await client.api.post('/users', { email, full_name: email, password: 'password123' });
-          const grantee = await client.api.post('/users', { email: `audit22g-${run}@goflow.com`, full_name: 'g', password: 'password123' });
+          const grantee = await client.api.post('/users', { email: `audit22g-${run}@bpmngo.com`, full_name: 'g', password: 'password123' });
           await client.api.post('/engine-rest/process-definition/key/OperateProcess/permissions', { granteeType: 'user', granteeId: grantee.data.user.id, permission: 'VIEW' });
           try {
             const outsider = new BpmnGoClient();

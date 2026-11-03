@@ -11,7 +11,7 @@
 set -euo pipefail
 
 URL="${1:-http://127.0.0.1:8080}"
-EMAIL="${2:-admin@goflow.com}"
+EMAIL="${2:-admin@bpmngo.com}"
 PASSWORD="${3:-admin123}"
 COUNT="${COUNT:-10}"
 
@@ -82,7 +82,7 @@ for pid in "${ids[@]}"; do
 	[ "$status" = "completed" ] || { echo "  instance $pid: ${status:-missing}"; lost=$((lost + 1)); }
 done
 
-echo "Restarting goflow-$OLD (rejoins as a replica)"
+echo "Restarting bpmngo-$OLD (rejoins as a replica)"
 docker start "bpmngo-$OLD" >/dev/null
 
 if [ "$lost" -eq 0 ] && [ "$completed" -eq "${#ids[@]}" ]; then

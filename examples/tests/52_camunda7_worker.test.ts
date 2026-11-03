@@ -27,7 +27,7 @@ const client = new BpmnGoClient();
 const run = Date.now().toString(36);
 const c7 = axios.create({
   baseURL: `${BASE_URL}/engine-rest`,
-  auth: { username: 'admin@goflow.com', password: 'admin123' },
+  auth: { username: 'admin@bpmngo.com', password: 'admin123' },
   validateStatus: () => true,
 });
 

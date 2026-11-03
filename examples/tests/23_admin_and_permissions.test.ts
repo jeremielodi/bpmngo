@@ -51,11 +51,11 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { BpmnGoClient, runSuite, assert } from './client';
 
-// GOFLOW_PG_CONTAINER names the Postgres container of the stack under test
+// BPMNGO_PG_CONTAINER names the Postgres container of the stack under test
 // (an isolated stack); by default, this repository's compose service.
 function psql(sql: string): string {
-  const target = process.env.GOFLOW_PG_CONTAINER
-    ? `docker exec -i ${process.env.GOFLOW_PG_CONTAINER}`
+  const target = process.env.BPMNGO_PG_CONTAINER
+    ? `docker exec -i ${process.env.BPMNGO_PG_CONTAINER}`
     : 'docker compose exec -T postgres';
   return execSync(`${target} psql -U goflow -d goflow -tAc "${sql}"`, {
     cwd: path.join(__dirname, '..', '..'),
@@ -111,7 +111,7 @@ async function run() {
       {
         name: '[A] Create role, assign action, assign to user, verify gated access, then revoke',
         async fn() {
-          const { id: userId, client: userClient } = await createUser('crud-user@goflow.com');
+          const { id: userId, client: userClient } = await createUser('crud-user@bpmngo.com');
 
           // Fresh user (default "user" role, no actions) — GET /tasks is
           // gated by CAN_READ_TASKS, should be forbidden.
@@ -143,8 +143,8 @@ async function run() {
         async fn() {
           await deploy(superuser);
 
-          const { id: userAId, client: userA } = await createUser('perm-user-a@goflow.com');
-          const { client: userB } = await createUser('perm-user-b@goflow.com');
+          const { id: userAId, client: userA } = await createUser('perm-user-a@bpmngo.com');
+          const { client: userB } = await createUser('perm-user-b@bpmngo.com');
 
           // The first deployment granted the deployer MANAGE, and only them.
           const me = (await superuser.api.get('/users/me')).data.user;
@@ -167,7 +167,7 @@ async function run() {
           });
 
           // A third, ungranted user created AFTER restriction — must be denied.
-          const { client: userC } = await createUser('perm-user-c@goflow.com');
+          const { client: userC } = await createUser('perm-user-c@bpmngo.com');
           const listC = await userC.api.get('/engine-rest/process-definition?key=PermissionProcess');
           assert(listC.data.length === 0, 'expected a restricted process to be filtered out of an ungranted user\'s list');
           const startC = await userC.startProcess('PermissionProcess', {}).catch(e => e.response);
@@ -192,7 +192,7 @@ async function run() {
       {
         name: '[C] Role read routes are gated, edit persists, delete-while-in-use is rejected',
         async fn() {
-          const { id: userId, client: userClient } = await createUser('role-hardening-user@goflow.com');
+          const { id: userId, client: userClient } = await createUser('role-hardening-user@bpmngo.com');
 
           // A fresh user has no CAN_EDIT_ROLE/CAN_MANAGE_USER — role read
           // routes must reject them (these used to have no guard at all).
@@ -227,16 +227,16 @@ async function run() {
       {
         name: '[D] DeleteUser soft-deletes (is_active=false, row survives); admin password reset persists',
         async fn() {
-          const { id: userId, client: userClient } = await createUser('lifecycle-user@goflow.com');
+          const { id: userId, client: userClient } = await createUser('lifecycle-user@bpmngo.com');
 
           // Admin resets the password — verified by actually logging in
           // with the new one (and confirming the old one no longer works),
           // not just checking for a 200.
           await superuser.api.put(`/users/${userId}/reset-password`, { new_password: 'resetpass456' });
           const freshClient = new BpmnGoClient();
-          const loginNew = await freshClient.login('lifecycle-user@goflow.com', 'resetpass456');
+          const loginNew = await freshClient.login('lifecycle-user@bpmngo.com', 'resetpass456');
           assert(!!loginNew.access_token, 'expected login with the admin-reset password to succeed');
-          const loginOld = await freshClient.login('lifecycle-user@goflow.com', 'password123').catch(e => e.response);
+          const loginOld = await freshClient.login('lifecycle-user@bpmngo.com', 'password123').catch(e => e.response);
           assert(loginOld?.status === 401, `expected the old password to be rejected after reset, got ${loginOld?.status}`);
 
           // DeleteUser soft-deletes: the row survives (is_active=false),
@@ -248,7 +248,7 @@ async function run() {
           const deletedUser = getAfterDelete.data.user ?? getAfterDelete.data;
           assert(deletedUser.is_active === false, `expected the user row to survive with is_active=false, got ${JSON.stringify(deletedUser)}`);
 
-          const loginDeactivated = await userClient.login('lifecycle-user@goflow.com', 'resetpass456').catch(e => e.response);
+          const loginDeactivated = await userClient.login('lifecycle-user@bpmngo.com', 'resetpass456').catch(e => e.response);
           assert(loginDeactivated?.status === 403, `expected a deactivated user's login to be rejected with 403, got ${loginDeactivated?.status}`);
         },
       },
@@ -263,8 +263,8 @@ async function run() {
 
           // Two distinct users: granteeId makes the process "restricted" in
           // the first place (IsRestricted), stranger gets NO grant at all.
-          const { id: strangerId, client: stranger } = await createUser('audit-stranger@goflow.com');
-          const { id: granteeId, client: granteeClient } = await createUser('audit-grantee@goflow.com');
+          const { id: strangerId, client: stranger } = await createUser('audit-stranger@bpmngo.com');
+          const { id: granteeId, client: granteeClient } = await createUser('audit-grantee@bpmngo.com');
           await superuser.api.post('/engine-rest/process-definition/key/PermissionProcess/permissions', {
             granteeType: 'user', granteeId, permission: 'VIEW',
           });
@@ -323,8 +323,8 @@ async function run() {
           // incident search has a row to hide.
           psql(`INSERT INTO incidents (process_instance_key, incident_type, activity_id, error_message) SELECT engine_key, 'executionError', 'reviewTask', 'v2 permission test' FROM process_instances WHERE id = '${instanceId}'`);
 
-          const { id: strangerId, client: stranger } = await createUser(`v2-stranger-${Date.now()}@goflow.com`);
-          const { id: granteeId, client: grantee } = await createUser(`v2-grantee-${Date.now()}@goflow.com`);
+          const { id: strangerId, client: stranger } = await createUser(`v2-stranger-${Date.now()}@bpmngo.com`);
+          const { id: granteeId, client: grantee } = await createUser(`v2-grantee-${Date.now()}@bpmngo.com`);
           await superuser.api.post('/engine-rest/process-definition/key/PermissionProcess/permissions', {
             granteeType: 'user', granteeId, permission: 'VIEW',
           });
@@ -376,8 +376,8 @@ async function run() {
           const keyB = `RevokeB_${runId}`;
           await deployKey(superuser, keyA);
           await deployKey(superuser, keyB);
-          const { id: viewerId, client: viewer } = await createUser(`revoke-viewer-${runId}@goflow.com`);
-          const { id: managerId, client: manager } = await createUser(`revoke-manager-${runId}@goflow.com`);
+          const { id: viewerId, client: viewer } = await createUser(`revoke-viewer-${runId}@bpmngo.com`);
+          const { id: managerId, client: manager } = await createUser(`revoke-manager-${runId}@bpmngo.com`);
 
           const grant = async (key: string, granteeId: string, permission: string) =>
             (await superuser.api.post(`/engine-rest/process-definition/key/${key}/permissions`, {
@@ -439,7 +439,7 @@ async function run() {
             `all revocations but the last succeed, the last is a 409: ${statuses}`);
           const left = (await superuser.api.get(`/engine-rest/process-definition/key/${keyB}/permissions`)).data.permissions as any[];
           assert(left.length === 1, `one grant must remain, got ${left.length}`);
-          const { client: outsider } = await createUser(`revoke-outsider-${runId}@goflow.com`);
+          const { client: outsider } = await createUser(`revoke-outsider-${runId}@bpmngo.com`);
           assert(await seen(outsider, keyB) === 404, 'the process must stay closed to everyone else');
         },
       },
@@ -448,8 +448,8 @@ async function run() {
       {
         name: '[H] Own password change, email lookup and permission check are self-or-admin only',
         async fn() {
-          const emailA = `self-a-${runId}@goflow.com`;
-          const emailB = `self-b-${runId}@goflow.com`;
+          const emailA = `self-a-${runId}@bpmngo.com`;
+          const emailB = `self-b-${runId}@bpmngo.com`;
           const { id: aId, client: a } = await createUser(emailA);
           const { id: bId } = await createUser(emailB);
           const status = (p: Promise<any>) => p.then(r => r.status, e => e.response?.status);
@@ -470,8 +470,8 @@ async function run() {
           const self = await a.api.get(`/users/email/${emailA}`);
           assert(self.data.user.id === aId, 'own email lookup should return self');
           assert(await status(a.api.get(`/users/email/${emailB}`)) === 403, 'looking up another user by email must be refused');
-          assert(await status(a.api.get(`/users/email/nobody-${runId}@goflow.com`)) === 403, 'an unknown email must look the same as a known one to a non-admin');
-          assert(await status(superuser.api.get(`/users/email/nobody-${runId}@goflow.com`)) === 404, 'admin lookup of an unknown email: 404');
+          assert(await status(a.api.get(`/users/email/nobody-${runId}@bpmngo.com`)) === 403, 'an unknown email must look the same as a known one to a non-admin');
+          assert(await status(superuser.api.get(`/users/email/nobody-${runId}@bpmngo.com`)) === 404, 'admin lookup of an unknown email: 404');
           assert((await superuser.api.get(`/users/email/${emailA}`)).data.user.id === aId, 'admin can look up any email');
 
           // Permission check follows role assignment, and is self-or-admin.

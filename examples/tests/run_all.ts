@@ -19,7 +19,7 @@ import { execSync, spawn } from 'child_process';
 import * as path from 'path';
 import { BpmnGoClient, sleep, SKIPPED_EXIT_CODE } from './client';
 
-const BASE_URL = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
+const BASE_URL = process.env.BPMNGO_URL ?? 'http://127.0.0.1:8080';
 const noTimers = process.argv.includes('--no-timers');
 
 // ─── Wait for app to be healthy ───────────────────────────────────────────────
@@ -77,9 +77,9 @@ async function main() {
   //   // }
 
   //   console.log('📦  Starting Docker services (fresh build)…');
-  //   // GOFLOW_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
+  //   // BPMNGO_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
   //   // runs the suites against several BpmnGo instances behind the load balancer.
-  //   const replicas = process.env.GOFLOW_REPLICAS ? ` --scale bpmngo=${process.env.GOFLOW_REPLICAS}` : '';
+  //   const replicas = process.env.BPMNGO_REPLICAS ? ` --scale bpmngo=${process.env.BPMNGO_REPLICAS}` : '';
   //   try {
   //     execSync(`docker compose up -d --build --wait${replicas}`, {
   //       cwd: path.join(__dirname, '..', '..'),

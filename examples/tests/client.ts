@@ -3,7 +3,7 @@ import FormData from 'form-data';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export const BASE_URL = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
+export const BASE_URL = process.env.BPMNGO_URL ?? 'http://127.0.0.1:8080';
 
 // ─── Response types ──────────────────────────────────────────────────────────
 
@@ -190,7 +190,7 @@ export class BpmnGoClient {
   }
 
   async loginAsSuperUser(): Promise<LoginResponse> {
-    return this.login('admin@goflow.com', 'admin123');
+    return this.login('admin@bpmngo.com', 'admin123');
   }
 
   async refreshToken(refreshToken: string): Promise<LoginResponse> {
@@ -210,7 +210,7 @@ export class BpmnGoClient {
     const form = new FormData();
     form.append('resources', fs.createReadStream(filePath));
     form.append('deployment-name', name ?? path.basename(filePath, '.bpmn'));
-    form.append('deployment-source', 'goflow-tests');
+    form.append('deployment-source', 'bpmngo-tests');
 
     const res = await this.api.post<Deployment>('/engine-rest/deployment/create', form, {
       headers: form.getHeaders(),

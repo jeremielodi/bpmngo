@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- A Camunda user task completed over REST, and compensation. -->
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
                   xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
                   id="tasks_compensation" targetNamespace="http://bpmn.io/schema/bpmn">
 
   <bpmn:error id="Err_pay" errorCode="PAY"/>
+
+  <bpmn:collaboration id="Collaboration_tasks_compensation">
+    <bpmn:participant id="Participant_ut_simple" name="ut_simple" processRef="ut_simple" />
+    <bpmn:participant id="Participant_cp_booking" name="cp_booking" processRef="cp_booking" />
+  </bpmn:collaboration>
 
   <bpmn:process id="ut_simple" isExecutable="true">
     <bpmn:startEvent id="u_start"/>
@@ -44,4 +52,94 @@
     <!-- Artifacts must follow all flow elements (BPMN 2.0 schema order). -->
     <bpmn:association id="c_assoc" associationDirection="One" sourceRef="c_book_comp" targetRef="c_undo"/>
   </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_tasks_compensation">
+    <bpmndi:BPMNPlane id="BPMNPlane_tasks_compensation" bpmnElement="Collaboration_tasks_compensation">
+      <bpmndi:BPMNShape id="Participant_ut_simple_di" bpmnElement="Participant_ut_simple" isHorizontal="true">
+        <dc:Bounds x="0" y="0" width="928" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_start_di" bpmnElement="u_start">
+        <dc:Bounds x="70" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_approve_di" bpmnElement="u_approve">
+        <dc:Bounds x="188" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_after_di" bpmnElement="u_after">
+        <dc:Bounds x="338" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_end_di" bpmnElement="u_end">
+        <dc:Bounds x="520" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="u_f0_di" bpmnElement="u_f0">
+        <di:waypoint x="106" y="80" />
+        <di:waypoint x="188" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="u_f1_di" bpmnElement="u_f1">
+        <di:waypoint x="288" y="80" />
+        <di:waypoint x="338" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="u_f2_di" bpmnElement="u_f2">
+        <di:waypoint x="438" y="80" />
+        <di:waypoint x="520" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_cp_booking_di" bpmnElement="Participant_cp_booking" isHorizontal="true">
+        <dc:Bounds x="0" y="190" width="928" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_start_di" bpmnElement="c_start">
+        <dc:Bounds x="102" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_book_di" bpmnElement="c_book">
+        <dc:Bounds x="220" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_book_comp_di" bpmnElement="c_book_comp">
+        <dc:Bounds x="252" y="292" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_charge_di" bpmnElement="c_charge">
+        <dc:Bounds x="370" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_pay_error_di" bpmnElement="c_pay_error">
+        <dc:Bounds x="402" y="292" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_end_di" bpmnElement="c_end">
+        <dc:Bounds x="552" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_undo_di" bpmnElement="c_undo">
+        <dc:Bounds x="70" y="370" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_compensate_di" bpmnElement="c_compensate">
+        <dc:Bounds x="552" y="392" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_failed_di" bpmnElement="c_failed">
+        <dc:Bounds x="670" y="370" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_end2_di" bpmnElement="c_end2">
+        <dc:Bounds x="852" y="392" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="c_f0_di" bpmnElement="c_f0">
+        <di:waypoint x="138" y="270" />
+        <di:waypoint x="220" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f1_di" bpmnElement="c_f1">
+        <di:waypoint x="320" y="270" />
+        <di:waypoint x="370" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f2_di" bpmnElement="c_f2">
+        <di:waypoint x="470" y="270" />
+        <di:waypoint x="552" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f3_di" bpmnElement="c_f3">
+        <di:waypoint x="420" y="328" />
+        <di:waypoint x="420" y="410" />
+        <di:waypoint x="552" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f4_di" bpmnElement="c_f4">
+        <di:waypoint x="588" y="410" />
+        <di:waypoint x="670" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f5_di" bpmnElement="c_f5">
+        <di:waypoint x="770" y="410" />
+        <di:waypoint x="852" y="410" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 </bpmn:definitions>

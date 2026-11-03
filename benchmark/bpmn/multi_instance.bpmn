@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Multi-instance activities. -->
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
                   xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   id="multi_instance" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:collaboration id="Collaboration_multi_instance">
+    <bpmn:participant id="Participant_mi_parallel" name="mi_parallel" processRef="mi_parallel" />
+    <bpmn:participant id="Participant_mi_sequential" name="mi_sequential" processRef="mi_sequential" />
+    <bpmn:participant id="Participant_mi_condition" name="mi_condition" processRef="mi_condition" />
+    <bpmn:participant id="Participant_mi_subprocess" name="mi_subprocess" processRef="mi_subprocess" />
+  </bpmn:collaboration>
 
   <!-- Parallel, with an output collection. -->
   <bpmn:process id="mi_parallel" isExecutable="true">
@@ -82,4 +92,127 @@
     <bpmn:sequenceFlow id="u_f2" sourceRef="u_after" targetRef="u_end"/>
     <bpmn:endEvent id="u_end"/>
   </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_multi_instance">
+    <bpmndi:BPMNPlane id="BPMNPlane_multi_instance" bpmnElement="Collaboration_multi_instance">
+      <bpmndi:BPMNShape id="Participant_mi_parallel_di" bpmnElement="Participant_mi_parallel" isHorizontal="true">
+        <dc:Bounds x="0" y="0" width="1046" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p_start_di" bpmnElement="p_start">
+        <dc:Bounds x="70" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p_each_di" bpmnElement="p_each">
+        <dc:Bounds x="188" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p_after_di" bpmnElement="p_after">
+        <dc:Bounds x="338" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="p_end_di" bpmnElement="p_end">
+        <dc:Bounds x="520" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="p_f0_di" bpmnElement="p_f0">
+        <di:waypoint x="106" y="80" />
+        <di:waypoint x="188" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="p_f1_di" bpmnElement="p_f1">
+        <di:waypoint x="288" y="80" />
+        <di:waypoint x="338" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="p_f2_di" bpmnElement="p_f2">
+        <di:waypoint x="438" y="80" />
+        <di:waypoint x="520" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_mi_sequential_di" bpmnElement="Participant_mi_sequential" isHorizontal="true">
+        <dc:Bounds x="0" y="190" width="1046" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_start_di" bpmnElement="s_start">
+        <dc:Bounds x="70" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_each_di" bpmnElement="s_each">
+        <dc:Bounds x="188" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_end_di" bpmnElement="s_end">
+        <dc:Bounds x="370" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="s_f0_di" bpmnElement="s_f0">
+        <di:waypoint x="106" y="270" />
+        <di:waypoint x="188" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f1_di" bpmnElement="s_f1">
+        <di:waypoint x="288" y="270" />
+        <di:waypoint x="370" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_mi_condition_di" bpmnElement="Participant_mi_condition" isHorizontal="true">
+        <dc:Bounds x="0" y="380" width="1046" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_start_di" bpmnElement="c_start">
+        <dc:Bounds x="70" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_each_di" bpmnElement="c_each">
+        <dc:Bounds x="188" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_after_di" bpmnElement="c_after">
+        <dc:Bounds x="338" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_end_di" bpmnElement="c_end">
+        <dc:Bounds x="520" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="c_f0_di" bpmnElement="c_f0">
+        <di:waypoint x="106" y="460" />
+        <di:waypoint x="188" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f1_di" bpmnElement="c_f1">
+        <di:waypoint x="288" y="460" />
+        <di:waypoint x="338" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f2_di" bpmnElement="c_f2">
+        <di:waypoint x="438" y="460" />
+        <di:waypoint x="520" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_mi_subprocess_di" bpmnElement="Participant_mi_subprocess" isHorizontal="true">
+        <dc:Bounds x="0" y="570" width="1046" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_start_di" bpmnElement="u_start">
+        <dc:Bounds x="70" y="632" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_sub_di" bpmnElement="u_sub" isExpanded="true">
+        <dc:Bounds x="188" y="610" width="550" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_after_di" bpmnElement="u_after">
+        <dc:Bounds x="788" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_end_di" bpmnElement="u_end">
+        <dc:Bounds x="970" y="632" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="u_f0_di" bpmnElement="u_f0">
+        <di:waypoint x="106" y="650" />
+        <di:waypoint x="188" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="u_f1_di" bpmnElement="u_f1">
+        <di:waypoint x="738" y="650" />
+        <di:waypoint x="788" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="u_f2_di" bpmnElement="u_f2">
+        <di:waypoint x="888" y="650" />
+        <di:waypoint x="970" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="u_sub_start_di" bpmnElement="u_sub_start">
+        <dc:Bounds x="295" y="702" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_inner_di" bpmnElement="u_inner">
+        <dc:Bounds x="413" y="680" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="u_sub_end_di" bpmnElement="u_sub_end">
+        <dc:Bounds x="595" y="702" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="u_s1_di" bpmnElement="u_s1">
+        <di:waypoint x="331" y="720" />
+        <di:waypoint x="413" y="720" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="u_s2_di" bpmnElement="u_s2">
+        <di:waypoint x="513" y="720" />
+        <di:waypoint x="595" y="720" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 </bpmn:definitions>

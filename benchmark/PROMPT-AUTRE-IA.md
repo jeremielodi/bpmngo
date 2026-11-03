@@ -11,7 +11,7 @@ Tu vas comparer deux moteurs de workflow BPMN de façon indépendante et équita
 
 1. **Même capacité** : limite chaque moteur à **2 cœurs dédiés et 2 Go de mémoire au total** (avec `cpuset` et `mem_limit` dans un fichier d'override Docker Compose). Pour BpmnGo, ce budget est partagé par tous ses conteneurs (application + Postgres). Vérifie les limites avec `docker inspect` avant chaque mesure.
 2. **Rien d'autre ne tourne** sur la machine pendant les mesures (pas d'autre pile Docker active, pas de compilation). Vérifie-le avec `docker stats`.
-3. **Même code client** pour les deux moteurs : passe uniquement par les API publiques que Camunda 8 expose — le **gRPC Zeebe** (proto officiel `gateway.proto`) et le **REST `/v2`**. Une seule différence permise : les identifiants (Camunda de la distribution n'en demande pas ; BpmnGo utilise `admin@goflow.com` / `admin123` en HTTP Basic).
+3. **Même code client** pour les deux moteurs : passe uniquement par les API publiques que Camunda 8 expose — le **gRPC Zeebe** (proto officiel `gateway.proto`) et le **REST `/v2`**. Une seule différence permise : les identifiants (Camunda de la distribution n'en demande pas ; BpmnGo utilise `admin@bpmngo.com` / `admin123` en HTTP Basic).
 4. **Chauffe** : fais tourner chaque moteur quelques minutes avant de mesurer (la JVM de Camunda doit être chaude).
 5. **Répète** chaque mesure de performance au moins **2 fois** et donne les deux valeurs ; signale tout écart de plus de 20 % entre deux passages.
 6. N'invente aucun chiffre. Si une mesure échoue ou n'a pas pu être faite, écris-le.

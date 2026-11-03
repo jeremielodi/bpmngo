@@ -34,7 +34,7 @@ public class ZeebeClientExample {
 
     public static void main(String[] args) {
         BpmnGoRestClient bpmngo = BpmnGoRestClient.fromEnv();
-        String gateway = BpmnGoRestClient.env("GOFLOW_GRPC", "127.0.0.1:26500");
+        String gateway = BpmnGoRestClient.env("BPMNGO_GRPC", "127.0.0.1:26500");
 
         // Send BpmnGo's JWT as gRPC metadata: the gateway refuses calls without
         // valid credentials (UNAUTHENTICATED), and applies this user's

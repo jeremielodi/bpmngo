@@ -20,7 +20,7 @@ import (
 //	cel    — CEL only, the historical behavior.
 //	shadow — (default) both run; the CEL result is still the one used, and
 //	         any disagreement is logged and counted
-//	         (goflow_feel_shadow_mismatches_total), so the switch to "feel"
+//	         (bpmngo_feel_shadow_mismatches_total), so the switch to "feel"
 //	         can be validated against real traffic first. Where CEL fails
 //	         and FEEL succeeds (a string literal, decimal arithmetic…), the
 //	         FEEL result is used: nothing CEL evaluates changes, and what

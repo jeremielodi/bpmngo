@@ -23,7 +23,7 @@ func callWith(header string) context.Context {
 
 func TestAuthenticate(t *testing.T) {
 	jwt := authentication.NewJWTService(nil, testSecret)
-	user := models.User{ID: uuid.New(), Email: "worker@goflow.com"}
+	user := models.User{ID: uuid.New(), Email: "worker@bpmngo.com"}
 	valid, err := jwt.CreateAccessToken(user)
 	if err != nil {
 		t.Fatal(err)

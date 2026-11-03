@@ -10,14 +10,14 @@ import { test, expect } from '@playwright/test';
 test.describe('Admin — create user and create role via the real UI', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('admin@example.com').fill('admin@goflow.com');
+    await page.getByPlaceholder('admin@example.com').fill('admin@bpmngo.com');
     await page.getByPlaceholder('••••••••').fill('admin123');
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page).toHaveURL('/');
   });
 
   test('New User button creates a user that appears in the list', async ({ page }) => {
-    const email = `pw-user-${Date.now()}@goflow.com`;
+    const email = `pw-user-${Date.now()}@bpmngo.com`;
 
     await page.getByRole('link', { name: 'Users' }).click();
     await expect(page).toHaveURL(/\/admin\/users/);

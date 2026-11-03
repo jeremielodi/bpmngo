@@ -8,11 +8,11 @@
 #                            # the web app (Tasks page), then watch the instance
 #
 # BPMNGO_URL (default http://127.0.0.1:8080), and the admin account from
-# SUPER_USER_EMAIL / SUPER_USER_PASSWORD (defaults admin@goflow.com / admin123).
+# SUPER_USER_EMAIL / SUPER_USER_PASSWORD (defaults admin@bpmngo.com / admin123).
 set -euo pipefail
 
 URL="${BPMNGO_URL:-http://127.0.0.1:${SERVER_PORT:-8080}}"
-USER_EMAIL="${SUPER_USER_EMAIL:-admin@goflow.com}"
+USER_EMAIL="${SUPER_USER_EMAIL:-admin@bpmngo.com}"
 USER_PASSWORD="${SUPER_USER_PASSWORD:-admin123}"
 cd "$(dirname "$0")/.." # a relative path for curl -F, whatever the shell's path style
 BPMN=examples/hello-world.bpmn

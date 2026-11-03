@@ -44,8 +44,8 @@ async function createTenantUser(email: string, tenantId: string): Promise<BpmnGo
 async function run() {
   await superuser.loginAsSuperUser();
 
-  const userA = await createTenantUser('tenant-a-user@goflow.com', 'tenant-a');
-  const userB = await createTenantUser('tenant-b-user@goflow.com', 'tenant-b');
+  const userA = await createTenantUser('tenant-a-user@bpmngo.com', 'tenant-a');
+  const userB = await createTenantUser('tenant-b-user@bpmngo.com', 'tenant-b');
 
   await runSuite({
     name: '20 — Multi-tenancy',

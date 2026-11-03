@@ -68,7 +68,7 @@ async function run() {
         async fn() {
           await client.loginAsSuperUser();
           const res = await client.api.get('/users/me');
-          assert(res.data.user?.email === 'admin@goflow.com', `expected admin@goflow.com, got ${res.data.user?.email}`);
+          assert(res.data.user?.email === 'admin@bpmngo.com', `expected admin@bpmngo.com, got ${res.data.user?.email}`);
         },
       },
 

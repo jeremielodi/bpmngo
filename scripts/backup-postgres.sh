@@ -13,7 +13,7 @@
 # Docker de BpmnGo (DOCKER_NETWORK, goflow_bpmngo-network par défaut).
 #
 # Cron quotidien (3h du matin) :
-#   0 3 * * * cd /root/apps/goflow && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1
+#   0 3 * * * cd /root/apps/bpmngo && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1
 #
 # Copier ensuite les fichiers hors du serveur (rsync, rclone, stockage
 # objet…) : une sauvegarde sur le même disque ne protège pas d'une panne de
@@ -40,7 +40,7 @@ pg() {
 
 mkdir -p "$BACKUP_DIR"
 stamp=$(date +%Y%m%d_%H%M%S)
-file="$BACKUP_DIR/goflow_${stamp}.dump"
+file="$BACKUP_DIR/bpmngo_${stamp}.dump"
 tmp="$file.partial"
 
 source="$CONTAINER"
@@ -59,5 +59,6 @@ fi
 mv "$tmp" "$file"
 echo "$(date '+%F %T') OK : $(du -h "$file" | cut -f1)"
 
-# Rotation : supprime les sauvegardes de plus de KEEP_DAYS jours.
-find "$BACKUP_DIR" -name 'goflow_*.dump' -type f -mtime +"$KEEP_DAYS" -print -delete
+# Rotation : supprime les sauvegardes de plus de KEEP_DAYS jours
+# (goflow_*.dump : nom des sauvegardes d'avant le renommage).
+find "$BACKUP_DIR" \( -name 'bpmngo_*.dump' -o -name 'goflow_*.dump' \) -type f -mtime +"$KEEP_DAYS" -print -delete

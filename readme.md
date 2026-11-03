@@ -26,7 +26,7 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 - **Same behaviour as Camunda 8:** the [benchmark](benchmark/README.md) drives BpmnGo and Camunda 8.10.7 with the same Zeebe gRPC and `/v2` client code, and all 87 scenarios (gateways, joins, loops, nested and interrupted sub-processes, multi-instance, events, timers, compensation, FEEL, DMN, models exported by Camunda Modeler…) behave the same. Where Camunda 8 departs from BPMN 2.0 — an exclusive gateway with several true conditions takes the last one, in file order — BpmnGo follows Camunda by default (`EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the BPMN 2.0 rule).
 - **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
 - **Backups:** `pg_dump` backups, with a script that checks each backup restores. See [Operations](docs/operations.md#backups).
-- **Secure defaults:** with `GOFLOW_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
+- **Secure defaults:** with `BPMNGO_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
 - **Operable:** Prometheus metrics, history retention, manual SQL migrations from a baseline, load and endurance tests that report PostgreSQL's own figures (statements, commits and WAL per instance). See [Operations](docs/operations.md).
 
 What BpmnGo does not cover yet compared with Camunda is listed in [Comparison to Camunda 7 / Camunda 8](docs/comparison.md).
@@ -54,9 +54,9 @@ docker compose up -d --build --wait     # PostgreSQL, BpmnGo and the web app
 ./scripts/demo.sh                       # your first workflow, end to end
 ```
 
-With no `.env`, BpmnGo starts in **demo mode**: it generates its token-signing key (kept in the `bpmngo_data` volume) and the admin account is `admin@goflow.com` / `admin123`. Fine to try BpmnGo, not for production (see below).
+With no `.env`, BpmnGo starts in **demo mode**: it generates its token-signing key (kept in the `bpmngo_data` volume) and the admin account is `admin@bpmngo.com` / `admin123`. Fine to try BpmnGo, not for production (see below).
 
-Then open the web app at `http://localhost:3000` and log in as `admin@goflow.com` / `admin123`. On Windows, run the script from Git Bash.
+Then open the web app at `http://localhost:3000` and log in as `admin@bpmngo.com` / `admin123`. On Windows, run the script from Git Bash.
 
 ### Your first workflow
 
@@ -79,8 +79,8 @@ cp .env.example .env
 
 In `.env`, set at least:
 
-- `JWT_SECRET_KEY` — a real random secret, e.g. the output of `openssl rand -base64 48`. With it set, BpmnGo runs in production mode (`GOFLOW_ENV=production`): it refuses to start with a sample value such as `change_me`, and warns about an unprotected `/metrics` or the sample admin password.
-- `SUPER_USER_PASSWORD` — the password of the admin account created at first start (`SUPER_USER_EMAIL`, `admin@goflow.com` by default).
+- `JWT_SECRET_KEY` — a real random secret, e.g. the output of `openssl rand -base64 48`. With it set, BpmnGo runs in production mode (`BPMNGO_ENV=production`): it refuses to start with a sample value such as `change_me`, and warns about an unprotected `/metrics` or the sample admin password.
+- `SUPER_USER_PASSWORD` — the password of the admin account created at first start (`SUPER_USER_EMAIL`, `admin@bpmngo.com` by default).
 
 Then `docker compose up -d --build --wait`, and check with `curl http://localhost:8080/health`. A database created this way already has the full schema; when upgrading an existing one, apply the new files of [`database/migrations/`](database/migrations/README.md) first.
 

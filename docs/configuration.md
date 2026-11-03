@@ -18,7 +18,7 @@ DB_NAME=goflow
 # DEMO_SECRET_FILE (default data/jwt_secret, the bpmngo_data volume in
 # Docker) — to try BpmnGo, never for production.
 JWT_SECRET_KEY=<random value>
-# GOFLOW_ENV=production        # or demo; unset: production when JWT_SECRET_KEY
+# BPMNGO_ENV=production        # or demo; unset: production when JWT_SECRET_KEY
 #                              # is set, demo otherwise. Production refuses a
 #                              # sample JWT key, warns about an open /metrics
 #                              # and the sample admin password
@@ -28,14 +28,14 @@ JWT_SECRET_KEY=<random value>
 # CREATE_SUPER_USER=false skips the seeding (unset = true)
 CREATE_SUPER_USER=true
 SUPER_USER_NAME=admin
-SUPER_USER_EMAIL=admin@goflow.com
+SUPER_USER_EMAIL=admin@bpmngo.com
 SUPER_USER_PASSWORD=admin123
 
 # OIDC (optional) — set all three to accept bearer tokens from an external
 # identity provider alongside the built-in JWT login; leave unset to disable
-# OIDC_ISSUER=https://your-idp.example.com/realms/goflow
-# OIDC_AUDIENCE=goflow-api
-# OIDC_JWKS_URL=https://your-idp.example.com/realms/goflow/protocol/openid-connect/certs
+# OIDC_ISSUER=https://your-idp.example.com/realms/bpmngo
+# OIDC_AUDIENCE=bpmngo-api
+# OIDC_JWKS_URL=https://your-idp.example.com/realms/bpmngo/protocol/openid-connect/certs
 
 # Kafka (Redpanda): only for the partitioned write path and the shadow event
 # log. Direct mode (the default) needs no Kafka: leave KAFKA_BROKERS unset and
@@ -91,7 +91,7 @@ SUPER_USER_PASSWORD=admin123
 # DB_QUERY_EXEC_MODE=cache_statement
 # Top-level runtime admission limit; default 4 × GOMAXPROCS (minimum 4).
 # On a two-CPU container, start with 8 and tune from
-# goflow_runtime_admission_wait_seconds.
+# bpmngo_runtime_admission_wait_seconds.
 # RUNTIME_MAX_CONCURRENCY=8
 # Minimum foreground concurrency retained above the hard archive backlog.
 # Defaults to one quarter of RUNTIME_MAX_CONCURRENCY (minimum 1).

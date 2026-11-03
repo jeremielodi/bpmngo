@@ -33,9 +33,9 @@ Not tested: Spring Zeebe / the Camunda 8 Spring Boot starter, TLS, OAuth.
 
 ```bash
 cd examples/java-client
-export GOFLOW_URL=http://bpmngo-host:8080      # default http://127.0.0.1:8080
-export GOFLOW_GRPC=bpmngo-host:26500           # default 127.0.0.1:26500
-export GOFLOW_USER=admin@goflow.com GOFLOW_PASSWORD=admin123
+export BPMNGO_URL=http://bpmngo-host:8080      # default http://127.0.0.1:8080
+export BPMNGO_GRPC=bpmngo-host:26500           # default 127.0.0.1:26500
+export BPMNGO_USER=admin@bpmngo.com BPMNGO_PASSWORD=admin123
 
 ./mvnw -q compile exec:java -Dexec.mainClass=com.bpmngo.examples.RestExample     # Windows: mvnw.cmd
 ./mvnw -q compile exec:java -Dexec.mainClass=com.bpmngo.examples.ExternalTaskWorkerExample
@@ -206,7 +206,7 @@ client.subscribe("charge-card")
         .open();
 ```
 
-Stop with `client.stop()`. The whole worker is in [ExternalTaskWorkerExample](../examples/java-client/src/main/java/com/bpmngo/examples/ExternalTaskWorkerExample.java), which fails each job once and then completes it. Set `GOFLOW_WORKER_AUTH=jwt` to run it with a JWT instead of Basic.
+Stop with `client.stop()`. The whole worker is in [ExternalTaskWorkerExample](../examples/java-client/src/main/java/com/bpmngo/examples/ExternalTaskWorkerExample.java), which fails each job once and then completes it. Set `BPMNGO_WORKER_AUTH=jwt` to run it with a JWT instead of Basic.
 
 ## 3. Camunda 8 Java client (gRPC)
 

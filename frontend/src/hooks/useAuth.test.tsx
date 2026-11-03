@@ -25,7 +25,7 @@ describe('AuthProvider session restore', () => {
   it('unwraps the nested user object returned by GET /users/me', async () => {
     localStorage.setItem('accessToken', 'token-123');
     vi.mocked(authApi.getMe).mockResolvedValue({
-      user: { id: 'u1', email: 'admin@goflow.com', full_name: 'Admin User' },
+      user: { id: 'u1', email: 'admin@bpmngo.com', full_name: 'Admin User' },
       roles: ['admin'],
       actions: ['CAN_DO_EVERYTHING'],
     });
@@ -37,7 +37,7 @@ describe('AuthProvider session restore', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('signed-in:admin@goflow.com')).toBeInTheDocument();
+      expect(screen.getByText('signed-in:admin@bpmngo.com')).toBeInTheDocument();
     });
   });
 

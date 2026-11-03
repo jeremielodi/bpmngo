@@ -25,11 +25,11 @@ const BPMN = path.join(__dirname, 'bpmn', '53_step_back.bpmn');
 const PARALLEL_BPMN = path.join(__dirname, 'bpmn', '53_step_back_parallel.bpmn');
 const client = new BpmnGoClient();
 
-// GOFLOW_PG_CONTAINER names the Postgres container of the stack under test
+// BPMNGO_PG_CONTAINER names the Postgres container of the stack under test
 // (an isolated stack); by default, this repository's compose service.
 function psql(sql: string): string {
-  const target = process.env.GOFLOW_PG_CONTAINER
-    ? `docker exec -i ${process.env.GOFLOW_PG_CONTAINER}`
+  const target = process.env.BPMNGO_PG_CONTAINER
+    ? `docker exec -i ${process.env.BPMNGO_PG_CONTAINER}`
     : 'docker compose exec -T postgres';
   return execSync(`${target} psql -U goflow -d goflow -tAc "${sql}"`, {
     cwd: path.join(__dirname, '..', '..'),
@@ -201,7 +201,7 @@ async function run() {
         name: '[F] A user with only VIEW on the process gets 404',
         async fn() {
           const id = await startToApprove({});
-          const email = `step-back-viewer-${Date.now()}@goflow.com`;
+          const email = `step-back-viewer-${Date.now()}@bpmngo.com`;
           const created = await client.api.post('/users', { email, full_name: email, password: 'password123' });
           const viewer = new BpmnGoClient();
           await viewer.login(email, 'password123');

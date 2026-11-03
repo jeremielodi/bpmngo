@@ -5,7 +5,7 @@
  * its rule, and against BpmnGo to check it follows it:
  *
  *   npx ts-node --transpile-only experiments/exclusive-order.ts camunda localhost:26500 http://localhost:8080
- *   npx ts-node --transpile-only experiments/exclusive-order.ts bpmngo localhost:26600 http://localhost:9080 admin@goflow.com admin123
+ *   npx ts-node --transpile-only experiments/exclusive-order.ts bpmngo localhost:26600 http://localhost:9080 admin@bpmngo.com admin123
  */
 import { Engine } from '../src/engine';
 

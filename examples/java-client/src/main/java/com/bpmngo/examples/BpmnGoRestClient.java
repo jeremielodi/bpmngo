@@ -48,12 +48,12 @@ public class BpmnGoRestClient {
         this.password = password;
     }
 
-    /** Reads GOFLOW_URL, GOFLOW_USER and GOFLOW_PASSWORD (defaults: a local dev server). */
+    /** Reads BPMNGO_URL, BPMNGO_USER and BPMNGO_PASSWORD (defaults: a local dev server). */
     public static BpmnGoRestClient fromEnv() {
         return new BpmnGoRestClient(
-                env("GOFLOW_URL", "http://127.0.0.1:8080"),
-                env("GOFLOW_USER", "admin@goflow.com"),
-                env("GOFLOW_PASSWORD", "admin123"));
+                env("BPMNGO_URL", "http://127.0.0.1:8080"),
+                env("BPMNGO_USER", "admin@bpmngo.com"),
+                env("BPMNGO_PASSWORD", "admin123"));
     }
 
     static String env(String name, String fallback) {

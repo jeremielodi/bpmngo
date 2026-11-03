@@ -45,9 +45,9 @@ import static com.bpmngo.examples.Examples.waitFor;
 public class Camunda7OpenApiExample {
 
     public static void main(String[] args) throws Exception {
-        String url = BpmnGoRestClient.env("GOFLOW_URL", "http://127.0.0.1:8080");
-        String user = BpmnGoRestClient.env("GOFLOW_USER", "admin@goflow.com");
-        String password = BpmnGoRestClient.env("GOFLOW_PASSWORD", "admin123");
+        String url = BpmnGoRestClient.env("BPMNGO_URL", "http://127.0.0.1:8080");
+        String user = BpmnGoRestClient.env("BPMNGO_USER", "admin@bpmngo.com");
+        String password = BpmnGoRestClient.env("BPMNGO_PASSWORD", "admin123");
 
         ApiClient client = new ApiClient();
         client.setBasePath(url + "/engine-rest");

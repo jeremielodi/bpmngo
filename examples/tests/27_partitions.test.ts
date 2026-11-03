@@ -113,7 +113,7 @@ async function main() {
               const ids: number[] = settled.brokers.flatMap((b: any) => b.partitions.map((p: any) => p.partitionId));
               return ids.length === settled.partitionsCount && new Set(ids).size === ids.length;
             }, 30000, 'every partition owned once');
-            const replicas = Number(process.env.GOFLOW_REPLICAS || 1);
+            const replicas = Number(process.env.BPMNGO_REPLICAS || 1);
             assert(settled.clusterSize === replicas, `expected ${replicas} brokers (replicas), got ${settled.clusterSize}`);
             console.log(`      partitioned: ${settled.partitionsCount} partitions over ${settled.clusterSize} replica(s)`);
           } else {

@@ -80,7 +80,7 @@ SERVER_PORT=9080 GRPC_PORT=26600 docker compose up -d postgres bpmngo
 ```
 
 BpmnGo then answers on `localhost:9080` (REST) and `localhost:26600` (gRPC).
-The bench logs in with `admin@goflow.com` / `admin123` (HTTP Basic, on both
+The bench logs in with `admin@bpmngo.com` / `admin123` (HTTP Basic, on both
 gRPC and REST); change it with `--bpmngo-user` and `--bpmngo-password`.
 
 **BpmnGo's PostgreSQL must run in UTC.** The `postgres:18` image of the
@@ -157,7 +157,7 @@ The command exits with code 1 when there is at least one difference.
 
 --bpmngo-grpc   host:port   BpmnGo gRPC gateway        (default localhost:26600)
 --bpmngo-rest   url         BpmnGo REST API            (default http://localhost:9080)
---bpmngo-user / --bpmngo-password     default admin@goflow.com / admin123
+--bpmngo-user / --bpmngo-password     default admin@bpmngo.com / admin123
 
 --engines camunda,bpmngo    which engines to run       (default both)
 --only <text>               only scenarios whose name or group contains <text>
