@@ -1,0 +1,66 @@
+{
+  "scenario": "feel-lists",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "last": 3,
+      "skus": [
+        "A",
+        "C"
+      ],
+      "items": [
+        1,
+        2,
+        3
+      ],
+      "order": {
+        "items": [
+          {
+            "sku": "A",
+            "qty": 2
+          },
+          {
+            "sku": "B",
+            "qty": 1
+          },
+          {
+            "sku": "C",
+            "qty": 5
+          }
+        ]
+      },
+      "stats": 7,
+      "anyBig": true,
+      "distinct": [
+        1,
+        2,
+        3,
+        9
+      ],
+      "filtered": [
+        2,
+        3
+      ],
+      "doubledSum": 12,
+      "outOfRange": null
+    },
+    "instances": [
+      {
+        "process": "feel_lists",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 1479,
+    "errors": [],
+    "restNotes": []
+  }
+}

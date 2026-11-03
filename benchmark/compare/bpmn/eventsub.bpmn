@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Event sub-processes at process level. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="eventsub" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:message id="Msg_esp_cancel" name="esp-cancel">
+    <bpmn:extensionElements><zeebe:subscription correlationKey="=orderId"/></bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:error id="Err_x" errorCode="X"/>
+
+  <bpmn:process id="esp_message" isExecutable="true">
+    <bpmn:startEvent id="m_start"/>
+    <bpmn:sequenceFlow id="m_f0" sourceRef="m_start" targetRef="m_work"/>
+    <bpmn:serviceTask id="m_work"><bpmn:extensionElements><zeebe:taskDefinition type="esp-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="m_f1" sourceRef="m_work" targetRef="m_end"/>
+    <bpmn:endEvent id="m_end"/>
+    <bpmn:subProcess id="m_esp" triggeredByEvent="true">
+      <bpmn:startEvent id="m_esp_start" isInterrupting="true"><bpmn:messageEventDefinition messageRef="Msg_esp_cancel"/></bpmn:startEvent>
+      <bpmn:sequenceFlow id="m_e1" sourceRef="m_esp_start" targetRef="m_handle"/>
+      <bpmn:serviceTask id="m_handle"><bpmn:extensionElements><zeebe:taskDefinition type="esp-handle"/></bpmn:extensionElements></bpmn:serviceTask>
+      <bpmn:sequenceFlow id="m_e2" sourceRef="m_handle" targetRef="m_esp_end"/>
+      <bpmn:endEvent id="m_esp_end"/>
+    </bpmn:subProcess>
+  </bpmn:process>
+
+  <bpmn:process id="esp_timer" isExecutable="true">
+    <bpmn:startEvent id="t_start"/>
+    <bpmn:sequenceFlow id="t_f0" sourceRef="t_start" targetRef="t_work"/>
+    <bpmn:serviceTask id="t_work"><bpmn:extensionElements><zeebe:taskDefinition type="esp-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="t_f1" sourceRef="t_work" targetRef="t_end"/>
+    <bpmn:endEvent id="t_end"/>
+    <bpmn:subProcess id="t_esp" triggeredByEvent="true">
+      <bpmn:startEvent id="t_esp_start" isInterrupting="false">
+        <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT1S</bpmn:timeDuration></bpmn:timerEventDefinition>
+      </bpmn:startEvent>
+      <bpmn:sequenceFlow id="t_e1" sourceRef="t_esp_start" targetRef="t_tick"/>
+      <bpmn:serviceTask id="t_tick"><bpmn:extensionElements><zeebe:taskDefinition type="esp-tick"/></bpmn:extensionElements></bpmn:serviceTask>
+      <bpmn:sequenceFlow id="t_e2" sourceRef="t_tick" targetRef="t_esp_end"/>
+      <bpmn:endEvent id="t_esp_end"/>
+    </bpmn:subProcess>
+  </bpmn:process>
+
+  <bpmn:process id="esp_error" isExecutable="true">
+    <bpmn:startEvent id="e_start"/>
+    <bpmn:sequenceFlow id="e_f0" sourceRef="e_start" targetRef="e_work"/>
+    <bpmn:serviceTask id="e_work"><bpmn:extensionElements><zeebe:taskDefinition type="esp-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="e_f1" sourceRef="e_work" targetRef="e_end"/>
+    <bpmn:endEvent id="e_end"/>
+    <bpmn:subProcess id="e_esp" triggeredByEvent="true">
+      <bpmn:startEvent id="e_esp_start"><bpmn:errorEventDefinition errorRef="Err_x"/></bpmn:startEvent>
+      <bpmn:sequenceFlow id="e_e1" sourceRef="e_esp_start" targetRef="e_handle"/>
+      <bpmn:serviceTask id="e_handle"><bpmn:extensionElements><zeebe:taskDefinition type="esp-handle"/></bpmn:extensionElements></bpmn:serviceTask>
+      <bpmn:sequenceFlow id="e_e2" sourceRef="e_handle" targetRef="e_esp_end"/>
+      <bpmn:endEvent id="e_esp_end"/>
+    </bpmn:subProcess>
+  </bpmn:process>
+</bpmn:definitions>

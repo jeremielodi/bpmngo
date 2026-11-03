@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Messages: correlation keys, time to live, message ids, start events,
+     event-based gateway. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="messages" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:message id="Msg_paid" name="msg-paid">
+    <bpmn:extensionElements><zeebe:subscription correlationKey="=orderId"/></bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_begin" name="msg-begin"/>
+  <bpmn:message id="Msg_approve" name="msg-approve">
+    <bpmn:extensionElements><zeebe:subscription correlationKey="=orderId"/></bpmn:extensionElements>
+  </bpmn:message>
+
+  <!-- A job first, then a message catch event. -->
+  <bpmn:process id="msg_catch" isExecutable="true">
+    <bpmn:startEvent id="c_start"/>
+    <bpmn:sequenceFlow id="c_f0" sourceRef="c_start" targetRef="c_prep"/>
+    <bpmn:serviceTask id="c_prep"><bpmn:extensionElements><zeebe:taskDefinition type="msg-prep"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="c_f1" sourceRef="c_prep" targetRef="c_wait"/>
+    <bpmn:intermediateCatchEvent id="c_wait"><bpmn:messageEventDefinition messageRef="Msg_paid"/></bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="c_f2" sourceRef="c_wait" targetRef="c_after"/>
+    <bpmn:serviceTask id="c_after"><bpmn:extensionElements><zeebe:taskDefinition type="msg-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="c_f3" sourceRef="c_after" targetRef="c_end"/>
+    <bpmn:endEvent id="c_end"/>
+  </bpmn:process>
+
+  <!-- Message start event. -->
+  <bpmn:process id="msg_start" isExecutable="true">
+    <bpmn:startEvent id="s_start"><bpmn:messageEventDefinition messageRef="Msg_begin"/></bpmn:startEvent>
+    <bpmn:sequenceFlow id="s_f0" sourceRef="s_start" targetRef="s_work"/>
+    <bpmn:serviceTask id="s_work"><bpmn:extensionElements><zeebe:taskDefinition type="msg-start-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="s_f1" sourceRef="s_work" targetRef="s_end"/>
+    <bpmn:endEvent id="s_end"/>
+  </bpmn:process>
+
+  <!-- Event-based gateway: a message or a 3 s timer, whichever comes first. -->
+  <bpmn:process id="msg_ebg" isExecutable="true">
+    <bpmn:startEvent id="g_start"/>
+    <bpmn:sequenceFlow id="g_f0" sourceRef="g_start" targetRef="g_gw"/>
+    <!-- Zeebe's validator counts <outgoing> children, not sourceRef. -->
+    <bpmn:eventBasedGateway id="g_gw">
+      <bpmn:incoming>g_f0</bpmn:incoming>
+      <bpmn:outgoing>g_f1</bpmn:outgoing>
+      <bpmn:outgoing>g_f2</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+    <bpmn:sequenceFlow id="g_f1" sourceRef="g_gw" targetRef="g_msg"/>
+    <bpmn:sequenceFlow id="g_f2" sourceRef="g_gw" targetRef="g_timer"/>
+    <bpmn:intermediateCatchEvent id="g_msg"><bpmn:messageEventDefinition messageRef="Msg_approve"/></bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="g_timer">
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT3S</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="g_f3" sourceRef="g_msg" targetRef="g_approved"/>
+    <bpmn:sequenceFlow id="g_f4" sourceRef="g_timer" targetRef="g_timeout"/>
+    <bpmn:serviceTask id="g_approved"><bpmn:extensionElements><zeebe:taskDefinition type="msg-approved"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="g_timeout"><bpmn:extensionElements><zeebe:taskDefinition type="msg-timeout"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="g_f5" sourceRef="g_approved" targetRef="g_end"/>
+    <bpmn:sequenceFlow id="g_f6" sourceRef="g_timeout" targetRef="g_end2"/>
+    <bpmn:endEvent id="g_end"/>
+    <bpmn:endEvent id="g_end2"/>
+  </bpmn:process>
+</bpmn:definitions>

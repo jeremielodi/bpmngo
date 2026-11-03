@@ -1,0 +1,82 @@
+{
+  "scenario": "gw-parallel-join-merges-variables",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "gw-a",
+        "elementId": "p_a",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "order": "O-1"
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "gw-b",
+        "elementId": "p_b",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "order": "O-1"
+        },
+        "answer": "after 500 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "gw-c",
+        "elementId": "p_c",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "order": "O-1"
+        },
+        "answer": "after 1000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "gw-after",
+        "elementId": "p_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "a": 1,
+          "b": 2,
+          "c": 3,
+          "order": "O-1"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "a": 1,
+      "b": 2,
+      "c": 3,
+      "order": "O-1"
+    },
+    "instances": [
+      {
+        "process": "gw_parallel",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3811,
+    "errors": [],
+    "restNotes": []
+  }
+}

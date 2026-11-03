@@ -1,0 +1,21 @@
+# camunda.yaml with 2 partitions: Zeebe runs each partition on one thread,
+# so with the default single partition it cannot use its second core.
+# The partition count is fixed when the data is created: this override mounts
+# new volumes (camunda-p2, camunda-data-p2) and leaves the existing ones as
+# they are. Apply from the Camunda folder, with the connectors stopped:
+#   docker compose -f docker-compose.yaml -f <bench>/limits/camunda.yaml \
+#     -f <bench>/limits/camunda-2p.yaml up -d orchestration
+services:
+  camunda-data-init:
+    volumes:
+      - camunda-data-p2:/usr/local/camunda/camunda-data
+  orchestration:
+    environment:
+      - CAMUNDA_CLUSTER_PARTITIONCOUNT=2
+    volumes:
+      - camunda-p2:/usr/local/camunda/data
+      - camunda-data-p2:/usr/local/camunda/camunda-data
+
+volumes:
+  camunda-p2:
+  camunda-data-p2:

@@ -1,0 +1,110 @@
+BpmnGo ⇄ Camunda 8 behaviour comparison
+Date      : 2026-10-30T22:01:24.747Z
+Reference : camunda  (gRPC localhost:26500, REST http://localhost:8080)
+Compared  : bpmngo  (gRPC localhost:26600, REST http://localhost:9080)
+
+Scenarios: 62   same: 61   expected differences: 0   different: 1   missing: 0
+
+── API checks ────────────────────────────────────────────────────────────
+  SAME       api-deploy-response
+  SAME       api-grpc-key-usable-in-rest
+  SAME       api-element-instances-endpoint
+  SAME       api-finished-instance-searchable
+  SAME       api-timer-waits-its-duration
+── Gateways ──────────────────────────────────────────────────────────────
+  SAME       gw-exclusive-default-taken
+  SAME       gw-exclusive-condition-beats-default
+  DIFFERENT  gw-exclusive-two-conditions-true   (jobs)
+  SAME       gw-exclusive-nothing-true-no-default
+  SAME       gw-exclusive-condition-on-missing-variable
+  SAME       gw-inclusive-default-alone
+  SAME       gw-inclusive-two-branches
+  SAME       gw-inclusive-nothing-true-no-default
+  SAME       gw-parallel-join-merges-variables
+── Boundary events ───────────────────────────────────────────────────────
+  SAME       boundary-timer-interrupting
+  SAME       boundary-timer-non-interrupting
+  SAME       boundary-message-interrupting
+  SAME       boundary-error-specific-code
+  SAME       boundary-error-catch-all
+  SAME       boundary-error-uncaught
+  SAME       boundary-signal-interrupting
+  SAME       boundary-escalation-non-interrupting
+── Jobs and variables ────────────────────────────────────────────────────
+  SAME       job-fail-then-retry
+  SAME       job-fail-no-retries-left
+  SAME       job-fail-with-backoff
+  SAME       job-fail-with-variables
+  SAME       job-headers-and-io-mappings
+  SAME       job-variable-types
+── Event sub-processes ───────────────────────────────────────────────────
+  SAME       esp-message-interrupting
+  SAME       esp-timer-non-interrupting
+  SAME       esp-error-catches-job-error
+── Multi-instance ────────────────────────────────────────────────────────
+  SAME       mi-parallel-output-collection
+  SAME       mi-sequential-loop-counter
+  SAME       mi-completion-condition
+  SAME       mi-empty-collection
+  SAME       mi-input-not-a-list
+  SAME       mi-subprocess-local-variables
+── Call activities ───────────────────────────────────────────────────────
+  SAME       call-propagate-all
+  SAME       call-only-mappings
+  SAME       call-child-error-caught-by-parent
+── Messages ──────────────────────────────────────────────────────────────
+  SAME       msg-correlation-key
+  SAME       msg-ttl-buffered
+  SAME       msg-ttl-zero-not-kept
+  SAME       msg-duplicate-message-id
+  SAME       msg-start-event
+  SAME       msg-event-gateway-message-wins
+  SAME       msg-event-gateway-timer-wins
+── Signals ───────────────────────────────────────────────────────────────
+  SAME       signal-start-event
+  SAME       signal-intermediate-catch
+── Timers ────────────────────────────────────────────────────────────────
+  SAME       timer-intermediate-duration
+  SAME       timer-date-in-the-past
+  SAME       timer-duration-from-feel
+  SAME       timer-cycle-boundary-fires-twice
+── FEEL expressions ──────────────────────────────────────────────────────
+  SAME       feel-numbers
+  SAME       feel-null-handling
+  SAME       feel-strings
+  SAME       feel-lists
+  SAME       feel-dates
+  SAME       feel-contexts
+── User tasks ────────────────────────────────────────────────────────────
+  SAME       user-task-completed-over-rest
+── Compensation ──────────────────────────────────────────────────────────
+  SAME       compensation-after-payment-error
+  SAME       compensation-not-run-on-happy-path
+
+── Resources (Docker) ────────────────────────────────────────────────────
+  container                  run  CPU time  CPU avg  CPU peak  mem idle  mem avg  mem peak  limits (CPU, memory)
+  camunda (total)          249 s   106.4 s     43 %     139 %  1098 MiB 1101 MiB  1106 MiB
+    orchestration                  106.4 s     43 %     139 %  1098 MiB 1101 MiB  1106 MiB  cores 2,3, 2048 MiB
+  bpmngo (total)           209 s    40.2 s     19 %      65 %    88 MiB  117 MiB   125 MiB
+    bpmngo-app                      16.8 s      8 %      27 %    10 MiB   15 MiB    17 MiB  cores 4,5, 1024 MiB
+    bpmngo-postgres                 23.4 s     11 %      49 %    78 MiB  102 MiB   108 MiB  cores 4,5, 1024 MiB
+
+  bpmngo / camunda: CPU time ×0.38, memory peak ×0.11, memory idle ×0.08, run time ×0.84
+
+  CPU in % of one core. CPU time from each container's cgroup counter over the run; peaks and
+  memory from `docker stats` samples (one every ~2 s). Each engine is measured during its own run.
+
+
+══════════════════════════════════════════════════════════════════════════════
+DETAILS
+══════════════════════════════════════════════════════════════════════════════
+
+▶ gw-exclusive-two-conditions-true  [different]
+  · jobs
+      [0] gw-huge @ x_huge
+        elementId:
+          camunda: x_huge
+          bpmngo : x_big
+        type:
+          camunda: gw-huge
+          bpmngo : gw-big

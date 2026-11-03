@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Signals and timers. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="signals_timers" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:signal id="Sig_go" name="sig-go"/>
+  <bpmn:signal id="Sig_continue" name="sig-continue"/>
+
+  <bpmn:process id="sig_start" isExecutable="true">
+    <bpmn:startEvent id="ss_start"><bpmn:signalEventDefinition signalRef="Sig_go"/></bpmn:startEvent>
+    <bpmn:sequenceFlow id="ss_f0" sourceRef="ss_start" targetRef="ss_work"/>
+    <bpmn:serviceTask id="ss_work"><bpmn:extensionElements><zeebe:taskDefinition type="sig-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="ss_f1" sourceRef="ss_work" targetRef="ss_end"/>
+    <bpmn:endEvent id="ss_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="sig_catch" isExecutable="true">
+    <bpmn:startEvent id="sc_start"/>
+    <bpmn:sequenceFlow id="sc_f0" sourceRef="sc_start" targetRef="sc_prep"/>
+    <bpmn:serviceTask id="sc_prep"><bpmn:extensionElements><zeebe:taskDefinition type="sig-prep"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="sc_f1" sourceRef="sc_prep" targetRef="sc_wait"/>
+    <bpmn:intermediateCatchEvent id="sc_wait"><bpmn:signalEventDefinition signalRef="Sig_continue"/></bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="sc_f2" sourceRef="sc_wait" targetRef="sc_after"/>
+    <bpmn:serviceTask id="sc_after"><bpmn:extensionElements><zeebe:taskDefinition type="sig-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="sc_f3" sourceRef="sc_after" targetRef="sc_end"/>
+    <bpmn:endEvent id="sc_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="tm_duration" isExecutable="true">
+    <bpmn:startEvent id="td_start"/>
+    <bpmn:sequenceFlow id="td_f0" sourceRef="td_start" targetRef="td_wait"/>
+    <bpmn:intermediateCatchEvent id="td_wait">
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT1S</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="td_f1" sourceRef="td_wait" targetRef="td_after"/>
+    <bpmn:serviceTask id="td_after"><bpmn:extensionElements><zeebe:taskDefinition type="tm-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="td_f2" sourceRef="td_after" targetRef="td_end"/>
+    <bpmn:endEvent id="td_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="tm_date_past" isExecutable="true">
+    <bpmn:startEvent id="tp_start"/>
+    <bpmn:sequenceFlow id="tp_f0" sourceRef="tp_start" targetRef="tp_wait"/>
+    <bpmn:intermediateCatchEvent id="tp_wait">
+      <bpmn:timerEventDefinition><bpmn:timeDate xsi:type="bpmn:tFormalExpression">2020-01-01T00:00:00Z</bpmn:timeDate></bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="tp_f1" sourceRef="tp_wait" targetRef="tp_after"/>
+    <bpmn:serviceTask id="tp_after"><bpmn:extensionElements><zeebe:taskDefinition type="tm-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="tp_f2" sourceRef="tp_after" targetRef="tp_end"/>
+    <bpmn:endEvent id="tp_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="tm_feel" isExecutable="true">
+    <bpmn:startEvent id="tf_start"/>
+    <bpmn:sequenceFlow id="tf_f0" sourceRef="tf_start" targetRef="tf_wait"/>
+    <bpmn:intermediateCatchEvent id="tf_wait">
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">=delay</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sequenceFlow id="tf_f1" sourceRef="tf_wait" targetRef="tf_after"/>
+    <bpmn:serviceTask id="tf_after"><bpmn:extensionElements><zeebe:taskDefinition type="tm-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="tf_f2" sourceRef="tf_after" targetRef="tf_end"/>
+    <bpmn:endEvent id="tf_end"/>
+  </bpmn:process>
+
+  <!-- A non-interrupting cycle boundary: R2/PT1S fires twice while the task runs. -->
+  <bpmn:process id="tm_cycle" isExecutable="true">
+    <bpmn:startEvent id="tc_start"/>
+    <bpmn:sequenceFlow id="tc_f0" sourceRef="tc_start" targetRef="tc_work"/>
+    <bpmn:serviceTask id="tc_work"><bpmn:extensionElements><zeebe:taskDefinition type="tm-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="tc_tick" attachedToRef="tc_work" cancelActivity="false">
+      <bpmn:timerEventDefinition><bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R2/PT1S</bpmn:timeCycle></bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="tc_f1" sourceRef="tc_work" targetRef="tc_end"/>
+    <bpmn:sequenceFlow id="tc_f2" sourceRef="tc_tick" targetRef="tc_reminder"/>
+    <bpmn:serviceTask id="tc_reminder"><bpmn:extensionElements><zeebe:taskDefinition type="tm-reminder"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="tc_f3" sourceRef="tc_reminder" targetRef="tc_end2"/>
+    <bpmn:endEvent id="tc_end"/>
+    <bpmn:endEvent id="tc_end2"/>
+  </bpmn:process>
+</bpmn:definitions>

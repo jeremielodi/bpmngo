@@ -1,0 +1,6 @@
+[
+  { "scenario": "gw-exclusive-two-conditions-true",
+    "section": "jobs",
+    "note": "Hand-written model whose gateway lists no <outgoing> elements, two conditions true. BpmnGo takes the first true flow in document order (BPMN 2.0); Camunda 8.10.7 took the last one. Models drawn in a modeler list their <outgoing> flows, and BpmnGo follows that order. Kept until Camunda's rule for this case is established on more than one observation."
+  }
+]

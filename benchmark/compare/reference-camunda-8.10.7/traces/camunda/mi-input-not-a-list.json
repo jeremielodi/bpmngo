@@ -1,0 +1,32 @@
+{
+  "scenario": "mi-input-not-a-list",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "not completed within 6s",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "mi_parallel",
+        "state": "ACTIVE",
+        "activeElements": [
+          "p_each"
+        ],
+        "incidents": [
+          {
+            "elementId": "p_each",
+            "errorType": "EXTRACT_VALUE_ERROR"
+          }
+        ]
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 7437,
+    "errors": [],
+    "restNotes": []
+  }
+}

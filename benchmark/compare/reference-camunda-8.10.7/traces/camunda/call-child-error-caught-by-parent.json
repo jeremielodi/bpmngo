@@ -1,0 +1,58 @@
+{
+  "scenario": "call-child-error-caught-by-parent",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "child:ca_child",
+        "type": "ca-child-work",
+        "elementId": "c_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "amount": 1
+        },
+        "answer": "error(CHILD_ERR)",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "ca-on-error",
+        "elementId": "e_on_error",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "amount": 1
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "amount": 1
+    },
+    "instances": [
+      {
+        "process": "ca_child",
+        "state": "TERMINATED",
+        "activeElements": [],
+        "incidents": []
+      },
+      {
+        "process": "ca_parent_error",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3062,
+    "errors": [],
+    "restNotes": []
+  }
+}

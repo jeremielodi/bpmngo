@@ -1,0 +1,47 @@
+{
+  "scenario": "user-task-completed-over-rest",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "ut-after",
+        "elementId": "u_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "request": "R-1",
+          "approved": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after 500 ms: complete user task u_approve",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "request": "R-1",
+      "approved": true
+    },
+    "instances": [
+      {
+        "process": "ut_simple",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2382,
+    "errors": [],
+    "restNotes": []
+  }
+}

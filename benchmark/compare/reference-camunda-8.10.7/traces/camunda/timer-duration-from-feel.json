@@ -1,0 +1,40 @@
+{
+  "scenario": "timer-duration-from-feel",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "tm-after",
+        "elementId": "tf_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "delay": "PT1S"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "delay": "PT1S"
+    },
+    "instances": [
+      {
+        "process": "tm_feel",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 4254,
+    "errors": [],
+    "restNotes": []
+  }
+}

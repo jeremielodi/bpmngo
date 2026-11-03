@@ -1,0 +1,22 @@
+{
+  "scenario": "api-timer-waits-its-duration",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "waited": "about 3 s"
+    },
+    "instances": []
+  },
+  "info": {
+    "durationMs": 0,
+    "errors": [
+      "waited 3.8 s for a PT3S timer"
+    ],
+    "restNotes": []
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "scenario": "gw-exclusive-condition-on-missing-variable",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "not completed within 6s",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "gw_exclusive_null",
+        "state": "ACTIVE",
+        "activeElements": [
+          "z_gw"
+        ],
+        "incidents": [
+          {
+            "elementId": "z_gw",
+            "errorType": "EXTRACT_VALUE_ERROR"
+          }
+        ]
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 7623,
+    "errors": [],
+    "restNotes": []
+  }
+}

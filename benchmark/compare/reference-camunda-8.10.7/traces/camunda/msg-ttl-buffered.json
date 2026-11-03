@@ -1,0 +1,59 @@
+{
+  "scenario": "msg-ttl-buffered",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "msg-prep",
+        "elementId": "c_prep",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "orderId": "A2"
+        },
+        "answer": "after 2000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "msg-after",
+        "elementId": "c_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "early": true,
+          "orderId": "A2"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after 0 ms: publish msg-paid key=A2 ttl=10000",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "early": true,
+      "orderId": "A2"
+    },
+    "instances": [
+      {
+        "process": "msg_catch",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 5609,
+    "errors": [],
+    "restNotes": []
+  }
+}

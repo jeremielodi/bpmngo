@@ -1,0 +1,49 @@
+{
+  "scenario": "esp-timer-non-interrupting",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "esp-work",
+        "elementId": "t_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "after 3000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "esp-tick",
+        "elementId": "t_tick",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "ticked": true,
+      "worked": true
+    },
+    "instances": [
+      {
+        "process": "esp_timer",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 6126,
+    "errors": [],
+    "restNotes": []
+  }
+}

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Jobs: failures and retries, headers, input/output mappings, variable types. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="jobs" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="job_retry" isExecutable="true">
+    <bpmn:startEvent id="r_start"/>
+    <bpmn:sequenceFlow id="r_f0" sourceRef="r_start" targetRef="r_work"/>
+    <bpmn:serviceTask id="r_work"><bpmn:extensionElements><zeebe:taskDefinition type="job-work" retries="3"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="r_f1" sourceRef="r_work" targetRef="r_end"/>
+    <bpmn:endEvent id="r_end"/>
+  </bpmn:process>
+
+  <!-- Headers, inputs computed from the instance, one output mapping. -->
+  <bpmn:process id="job_io" isExecutable="true">
+    <bpmn:startEvent id="io_start"/>
+    <bpmn:sequenceFlow id="io_f0" sourceRef="io_start" targetRef="io_calc"/>
+    <bpmn:serviceTask id="io_calc">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="job-calc"/>
+        <zeebe:taskHeaders>
+          <zeebe:header key="region" value="eu"/>
+          <zeebe:header key="priority" value="1"/>
+        </zeebe:taskHeaders>
+        <zeebe:ioMapping>
+          <zeebe:input source="=amount * 2" target="doubled"/>
+          <zeebe:input source="=&quot;fixed&quot;" target="label"/>
+          <zeebe:output source="=result + 1" target="total"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="io_f1" sourceRef="io_calc" targetRef="io_check"/>
+    <bpmn:serviceTask id="io_check"><bpmn:extensionElements><zeebe:taskDefinition type="job-check"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="io_f2" sourceRef="io_check" targetRef="io_end"/>
+    <bpmn:endEvent id="io_end"/>
+  </bpmn:process>
+
+  <!-- A worker sets variables of every JSON type; the next job reads them. -->
+  <bpmn:process id="job_types" isExecutable="true">
+    <bpmn:startEvent id="t_start"/>
+    <bpmn:sequenceFlow id="t_f0" sourceRef="t_start" targetRef="t_set"/>
+    <bpmn:serviceTask id="t_set"><bpmn:extensionElements><zeebe:taskDefinition type="job-set"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="t_f1" sourceRef="t_set" targetRef="t_read"/>
+    <bpmn:serviceTask id="t_read"><bpmn:extensionElements><zeebe:taskDefinition type="job-read"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="t_f2" sourceRef="t_read" targetRef="t_end"/>
+    <bpmn:endEvent id="t_end"/>
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,0 +1,31 @@
+{
+  "scenario": "feel-null-handling",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "ifNull": "b",
+      "isNull": true,
+      "andNull": false,
+      "defined": false,
+      "plusNull": null
+    },
+    "instances": [
+      {
+        "process": "feel_null",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2610,
+    "errors": [],
+    "restNotes": []
+  }
+}

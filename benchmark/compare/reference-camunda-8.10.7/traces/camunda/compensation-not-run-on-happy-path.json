@@ -1,0 +1,51 @@
+{
+  "scenario": "compensation-not-run-on-happy-path",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "cp-book",
+        "elementId": "c_book",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "cp-charge",
+        "elementId": "c_charge",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "booking": "B-2"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "paid": true,
+      "booking": "B-2"
+    },
+    "instances": [
+      {
+        "process": "cp_booking",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2367,
+    "errors": [],
+    "restNotes": []
+  }
+}

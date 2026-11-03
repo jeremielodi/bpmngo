@@ -1,0 +1,44 @@
+{
+  "scenario": "feel-contexts",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "ctx": {
+        "x": 1,
+        "y": 2
+      },
+      "order": {
+        "id": "O-9",
+        "customer": {
+          "name": "Ada"
+        }
+      },
+      "byName": "O-9",
+      "nested": 1,
+      "customer": "Ada",
+      "customer2": {
+        "name": "Ada",
+        "vip": true
+      },
+      "missingPath": null
+    },
+    "instances": [
+      {
+        "process": "feel_context",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2624,
+    "errors": [],
+    "restNotes": []
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "scenario": "boundary-escalation-non-interrupting",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "be-note",
+        "elementId": "es_note",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "be-after",
+        "elementId": "es_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "noted": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "be-on-late",
+        "elementId": "es_on_late",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "noted": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "noted": true
+    },
+    "instances": [
+      {
+        "process": "be_escalation",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3323,
+    "errors": [],
+    "restNotes": []
+  }
+}

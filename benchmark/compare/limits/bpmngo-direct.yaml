@@ -1,0 +1,18 @@
+# BpmnGo in direct mode (no Kafka, Redpanda not started), with the same
+# capacity as camunda.yaml: 2 dedicated cores and 2 GiB of memory in all,
+# shared by its two containers (same cpuset; 1 GiB + 1 GiB).
+# Apply from the BpmnGo folder, with KAFKA_BROKERS empty:
+#   docker compose stop redpanda
+#   KAFKA_BROKERS= WRITE_PATH=direct EVENT_LOG=off \
+#     docker compose -f docker-compose.yaml -f <bench>/limits/bpmngo-direct.yaml up -d postgres bpmngo
+# CPUs: BENCH_BPMNGO_CPUS (default "6,8"), BENCH_CAMUNDA_CPUS (default "2,4").
+# Give each engine two *physical* cores, and different ones: on a machine
+# with hyperthreading, logical CPUs 2 and 3 are often the same core (check
+# with: docker run --rm alpine cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list).
+services:
+  bpmngo:
+    cpuset: "${BENCH_BPMNGO_CPUS:-6,8}"
+    mem_limit: 1g
+  postgres:
+    cpuset: "${BENCH_BPMNGO_CPUS:-6,8}"
+    mem_limit: 1g

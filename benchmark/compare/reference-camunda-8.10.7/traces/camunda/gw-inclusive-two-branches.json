@@ -1,0 +1,72 @@
+{
+  "scenario": "gw-inclusive-two-branches",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "gw-a",
+        "elementId": "i_a",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "wantA": true,
+          "wantB": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "gw-b",
+        "elementId": "i_b",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "wantA": true,
+          "wantB": true
+        },
+        "answer": "after 1500 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "gw-after",
+        "elementId": "i_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "a": true,
+          "b": true,
+          "wantA": true,
+          "wantB": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "a": true,
+      "b": true,
+      "wantA": true,
+      "wantB": true
+    },
+    "instances": [
+      {
+        "process": "gw_inclusive",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 4996,
+    "errors": [],
+    "restNotes": []
+  }
+}

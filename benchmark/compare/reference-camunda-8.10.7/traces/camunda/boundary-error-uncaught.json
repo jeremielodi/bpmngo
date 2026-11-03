@@ -1,0 +1,43 @@
+{
+  "scenario": "boundary-error-uncaught",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "be-pay",
+        "elementId": "eu_pay",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "error(NOPE)",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "not completed within 6s",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "be_error_uncaught",
+        "state": "ACTIVE",
+        "activeElements": [
+          "eu_pay"
+        ],
+        "incidents": [
+          {
+            "elementId": "eu_pay",
+            "errorType": "UNHANDLED_ERROR_EVENT"
+          }
+        ]
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 7414,
+    "errors": [],
+    "restNotes": []
+  }
+}

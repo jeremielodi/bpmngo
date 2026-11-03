@@ -1,0 +1,57 @@
+{
+  "scenario": "gw-inclusive-default-alone",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "gw-none",
+        "elementId": "i_none",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "wantA": false,
+          "wantB": false
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "gw-after",
+        "elementId": "i_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "none": true,
+          "wantA": false,
+          "wantB": false
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "none": true,
+      "wantA": false,
+      "wantB": false
+    },
+    "instances": [
+      {
+        "process": "gw_inclusive",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2134,
+    "errors": [],
+    "restNotes": []
+  }
+}

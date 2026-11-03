@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Multi-instance activities. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="multi_instance" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- Parallel, with an output collection. -->
+  <bpmn:process id="mi_parallel" isExecutable="true">
+    <bpmn:startEvent id="p_start"/>
+    <bpmn:sequenceFlow id="p_f0" sourceRef="p_start" targetRef="p_each"/>
+    <bpmn:serviceTask id="p_each">
+      <bpmn:extensionElements><zeebe:taskDefinition type="mi-each"/></bpmn:extensionElements>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=items" inputElement="item" outputCollection="results" outputElement="=result"/>
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="p_f1" sourceRef="p_each" targetRef="p_after"/>
+    <bpmn:serviceTask id="p_after"><bpmn:extensionElements><zeebe:taskDefinition type="mi-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="p_f2" sourceRef="p_after" targetRef="p_end"/>
+    <bpmn:endEvent id="p_end"/>
+  </bpmn:process>
+
+  <!-- Sequential. -->
+  <bpmn:process id="mi_sequential" isExecutable="true">
+    <bpmn:startEvent id="s_start"/>
+    <bpmn:sequenceFlow id="s_f0" sourceRef="s_start" targetRef="s_each"/>
+    <bpmn:serviceTask id="s_each">
+      <bpmn:extensionElements><zeebe:taskDefinition type="mi-each"/></bpmn:extensionElements>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=names" inputElement="name"/>
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="s_f1" sourceRef="s_each" targetRef="s_end"/>
+    <bpmn:endEvent id="s_end"/>
+  </bpmn:process>
+
+  <!-- Parallel with a completion condition: two of three are enough. -->
+  <bpmn:process id="mi_condition" isExecutable="true">
+    <bpmn:startEvent id="c_start"/>
+    <bpmn:sequenceFlow id="c_f0" sourceRef="c_start" targetRef="c_each"/>
+    <bpmn:serviceTask id="c_each">
+      <bpmn:extensionElements><zeebe:taskDefinition type="mi-each"/></bpmn:extensionElements>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=items" inputElement="item" outputCollection="results" outputElement="=result"/>
+        </bpmn:extensionElements>
+        <bpmn:completionCondition xsi:type="bpmn:tFormalExpression">=numberOfCompletedInstances &gt;= 2</bpmn:completionCondition>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="c_f1" sourceRef="c_each" targetRef="c_after"/>
+    <bpmn:serviceTask id="c_after"><bpmn:extensionElements><zeebe:taskDefinition type="mi-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="c_f2" sourceRef="c_after" targetRef="c_end"/>
+    <bpmn:endEvent id="c_end"/>
+  </bpmn:process>
+
+  <!-- Multi-instance embedded sub-process with a local input mapping. -->
+  <bpmn:process id="mi_subprocess" isExecutable="true">
+    <bpmn:startEvent id="u_start"/>
+    <bpmn:sequenceFlow id="u_f0" sourceRef="u_start" targetRef="u_sub"/>
+    <bpmn:subProcess id="u_sub">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping><zeebe:input source="=item * 2" target="double"/></zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=items" inputElement="item" outputCollection="doubles" outputElement="=double + bonus"/>
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:startEvent id="u_sub_start"/>
+      <bpmn:sequenceFlow id="u_s1" sourceRef="u_sub_start" targetRef="u_inner"/>
+      <bpmn:serviceTask id="u_inner"><bpmn:extensionElements><zeebe:taskDefinition type="mi-inner"/></bpmn:extensionElements></bpmn:serviceTask>
+      <bpmn:sequenceFlow id="u_s2" sourceRef="u_inner" targetRef="u_sub_end"/>
+      <bpmn:endEvent id="u_sub_end"/>
+    </bpmn:subProcess>
+    <bpmn:sequenceFlow id="u_f1" sourceRef="u_sub" targetRef="u_after"/>
+    <bpmn:serviceTask id="u_after"><bpmn:extensionElements><zeebe:taskDefinition type="mi-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="u_f2" sourceRef="u_after" targetRef="u_end"/>
+    <bpmn:endEvent id="u_end"/>
+  </bpmn:process>
+</bpmn:definitions>

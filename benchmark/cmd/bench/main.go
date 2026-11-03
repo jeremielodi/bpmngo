@@ -96,8 +96,6 @@ func main() {
 		out = r.latency()
 	case "load":
 		out = r.load()
-	case "behavior":
-		out = r.behavior()
 	default:
 		fatal("unknown -mode %q", cfg.mode)
 	}

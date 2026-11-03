@@ -1,0 +1,92 @@
+{
+  "scenario": "mi-sequential-loop-counter",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "mi-each",
+        "elementId": "s_each",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "name": "a",
+          "loopCounter": 1,
+          "names": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-each",
+        "elementId": "s_each",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "name": "b",
+          "loopCounter": 2,
+          "names": [
+            "a",
+            "b",
+            "c"
+          ],
+          "seen_a": 1
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-each",
+        "elementId": "s_each",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "name": "c",
+          "loopCounter": 3,
+          "names": [
+            "a",
+            "b",
+            "c"
+          ],
+          "seen_a": 1,
+          "seen_b": 2
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "names": [
+        "a",
+        "b",
+        "c"
+      ],
+      "seen_a": 1,
+      "seen_b": 2,
+      "seen_c": 3
+    },
+    "instances": [
+      {
+        "process": "mi_sequential",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 1611,
+    "errors": [],
+    "restNotes": []
+  }
+}

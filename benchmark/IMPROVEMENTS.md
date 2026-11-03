@@ -30,7 +30,9 @@ same 47-model suite was rerun against both engines.
   `raw/camunda-improved-reference.json`.
 - Definitive BpmnGo output:
   `raw/bpmngo-improved-definitive.json`.
-- Reproducible comparison:
+- Reproducible comparison (`scripts/compare-behavior.js` was removed on
+  2026-11-03 with the Go behaviour suite, see the git history; behaviour is
+  now compared by `compare/`, `npm run compare`):
 
   ```sh
   node scripts/compare-behavior.js \

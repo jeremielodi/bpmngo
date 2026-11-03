@@ -1,0 +1,31 @@
+# Same capacity as camunda.yaml: 2 dedicated cores and 2 GiB of memory in all,
+# shared by the three containers BpmnGo needs. The CPUs are shared freely
+# (same cpuset); the memory is split: 512 MiB + 512 MiB + 1 GiB.
+# Apply from the BpmnGo folder (see README, "Same capacity for both engines"):
+#   docker compose -f docker-compose.yaml -f <bench>/limits/bpmngo.yaml up -d postgres redpanda bpmngo
+# CPUs: BENCH_BPMNGO_CPUS (default "6,8"), BENCH_CAMUNDA_CPUS (default "2,4").
+# Give each engine two *physical* cores, and different ones: on a machine
+# with hyperthreading, logical CPUs 2 and 3 are often the same core (check
+# with: docker run --rm alpine cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list).
+services:
+  bpmngo:
+    cpuset: "${BENCH_BPMNGO_CPUS:-6,8}"
+    mem_limit: 512m
+  postgres:
+    cpuset: "${BENCH_BPMNGO_CPUS:-6,8}"
+    mem_limit: 512m
+  redpanda:
+    cpuset: "${BENCH_BPMNGO_CPUS:-6,8}"
+    mem_limit: 1g
+    # The base file's command with --memory lowered from 1G, so Redpanda
+    # fits in its 1 GiB limit with room for what it allocates outside it.
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=768M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092

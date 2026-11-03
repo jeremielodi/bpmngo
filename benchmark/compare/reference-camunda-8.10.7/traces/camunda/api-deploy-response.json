@@ -1,0 +1,22 @@
+{
+  "scenario": "api-deploy-response",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "ok",
+    "finalVariables": {
+      "resourceName": "api-simple.bpmn",
+      "version": 1,
+      "bpmnProcessId": "api_simple"
+    },
+    "instances": []
+  },
+  "info": {
+    "durationMs": 0,
+    "errors": [],
+    "restNotes": []
+  }
+}

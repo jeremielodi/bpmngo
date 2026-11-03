@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Boundary events on service tasks and sub-processes. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="boundary" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:message id="Msg_cancel" name="be-cancel">
+    <bpmn:extensionElements><zeebe:subscription correlationKey="=orderId"/></bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:signal id="Sig_stop" name="be-stop"/>
+  <bpmn:error id="Err_card" name="Card declined" errorCode="CARD"/>
+  <bpmn:escalation id="Esc_late" name="Late" escalationCode="LATE"/>
+
+  <!-- Interrupting timer on a service task. -->
+  <bpmn:process id="be_timer_int" isExecutable="true">
+    <bpmn:startEvent id="ti_start"/>
+    <bpmn:sequenceFlow id="ti_f0" sourceRef="ti_start" targetRef="ti_slow"/>
+    <bpmn:serviceTask id="ti_slow"><bpmn:extensionElements><zeebe:taskDefinition type="be-slow"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="ti_timer" attachedToRef="ti_slow">
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT2S</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="ti_f1" sourceRef="ti_slow" targetRef="ti_end"/>
+    <bpmn:sequenceFlow id="ti_f2" sourceRef="ti_timer" targetRef="ti_late"/>
+    <bpmn:serviceTask id="ti_late"><bpmn:extensionElements><zeebe:taskDefinition type="be-late"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="ti_f3" sourceRef="ti_late" targetRef="ti_end2"/>
+    <bpmn:endEvent id="ti_end"/>
+    <bpmn:endEvent id="ti_end2"/>
+  </bpmn:process>
+
+  <!-- Non-interrupting timer: a reminder while the task goes on. -->
+  <bpmn:process id="be_timer_nonint" isExecutable="true">
+    <bpmn:startEvent id="tn_start"/>
+    <bpmn:sequenceFlow id="tn_f0" sourceRef="tn_start" targetRef="tn_long"/>
+    <bpmn:serviceTask id="tn_long"><bpmn:extensionElements><zeebe:taskDefinition type="be-long"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="tn_timer" attachedToRef="tn_long" cancelActivity="false">
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT1S</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="tn_f1" sourceRef="tn_long" targetRef="tn_end"/>
+    <bpmn:sequenceFlow id="tn_f2" sourceRef="tn_timer" targetRef="tn_reminder"/>
+    <bpmn:serviceTask id="tn_reminder"><bpmn:extensionElements><zeebe:taskDefinition type="be-reminder"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="tn_f3" sourceRef="tn_reminder" targetRef="tn_end2"/>
+    <bpmn:endEvent id="tn_end"/>
+    <bpmn:endEvent id="tn_end2"/>
+  </bpmn:process>
+
+  <!-- Interrupting message boundary with a correlation key. -->
+  <bpmn:process id="be_message_int" isExecutable="true">
+    <bpmn:startEvent id="mi_start"/>
+    <bpmn:sequenceFlow id="mi_f0" sourceRef="mi_start" targetRef="mi_work"/>
+    <bpmn:serviceTask id="mi_work"><bpmn:extensionElements><zeebe:taskDefinition type="be-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="mi_msg" attachedToRef="mi_work">
+      <bpmn:messageEventDefinition messageRef="Msg_cancel"/>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="mi_f1" sourceRef="mi_work" targetRef="mi_end"/>
+    <bpmn:sequenceFlow id="mi_f2" sourceRef="mi_msg" targetRef="mi_cancelled"/>
+    <bpmn:serviceTask id="mi_cancelled"><bpmn:extensionElements><zeebe:taskDefinition type="be-cancelled"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="mi_f3" sourceRef="mi_cancelled" targetRef="mi_end2"/>
+    <bpmn:endEvent id="mi_end"/>
+    <bpmn:endEvent id="mi_end2"/>
+  </bpmn:process>
+
+  <!-- A specific error boundary and a catch-all one on the same task. -->
+  <bpmn:process id="be_error" isExecutable="true">
+    <bpmn:startEvent id="er_start"/>
+    <bpmn:sequenceFlow id="er_f0" sourceRef="er_start" targetRef="er_pay"/>
+    <bpmn:serviceTask id="er_pay"><bpmn:extensionElements><zeebe:taskDefinition type="be-pay"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="er_card" attachedToRef="er_pay"><bpmn:errorEventDefinition errorRef="Err_card"/></bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="er_any" attachedToRef="er_pay"><bpmn:errorEventDefinition/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="er_f1" sourceRef="er_pay" targetRef="er_end"/>
+    <bpmn:sequenceFlow id="er_f2" sourceRef="er_card" targetRef="er_on_card"/>
+    <bpmn:sequenceFlow id="er_f3" sourceRef="er_any" targetRef="er_on_any"/>
+    <bpmn:serviceTask id="er_on_card"><bpmn:extensionElements><zeebe:taskDefinition type="be-on-card"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="er_on_any"><bpmn:extensionElements><zeebe:taskDefinition type="be-on-any"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="er_f4" sourceRef="er_on_card" targetRef="er_end2"/>
+    <bpmn:sequenceFlow id="er_f5" sourceRef="er_on_any" targetRef="er_end3"/>
+    <bpmn:endEvent id="er_end"/>
+    <bpmn:endEvent id="er_end2"/>
+    <bpmn:endEvent id="er_end3"/>
+  </bpmn:process>
+
+  <!-- An error nothing catches. -->
+  <bpmn:process id="be_error_uncaught" isExecutable="true">
+    <bpmn:startEvent id="eu_start"/>
+    <bpmn:sequenceFlow id="eu_f0" sourceRef="eu_start" targetRef="eu_pay"/>
+    <bpmn:serviceTask id="eu_pay"><bpmn:extensionElements><zeebe:taskDefinition type="be-pay"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="eu_f1" sourceRef="eu_pay" targetRef="eu_end"/>
+    <bpmn:endEvent id="eu_end"/>
+  </bpmn:process>
+
+  <!-- Interrupting signal boundary. -->
+  <bpmn:process id="be_signal_int" isExecutable="true">
+    <bpmn:startEvent id="si_start"/>
+    <bpmn:sequenceFlow id="si_f0" sourceRef="si_start" targetRef="si_work"/>
+    <bpmn:serviceTask id="si_work"><bpmn:extensionElements><zeebe:taskDefinition type="be-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="si_sig" attachedToRef="si_work"><bpmn:signalEventDefinition signalRef="Sig_stop"/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="si_f1" sourceRef="si_work" targetRef="si_end"/>
+    <bpmn:sequenceFlow id="si_f2" sourceRef="si_sig" targetRef="si_stopped"/>
+    <bpmn:serviceTask id="si_stopped"><bpmn:extensionElements><zeebe:taskDefinition type="be-stopped"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="si_f3" sourceRef="si_stopped" targetRef="si_end2"/>
+    <bpmn:endEvent id="si_end"/>
+    <bpmn:endEvent id="si_end2"/>
+  </bpmn:process>
+
+  <!-- Escalation end event inside a sub-process, caught by a
+       non-interrupting boundary: both paths run. -->
+  <bpmn:process id="be_escalation" isExecutable="true">
+    <bpmn:startEvent id="es_start"/>
+    <bpmn:sequenceFlow id="es_f0" sourceRef="es_start" targetRef="es_sub"/>
+    <bpmn:subProcess id="es_sub">
+      <bpmn:startEvent id="es_sub_start"/>
+      <bpmn:sequenceFlow id="es_s1" sourceRef="es_sub_start" targetRef="es_note"/>
+      <bpmn:serviceTask id="es_note"><bpmn:extensionElements><zeebe:taskDefinition type="be-note"/></bpmn:extensionElements></bpmn:serviceTask>
+      <bpmn:sequenceFlow id="es_s2" sourceRef="es_note" targetRef="es_throw"/>
+      <bpmn:endEvent id="es_throw"><bpmn:escalationEventDefinition escalationRef="Esc_late"/></bpmn:endEvent>
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="es_catch" attachedToRef="es_sub" cancelActivity="false">
+      <bpmn:escalationEventDefinition escalationRef="Esc_late"/>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="es_f1" sourceRef="es_sub" targetRef="es_after"/>
+    <bpmn:sequenceFlow id="es_f2" sourceRef="es_catch" targetRef="es_on_late"/>
+    <bpmn:serviceTask id="es_after"><bpmn:extensionElements><zeebe:taskDefinition type="be-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="es_on_late"><bpmn:extensionElements><zeebe:taskDefinition type="be-on-late"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="es_f3" sourceRef="es_after" targetRef="es_end"/>
+    <bpmn:sequenceFlow id="es_f4" sourceRef="es_on_late" targetRef="es_end2"/>
+    <bpmn:endEvent id="es_end"/>
+    <bpmn:endEvent id="es_end2"/>
+  </bpmn:process>
+</bpmn:definitions>

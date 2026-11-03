@@ -1,0 +1,50 @@
+{
+  "scenario": "esp-error-catches-job-error",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "esp-work",
+        "elementId": "e_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "error(X)",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "esp-handle",
+        "elementId": "e_handle",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "failedAt": "work"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "failedAt": "work"
+    },
+    "instances": [
+      {
+        "process": "esp_error",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3246,
+    "errors": [],
+    "restNotes": []
+  }
+}

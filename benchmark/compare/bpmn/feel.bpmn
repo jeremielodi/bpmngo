@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FEEL expressions, evaluated by script tasks (zeebe:script). Each
+     process is a chain of script tasks; the result variables are compared.
+     If an expression fails, the instance stops there with an incident. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="feel" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="feel_numbers" isExecutable="true">
+    <bpmn:startEvent id="n_start"/>
+    <bpmn:sequenceFlow id="n_f0" sourceRef="n_start" targetRef="n1"/>
+    <bpmn:scriptTask id="n1"><bpmn:extensionElements><zeebe:script expression="=0.1 + 0.2" resultVariable="sum"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f1" sourceRef="n1" targetRef="n2"/>
+    <bpmn:scriptTask id="n2"><bpmn:extensionElements><zeebe:script expression="=0.1 + 0.2 = 0.3" resultVariable="exact"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f2" sourceRef="n2" targetRef="n3"/>
+    <bpmn:scriptTask id="n3"><bpmn:extensionElements><zeebe:script expression="=10 / 4" resultVariable="div"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f3" sourceRef="n3" targetRef="n4"/>
+    <bpmn:scriptTask id="n4"><bpmn:extensionElements><zeebe:script expression="=2 ** 10" resultVariable="pow"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f4" sourceRef="n4" targetRef="n5"/>
+    <bpmn:scriptTask id="n5"><bpmn:extensionElements><zeebe:script expression="=decimal(1.255, 2)" resultVariable="rounded"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f5" sourceRef="n5" targetRef="n6"/>
+    <bpmn:scriptTask id="n6"><bpmn:extensionElements><zeebe:script expression="=floor(-1.5)" resultVariable="floored"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f6" sourceRef="n6" targetRef="n7"/>
+    <bpmn:scriptTask id="n7"><bpmn:extensionElements><zeebe:script expression="=modulo(-5, 3)" resultVariable="mod"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f7" sourceRef="n7" targetRef="n8"/>
+    <bpmn:scriptTask id="n8"><bpmn:extensionElements><zeebe:script expression="=amount * 1.1" resultVariable="scaled"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f8" sourceRef="n8" targetRef="n9"/>
+    <bpmn:scriptTask id="n9"><bpmn:extensionElements><zeebe:script expression="=1 / 0" resultVariable="divByZero"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f9" sourceRef="n9" targetRef="n_end"/>
+    <bpmn:endEvent id="n_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_null" isExecutable="true">
+    <bpmn:startEvent id="z_start"/>
+    <bpmn:sequenceFlow id="z_f0" sourceRef="z_start" targetRef="z1"/>
+    <bpmn:scriptTask id="z1"><bpmn:extensionElements><zeebe:script expression="=missing = null" resultVariable="isNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f1" sourceRef="z1" targetRef="z2"/>
+    <bpmn:scriptTask id="z2"><bpmn:extensionElements><zeebe:script expression="=if missing &gt; 5 then &quot;a&quot; else &quot;b&quot;" resultVariable="ifNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f2" sourceRef="z2" targetRef="z3"/>
+    <bpmn:scriptTask id="z3"><bpmn:extensionElements><zeebe:script expression="=missing + 1" resultVariable="plusNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f3" sourceRef="z3" targetRef="z4"/>
+    <bpmn:scriptTask id="z4"><bpmn:extensionElements><zeebe:script expression="=is defined(missing)" resultVariable="defined"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f4" sourceRef="z4" targetRef="z5"/>
+    <bpmn:scriptTask id="z5"><bpmn:extensionElements><zeebe:script expression="=false and missing" resultVariable="andNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f5" sourceRef="z5" targetRef="z_end"/>
+    <bpmn:endEvent id="z_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_strings" isExecutable="true">
+    <bpmn:startEvent id="s_start"/>
+    <bpmn:sequenceFlow id="s_f0" sourceRef="s_start" targetRef="s1"/>
+    <bpmn:scriptTask id="s1"><bpmn:extensionElements><zeebe:script expression="=upper case(name)" resultVariable="upper"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f1" sourceRef="s1" targetRef="s2"/>
+    <bpmn:scriptTask id="s2"><bpmn:extensionElements><zeebe:script expression="=substring(name, 2, 3)" resultVariable="sub"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f2" sourceRef="s2" targetRef="s3"/>
+    <bpmn:scriptTask id="s3"><bpmn:extensionElements><zeebe:script expression="=string length(name)" resultVariable="len"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f3" sourceRef="s3" targetRef="s4"/>
+    <bpmn:scriptTask id="s4"><bpmn:extensionElements><zeebe:script expression="=name + &quot; #&quot; + string(42)" resultVariable="joined"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f4" sourceRef="s4" targetRef="s5"/>
+    <bpmn:scriptTask id="s5"><bpmn:extensionElements><zeebe:script expression="=split(&quot;a,b,c&quot;, &quot;,&quot;)" resultVariable="parts"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f5" sourceRef="s5" targetRef="s6"/>
+    <bpmn:scriptTask id="s6"><bpmn:extensionElements><zeebe:script expression="=matches(code, &quot;^[A-Z]{2}-[0-9]+$&quot;)" resultVariable="codeOk"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f6" sourceRef="s6" targetRef="s7"/>
+    <bpmn:scriptTask id="s7"><bpmn:extensionElements><zeebe:script expression="=string(12.50)" resultVariable="numText"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f7" sourceRef="s7" targetRef="s_end"/>
+    <bpmn:endEvent id="s_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_lists" isExecutable="true">
+    <bpmn:startEvent id="l_start"/>
+    <bpmn:sequenceFlow id="l_f0" sourceRef="l_start" targetRef="l1"/>
+    <bpmn:scriptTask id="l1"><bpmn:extensionElements><zeebe:script expression="=sum(for i in items return i * 2)" resultVariable="doubledSum"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f1" sourceRef="l1" targetRef="l2"/>
+    <bpmn:scriptTask id="l2"><bpmn:extensionElements><zeebe:script expression="=items[item &gt; 1]" resultVariable="filtered"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f2" sourceRef="l2" targetRef="l3"/>
+    <bpmn:scriptTask id="l3"><bpmn:extensionElements><zeebe:script expression="=items[-1]" resultVariable="last"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f3" sourceRef="l3" targetRef="l4"/>
+    <bpmn:scriptTask id="l4"><bpmn:extensionElements><zeebe:script expression="=count(items) + min(items) + max(items)" resultVariable="stats"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f4" sourceRef="l4" targetRef="l5"/>
+    <bpmn:scriptTask id="l5"><bpmn:extensionElements><zeebe:script expression="=distinct values(append(items, 1, 9))" resultVariable="distinct"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f5" sourceRef="l5" targetRef="l6"/>
+    <bpmn:scriptTask id="l6"><bpmn:extensionElements><zeebe:script expression="=some i in items satisfies i &gt; 2" resultVariable="anyBig"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f6" sourceRef="l6" targetRef="l7"/>
+    <bpmn:scriptTask id="l7"><bpmn:extensionElements><zeebe:script expression="=items[5]" resultVariable="outOfRange"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f7" sourceRef="l7" targetRef="l8"/>
+    <bpmn:scriptTask id="l8"><bpmn:extensionElements><zeebe:script expression="=order.items[qty &gt; 1].sku" resultVariable="skus"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f8" sourceRef="l8" targetRef="l_end"/>
+    <bpmn:endEvent id="l_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_dates" isExecutable="true">
+    <bpmn:startEvent id="d_start"/>
+    <bpmn:sequenceFlow id="d_f0" sourceRef="d_start" targetRef="d1"/>
+    <bpmn:scriptTask id="d1"><bpmn:extensionElements><zeebe:script expression="=string(date(&quot;2024-01-31&quot;) + duration(&quot;P1M&quot;))" resultVariable="endOfFeb"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f1" sourceRef="d1" targetRef="d2"/>
+    <bpmn:scriptTask id="d2"><bpmn:extensionElements><zeebe:script expression="=string(date(&quot;2024-03-01&quot;) - duration(&quot;P1D&quot;))" resultVariable="leapDay"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f2" sourceRef="d2" targetRef="d3"/>
+    <bpmn:scriptTask id="d3"><bpmn:extensionElements><zeebe:script expression="=string(duration(&quot;PT90M&quot;))" resultVariable="ninety"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f3" sourceRef="d3" targetRef="d4"/>
+    <bpmn:scriptTask id="d4"><bpmn:extensionElements><zeebe:script expression="=date(&quot;2024-02-28&quot;) &lt; date(&quot;2024-03-01&quot;)" resultVariable="before"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f4" sourceRef="d4" targetRef="d5"/>
+    <bpmn:scriptTask id="d5"><bpmn:extensionElements><zeebe:script expression="=date(&quot;2024-01-15&quot;).month" resultVariable="month"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f5" sourceRef="d5" targetRef="d6"/>
+    <bpmn:scriptTask id="d6"><bpmn:extensionElements><zeebe:script expression="=date(&quot;2024-01-31&quot;) + duration(&quot;P1D&quot;)" resultVariable="rawDate"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f6" sourceRef="d6" targetRef="d7"/>
+    <bpmn:scriptTask id="d7"><bpmn:extensionElements><zeebe:script expression="=string(date and time(&quot;2024-05-01T10:00:00Z&quot;) + duration(&quot;PT36H&quot;))" resultVariable="dateTime"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f7" sourceRef="d7" targetRef="d_end"/>
+    <bpmn:endEvent id="d_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_context" isExecutable="true">
+    <bpmn:startEvent id="c_start"/>
+    <bpmn:sequenceFlow id="c_f0" sourceRef="c_start" targetRef="c1"/>
+    <bpmn:scriptTask id="c1"><bpmn:extensionElements><zeebe:script expression="={a: {b: 1}}.a.b" resultVariable="nested"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f1" sourceRef="c1" targetRef="c2"/>
+    <bpmn:scriptTask id="c2"><bpmn:extensionElements><zeebe:script expression="={x: 1, y: x + 1}" resultVariable="ctx"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f2" sourceRef="c2" targetRef="c3"/>
+    <bpmn:scriptTask id="c3"><bpmn:extensionElements><zeebe:script expression="=order.customer.name" resultVariable="customer"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f3" sourceRef="c3" targetRef="c4"/>
+    <bpmn:scriptTask id="c4"><bpmn:extensionElements><zeebe:script expression="=order.missing.deeper" resultVariable="missingPath"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f4" sourceRef="c4" targetRef="c5"/>
+    <bpmn:scriptTask id="c5"><bpmn:extensionElements><zeebe:script expression="=get value(order, &quot;id&quot;)" resultVariable="byName"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f5" sourceRef="c5" targetRef="c6"/>
+    <bpmn:scriptTask id="c6"><bpmn:extensionElements><zeebe:script expression="=context put(order.customer, &quot;vip&quot;, true)" resultVariable="customer2"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f6" sourceRef="c6" targetRef="c_end"/>
+    <bpmn:endEvent id="c_end"/>
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,0 +1,94 @@
+{
+  "scenario": "job-variable-types",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "job-set",
+        "elementId": "t_set",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "job-read",
+        "elementId": "t_read",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "b": true,
+          "f": 1.5,
+          "n": 1,
+          "s": "é ✓",
+          "arr": [
+            1,
+            "a",
+            null
+          ],
+          "big": 9007199254740991,
+          "neg": -3,
+          "nul": null,
+          "obj": {
+            "k": {
+              "z": [
+                1,
+                {
+                  "y": 2
+                }
+              ]
+            }
+          },
+          "empty": {}
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "b": true,
+      "f": 1.5,
+      "n": 1,
+      "s": "é ✓",
+      "arr": [
+        1,
+        "a",
+        null
+      ],
+      "big": 9007199254740991,
+      "neg": -3,
+      "nul": null,
+      "obj": {
+        "k": {
+          "z": [
+            1,
+            {
+              "y": 2
+            }
+          ]
+        }
+      },
+      "empty": {}
+    },
+    "instances": [
+      {
+        "process": "job_types",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2933,
+    "errors": [],
+    "restNotes": []
+  }
+}

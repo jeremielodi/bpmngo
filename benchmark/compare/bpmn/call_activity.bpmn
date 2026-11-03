@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Call activities: the parents and the child they call. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="call_activity" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:error id="Err_child" errorCode="CHILD_ERR"/>
+
+  <bpmn:process id="ca_child" isExecutable="true">
+    <bpmn:startEvent id="c_start"/>
+    <bpmn:sequenceFlow id="c_f0" sourceRef="c_start" targetRef="c_work"/>
+    <bpmn:serviceTask id="c_work"><bpmn:extensionElements><zeebe:taskDefinition type="ca-child-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="c_f1" sourceRef="c_work" targetRef="c_end"/>
+    <bpmn:endEvent id="c_end"/>
+  </bpmn:process>
+
+  <!-- Default propagation: parent variables in, all child variables out. -->
+  <bpmn:process id="ca_parent_all" isExecutable="true">
+    <bpmn:startEvent id="a_start"/>
+    <bpmn:sequenceFlow id="a_f0" sourceRef="a_start" targetRef="a_call"/>
+    <bpmn:callActivity id="a_call"><bpmn:extensionElements><zeebe:calledElement processId="ca_child" propagateAllChildVariables="true"/></bpmn:extensionElements></bpmn:callActivity>
+    <bpmn:sequenceFlow id="a_f1" sourceRef="a_call" targetRef="a_after"/>
+    <bpmn:serviceTask id="a_after"><bpmn:extensionElements><zeebe:taskDefinition type="ca-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="a_f2" sourceRef="a_after" targetRef="a_end"/>
+    <bpmn:endEvent id="a_end"/>
+  </bpmn:process>
+
+  <!-- No propagation: only the mappings cross. -->
+  <bpmn:process id="ca_parent_mapped" isExecutable="true">
+    <bpmn:startEvent id="m_start"/>
+    <bpmn:sequenceFlow id="m_f0" sourceRef="m_start" targetRef="m_call"/>
+    <bpmn:callActivity id="m_call">
+      <bpmn:extensionElements>
+        <zeebe:calledElement processId="ca_child" propagateAllChildVariables="false" propagateAllParentVariables="false"/>
+        <zeebe:ioMapping>
+          <zeebe:input source="=amount" target="given"/>
+          <zeebe:output source="=childResult" target="mapped"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="m_f1" sourceRef="m_call" targetRef="m_after"/>
+    <bpmn:serviceTask id="m_after"><bpmn:extensionElements><zeebe:taskDefinition type="ca-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="m_f2" sourceRef="m_after" targetRef="m_end"/>
+    <bpmn:endEvent id="m_end"/>
+  </bpmn:process>
+
+  <!-- An error thrown in the child, caught on the call activity. -->
+  <bpmn:process id="ca_parent_error" isExecutable="true">
+    <bpmn:startEvent id="e_start"/>
+    <bpmn:sequenceFlow id="e_f0" sourceRef="e_start" targetRef="e_call"/>
+    <bpmn:callActivity id="e_call"><bpmn:extensionElements><zeebe:calledElement processId="ca_child" propagateAllChildVariables="true"/></bpmn:extensionElements></bpmn:callActivity>
+    <bpmn:boundaryEvent id="e_catch" attachedToRef="e_call"><bpmn:errorEventDefinition errorRef="Err_child"/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="e_f1" sourceRef="e_call" targetRef="e_end"/>
+    <bpmn:sequenceFlow id="e_f2" sourceRef="e_catch" targetRef="e_on_error"/>
+    <bpmn:serviceTask id="e_on_error"><bpmn:extensionElements><zeebe:taskDefinition type="ca-on-error"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="e_f3" sourceRef="e_on_error" targetRef="e_end2"/>
+    <bpmn:endEvent id="e_end"/>
+    <bpmn:endEvent id="e_end2"/>
+  </bpmn:process>
+</bpmn:definitions>

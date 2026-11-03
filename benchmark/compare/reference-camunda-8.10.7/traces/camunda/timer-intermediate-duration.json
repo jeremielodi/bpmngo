@@ -1,0 +1,36 @@
+{
+  "scenario": "timer-intermediate-duration",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "tm-after",
+        "elementId": "td_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {},
+    "instances": [
+      {
+        "process": "tm_duration",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3963,
+    "errors": [],
+    "restNotes": []
+  }
+}

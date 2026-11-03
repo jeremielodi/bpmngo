@@ -1,0 +1,38 @@
+{
+  "scenario": "signal-start-event",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "sig-work",
+        "elementId": "ss_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "reason": "signal"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "no result requested",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "sig_start",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2966,
+    "errors": [],
+    "restNotes": []
+  }
+}

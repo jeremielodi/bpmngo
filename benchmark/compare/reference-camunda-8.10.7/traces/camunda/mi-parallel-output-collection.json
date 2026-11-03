@@ -1,0 +1,130 @@
+{
+  "scenario": "mi-parallel-output-collection",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "mi-each",
+        "elementId": "p_each",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 3,
+          "result": null,
+          "loopCounter": 1,
+          "results": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            3,
+            1,
+            2
+          ]
+        },
+        "answer": "after 1200 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-each",
+        "elementId": "p_each",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 1,
+          "result": null,
+          "loopCounter": 2,
+          "results": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            3,
+            1,
+            2
+          ]
+        },
+        "answer": "after 400 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-each",
+        "elementId": "p_each",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 2,
+          "result": null,
+          "loopCounter": 3,
+          "results": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            3,
+            1,
+            2
+          ]
+        },
+        "answer": "after 800 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-after",
+        "elementId": "p_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "items": [
+            3,
+            1,
+            2
+          ],
+          "results": [
+            30,
+            10,
+            20
+          ]
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "items": [
+        3,
+        1,
+        2
+      ],
+      "results": [
+        30,
+        10,
+        20
+      ]
+    },
+    "instances": [
+      {
+        "process": "mi_parallel",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 4622,
+    "errors": [],
+    "restNotes": []
+  }
+}

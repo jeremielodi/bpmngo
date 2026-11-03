@@ -1,0 +1,39 @@
+{
+  "scenario": "feel-strings",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "len": 5,
+      "sub": "lic",
+      "code": "AB-123",
+      "name": "Alice",
+      "parts": [
+        "a",
+        "b",
+        "c"
+      ],
+      "upper": "ALICE",
+      "codeOk": true,
+      "joined": "Alice #42",
+      "numText": "12.50"
+    },
+    "instances": [
+      {
+        "process": "feel_strings",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2533,
+    "errors": [],
+    "restNotes": []
+  }
+}

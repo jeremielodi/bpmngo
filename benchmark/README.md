@@ -1,14 +1,32 @@
-# Camunda 8.10.7 vs BpmnGo 1.0.1 benchmark
+# BpmnGo ⇄ Camunda 8.10.7 benchmarks
 
-This directory contains the reproducible harness and raw evidence for the
-comparison requested in `PROMPT-AUTRE-IA.md`.
+Two tools, both driving the engines only through the public Zeebe gRPC
+protocol and the Camunda 8 REST `/v2` API, as a Camunda 8 application does:
 
-The benchmark uses only the public Zeebe gRPC protocol and Camunda 8 REST
-`/v2` endpoints.  Compose overrides assign both engines CPUs `0-1` and a
-combined memory limit of 2 GiB.
+| What | Tool | Where |
+|---|---|---|
+| **Behaviour** (62 scenarios: gateways, events, jobs, messages, timers, multi-instance, FEEL, API checks), with a per-section diff against Camunda | Node/TypeScript | [`compare/`](compare/README.md): `npm run compare` |
+| **Load** (closed-loop clients with the SDKs' back-off, fixed-rate "highest sustained rate", repeats with mean ± standard deviation, CPU per instance) | Node/TypeScript | [`compare/`](compare/README.md): `npm run load` |
+| **Latency per call** and **endurance** with PostgreSQL internals (`pg_stat_statements`, WAL, I/O, bloat) | Go | `cmd/bench` (`-mode latency` / `-mode load`), `scripts/run-endurance.sh` |
 
-Generated measurements are written below `raw/<run-id>/`; the final report is
-`REPORT.md`.
+`compare/` replaced the Go behaviour suite (47 scenarios) on 2026-11-03: it
+covers more, reports what differs rather than a count, and found the
+join and multi-instance defects the Go suite missed. Camunda 8.10.7's traces
+of its suite are in `compare/reference-camunda-8.10.7/`, so BpmnGo can be
+checked without running Camunda.
+
+Camunda 8.10.7 itself runs from `camunda-8.10.7/` (create its `.env`:
+`CAMUNDA_VERSION=8.10.7`, `CAMUNDA_CONNECTORS_VERSION=8.10.2`).
+
+**Same capacity for both engines**: two *physical* cores and 2 GiB each.
+`compare/limits/` takes the cores from `BENCH_CAMUNDA_CPUS` /
+`BENCH_BPMNGO_CPUS`. The older overrides here (`bpmngo.override.yaml`,
+`camunda-8.10.7/docker-compose.override.yaml`) pin CPUs `0-1`: on a
+hyperthreaded machine that is one physical core, shared with the host's
+interrupts. Check the topology first:
+`docker run --rm alpine cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list`.
+
+## Reports (history)
 
 The completed report is [`REPORT.md`](REPORT.md), with consolidated measurements
 in [`raw/summary.json`](raw/summary.json). The Go harness is in `cmd/bench` and

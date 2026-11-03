@@ -1,0 +1,63 @@
+{
+  "scenario": "msg-correlation-key",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "msg-prep",
+        "elementId": "c_prep",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "orderId": "A1"
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "msg-after",
+        "elementId": "c_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "paidBy": "card",
+          "orderId": "A1"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after job msg-prep: publish msg-paid key=OTHER",
+        "result": "ok"
+      },
+      {
+        "action": "after job msg-prep: publish msg-paid key=A1",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "paidBy": "card",
+      "orderId": "A1"
+    },
+    "instances": [
+      {
+        "process": "msg_catch",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 6122,
+    "errors": [],
+    "restNotes": []
+  }
+}

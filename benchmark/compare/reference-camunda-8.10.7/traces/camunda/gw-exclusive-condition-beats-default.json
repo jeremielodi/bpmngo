@@ -1,0 +1,40 @@
+{
+  "scenario": "gw-exclusive-condition-beats-default",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "gw-big",
+        "elementId": "x_big",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "amount": 500
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "amount": 500
+    },
+    "instances": [
+      {
+        "process": "gw_exclusive",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2622,
+    "errors": [],
+    "restNotes": []
+  }
+}

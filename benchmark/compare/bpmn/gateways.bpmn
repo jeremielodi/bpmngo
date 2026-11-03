@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gateways. Every task is a service task so the bench sees each step as a job. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="gateways" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- Exclusive gateway with a default flow, listed FIRST on purpose, and
+       two conditions that can both be true (amount > 100 and > 1000). -->
+  <bpmn:process id="gw_exclusive" isExecutable="true">
+    <bpmn:startEvent id="x_start"/>
+    <bpmn:sequenceFlow id="x_f0" sourceRef="x_start" targetRef="x_gw"/>
+    <bpmn:exclusiveGateway id="x_gw" default="x_to_small"/>
+    <bpmn:sequenceFlow id="x_to_small" sourceRef="x_gw" targetRef="x_small"/>
+    <bpmn:sequenceFlow id="x_to_big" sourceRef="x_gw" targetRef="x_big">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=amount &gt; 100</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="x_to_huge" sourceRef="x_gw" targetRef="x_huge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=amount &gt; 1000</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="x_small"><bpmn:extensionElements><zeebe:taskDefinition type="gw-small"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="x_big"><bpmn:extensionElements><zeebe:taskDefinition type="gw-big"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="x_huge"><bpmn:extensionElements><zeebe:taskDefinition type="gw-huge"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="x_f1" sourceRef="x_small" targetRef="x_end"/>
+    <bpmn:sequenceFlow id="x_f2" sourceRef="x_big" targetRef="x_end"/>
+    <bpmn:sequenceFlow id="x_f3" sourceRef="x_huge" targetRef="x_end"/>
+    <bpmn:endEvent id="x_end"/>
+  </bpmn:process>
+
+  <!-- Exclusive gateway without default: nothing true is an incident. -->
+  <bpmn:process id="gw_exclusive_nodefault" isExecutable="true">
+    <bpmn:startEvent id="n_start"/>
+    <bpmn:sequenceFlow id="n_f0" sourceRef="n_start" targetRef="n_gw"/>
+    <bpmn:exclusiveGateway id="n_gw"/>
+    <bpmn:sequenceFlow id="n_to_big" sourceRef="n_gw" targetRef="n_big">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=amount &gt; 100</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="n_to_small" sourceRef="n_gw" targetRef="n_small">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=amount &lt; 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="n_big"><bpmn:extensionElements><zeebe:taskDefinition type="gw-big"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="n_small"><bpmn:extensionElements><zeebe:taskDefinition type="gw-small"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="n_f1" sourceRef="n_big" targetRef="n_end"/>
+    <bpmn:sequenceFlow id="n_f2" sourceRef="n_small" targetRef="n_end"/>
+    <bpmn:endEvent id="n_end"/>
+  </bpmn:process>
+
+  <!-- A condition on a variable that was never set, with a default flow. -->
+  <bpmn:process id="gw_exclusive_null" isExecutable="true">
+    <bpmn:startEvent id="z_start"/>
+    <bpmn:sequenceFlow id="z_f0" sourceRef="z_start" targetRef="z_gw"/>
+    <bpmn:exclusiveGateway id="z_gw" default="z_to_small"/>
+    <bpmn:sequenceFlow id="z_to_big" sourceRef="z_gw" targetRef="z_big">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=missing &gt; 5</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="z_to_small" sourceRef="z_gw" targetRef="z_small"/>
+    <bpmn:serviceTask id="z_big"><bpmn:extensionElements><zeebe:taskDefinition type="gw-big"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="z_small"><bpmn:extensionElements><zeebe:taskDefinition type="gw-small"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="z_f1" sourceRef="z_big" targetRef="z_end"/>
+    <bpmn:sequenceFlow id="z_f2" sourceRef="z_small" targetRef="z_end"/>
+    <bpmn:endEvent id="z_end"/>
+  </bpmn:process>
+
+  <!-- Inclusive gateway with a default flow (listed first) and a join. -->
+  <bpmn:process id="gw_inclusive" isExecutable="true">
+    <bpmn:startEvent id="i_start"/>
+    <bpmn:sequenceFlow id="i_f0" sourceRef="i_start" targetRef="i_fork"/>
+    <bpmn:inclusiveGateway id="i_fork" default="i_to_none"/>
+    <bpmn:sequenceFlow id="i_to_none" sourceRef="i_fork" targetRef="i_none"/>
+    <bpmn:sequenceFlow id="i_to_a" sourceRef="i_fork" targetRef="i_a">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=wantA</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="i_to_b" sourceRef="i_fork" targetRef="i_b">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=wantB</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="i_none"><bpmn:extensionElements><zeebe:taskDefinition type="gw-none"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="i_a"><bpmn:extensionElements><zeebe:taskDefinition type="gw-a"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="i_b"><bpmn:extensionElements><zeebe:taskDefinition type="gw-b"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="i_f1" sourceRef="i_none" targetRef="i_join"/>
+    <bpmn:sequenceFlow id="i_f2" sourceRef="i_a" targetRef="i_join"/>
+    <bpmn:sequenceFlow id="i_f3" sourceRef="i_b" targetRef="i_join"/>
+    <bpmn:inclusiveGateway id="i_join"/>
+    <bpmn:sequenceFlow id="i_f4" sourceRef="i_join" targetRef="i_after"/>
+    <bpmn:serviceTask id="i_after"><bpmn:extensionElements><zeebe:taskDefinition type="gw-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="i_f5" sourceRef="i_after" targetRef="i_end"/>
+    <bpmn:endEvent id="i_end"/>
+  </bpmn:process>
+
+  <!-- Inclusive gateway without default: nothing true is an incident. -->
+  <bpmn:process id="gw_inclusive_nodefault" isExecutable="true">
+    <bpmn:startEvent id="j_start"/>
+    <bpmn:sequenceFlow id="j_f0" sourceRef="j_start" targetRef="j_fork"/>
+    <bpmn:inclusiveGateway id="j_fork"/>
+    <bpmn:sequenceFlow id="j_to_a" sourceRef="j_fork" targetRef="j_a">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=wantA</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="j_to_b" sourceRef="j_fork" targetRef="j_b">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=wantB</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="j_a"><bpmn:extensionElements><zeebe:taskDefinition type="gw-a"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="j_b"><bpmn:extensionElements><zeebe:taskDefinition type="gw-b"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="j_f1" sourceRef="j_a" targetRef="j_join"/>
+    <bpmn:sequenceFlow id="j_f2" sourceRef="j_b" targetRef="j_join"/>
+    <bpmn:inclusiveGateway id="j_join"/>
+    <bpmn:sequenceFlow id="j_f3" sourceRef="j_join" targetRef="j_end"/>
+    <bpmn:endEvent id="j_end"/>
+  </bpmn:process>
+
+  <!-- Parallel fork/join: each branch sets its own variable; the task after
+       the join sees all of them. -->
+  <bpmn:process id="gw_parallel" isExecutable="true">
+    <bpmn:startEvent id="p_start"/>
+    <bpmn:sequenceFlow id="p_f0" sourceRef="p_start" targetRef="p_fork"/>
+    <bpmn:parallelGateway id="p_fork"/>
+    <bpmn:sequenceFlow id="p_f1" sourceRef="p_fork" targetRef="p_a"/>
+    <bpmn:sequenceFlow id="p_f2" sourceRef="p_fork" targetRef="p_b"/>
+    <bpmn:sequenceFlow id="p_f3" sourceRef="p_fork" targetRef="p_c"/>
+    <bpmn:serviceTask id="p_a"><bpmn:extensionElements><zeebe:taskDefinition type="gw-a"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="p_b"><bpmn:extensionElements><zeebe:taskDefinition type="gw-b"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="p_c"><bpmn:extensionElements><zeebe:taskDefinition type="gw-c"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="p_f4" sourceRef="p_a" targetRef="p_join"/>
+    <bpmn:sequenceFlow id="p_f5" sourceRef="p_b" targetRef="p_join"/>
+    <bpmn:sequenceFlow id="p_f6" sourceRef="p_c" targetRef="p_join"/>
+    <bpmn:parallelGateway id="p_join"/>
+    <bpmn:sequenceFlow id="p_f7" sourceRef="p_join" targetRef="p_after"/>
+    <bpmn:serviceTask id="p_after"><bpmn:extensionElements><zeebe:taskDefinition type="gw-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="p_f8" sourceRef="p_after" targetRef="p_end"/>
+    <bpmn:endEvent id="p_end"/>
+  </bpmn:process>
+</bpmn:definitions>
