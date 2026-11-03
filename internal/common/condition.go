@@ -5,7 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
+	"os"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 
@@ -368,14 +372,15 @@ func ResolveNext(node *engine.Node, variables map[string]interface{}) (string, e
 		return normalFlows[0].TargetRef, nil
 	}
 
-	// For ExclusiveGateway, as in BPMN 2.0 (and Camunda 7 and 8): the first
-	// flow, in document order, whose condition is true (a flow without a
-	// condition counts as true); the default flow only when none is.
+	// For ExclusiveGateway: the flow whose condition is true (a flow without
+	// a condition counts as true); the default flow only when none is. When
+	// several are true, ExclusiveGatewayOrder decides which.
 	if node.Type == engine.ExclusiveGatewayType {
 		var defaultFlow *engine.Flow
-		for i, flow := range node.Outgoing {
+		flows := exclusiveEvaluationOrder(node.Outgoing)
+		for i, flow := range flows {
 			if flow.ID == node.DefaultFlow {
-				defaultFlow = &node.Outgoing[i]
+				defaultFlow = &flows[i]
 				continue
 			}
 			condition := strings.TrimSpace(flow.Condition)
@@ -410,6 +415,46 @@ func ResolveNext(node *engine.Node, variables map[string]interface{}) (string, e
 		return "", fmt.Errorf("node %s of type %s has multiple outgoing flows (%d), expected 1", node.ID, node.Type, len(node.Outgoing))
 	}
 	return node.Outgoing[0].TargetRef, nil
+}
+
+// EXCLUSIVE_GATEWAY_ORDER picks the flow an exclusive gateway takes when
+// several conditions are true:
+//   - camunda (default): the last one, in the order of the sequenceFlow
+//     elements in the BPMN file, whatever the gateway's <outgoing> list
+//     says. That is what Camunda 8.10.7 does
+//     (benchmark/experiments/exclusive-order.ts), although its documentation says
+//     "the first".
+//   - bpmn: the first one, in the gateway's <outgoing> order when the model
+//     lists it, else in file order, as BPMN 2.0 specifies.
+var exclusiveLastTrue = sync.OnceValue(func() bool {
+	switch mode := strings.ToLower(strings.TrimSpace(os.Getenv("EXCLUSIVE_GATEWAY_ORDER"))); mode {
+	case "", "camunda":
+		return true
+	case "bpmn":
+		return false
+	default:
+		log.Printf("⚠️ unknown EXCLUSIVE_GATEWAY_ORDER %q — using \"camunda\"", mode)
+		return true
+	}
+})
+
+// exclusiveEvaluationOrder returns the flows in the order their conditions
+// are tried: the first true one is taken.
+func exclusiveEvaluationOrder(outgoing []engine.Flow) []engine.Flow {
+	if !exclusiveLastTrue() || len(outgoing) < 2 {
+		return outgoing
+	}
+	flows := slices.Clone(outgoing)
+	recorded := true
+	for _, f := range flows {
+		recorded = recorded && f.DocOrder > 0
+	}
+	if recorded {
+		sort.SliceStable(flows, func(i, j int) bool { return flows[i].DocOrder > flows[j].DocOrder })
+	} else {
+		slices.Reverse(flows) // graph stored before DocOrder: its order, from the end
+	}
+	return flows
 }
 
 // ResolveExpression resolves expression strings like ${variableName}

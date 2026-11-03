@@ -192,6 +192,7 @@ services:
       # Expressions FEEL (préfixe "=") : shadow (défaut : CEL utilisé, écarts
       # avec le moteur FEEL natif journalisés), feel (moteur natif), cel
       FEEL_MODE: ${FEEL_MODE:-shadow}
+      EXCLUSIVE_GATEWAY_ORDER: ${EXCLUSIVE_GATEWAY_ORDER:-camunda}
 
       # Clés dans les réponses /v2 : int par défaut (la clé int64 du gRPC,
       # comme Camunda 8) ; uuid conserve l'ancien format BpmnGo.

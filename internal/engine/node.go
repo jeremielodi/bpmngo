@@ -85,6 +85,10 @@ type Flow struct {
 	TargetRef  string
 	Condition  string
 	IsBoundary bool // true for flows generated from boundary event attachments
+	// DocOrder is the flow's position (1-based) among its process's
+	// sequenceFlow elements in the BPMN file; 0 in graphs stored before it
+	// was recorded (BackfillFlowDocOrder fills them in).
+	DocOrder int `json:"docOrder,omitempty"`
 }
 
 type Node struct {

@@ -415,6 +415,11 @@ func main() {
 	} else if n > 0 {
 		log.Printf("✅ Gateway default flows added to %d stored process graphs", n)
 	}
+	if n, err := service.BackfillFlowDocOrder(db); err != nil {
+		log.Println("⚠️ sequence-flow order backfill:", err)
+	} else if n > 0 {
+		log.Printf("✅ Sequence-flow file order added to %d stored process graphs", n)
+	}
 
 	retentionCfg, err := retention.ConfigFromEnv(util.DotEnvVariable)
 	if err != nil {

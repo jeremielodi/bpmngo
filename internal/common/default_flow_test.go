@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,40 +44,107 @@ func TestExclusiveGateway_DefaultFlow(t *testing.T) {
 	}
 }
 
-// Two conditions true: the first in document order wins (BPMN 2.0,
-// Camunda 7 and 8), no incident. No condition true and no default: error.
-func TestExclusiveGateway_FirstTrueWins(t *testing.T) {
+// withExclusiveOrder runs f with EXCLUSIVE_GATEWAY_ORDER set to camunda
+// (lastTrue) or bpmn.
+func withExclusiveOrder(t *testing.T, lastTrue bool, f func()) {
+	t.Helper()
+	saved := exclusiveLastTrue
+	exclusiveLastTrue = func() bool { return lastTrue }
+	defer func() { exclusiveLastTrue = saved }()
+	f()
+}
+
+// Two conditions true. camunda (default): the last sequenceFlow of the
+// file, as Camunda 8.10.7 does; bpmn: the first, as BPMN 2.0 specifies.
+// No condition true and no default: an error, in both.
+func TestExclusiveGateway_TwoConditionsTrue(t *testing.T) {
 	g, err := engine.BuildGraphForProcess([]byte(firstTrueXML), "p")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := []struct {
-		amount  float64
-		want    string
-		wantErr bool
-	}{
-		{5000, "big", false}, // both > 100 and > 1000 are true: first wins
-		{500, "big", false},  // only > 100
-		{50, "", true},       // none, and no default
-	}
-	for _, c := range cases {
-		got, err := ResolveNext(g.Nodes["gw"], map[string]interface{}{"amount": c.amount})
-		if (err != nil) != c.wantErr || got != c.want {
-			t.Errorf("amount=%v: got %q, %v; want %q (error %v)", c.amount, got, err, c.want, c.wantErr)
-		}
+	for _, mode := range []struct {
+		name     string
+		lastTrue bool
+		both     string
+	}{{"camunda", true, "huge"}, {"bpmn", false, "big"}} {
+		withExclusiveOrder(t, mode.lastTrue, func() {
+			cases := []struct {
+				amount  float64
+				want    string
+				wantErr bool
+			}{
+				{5000, mode.both, false}, // both > 100 and > 1000 are true
+				{500, "big", false},      // only > 100
+				{50, "", true},           // none, and no default
+			}
+			for _, c := range cases {
+				got, err := ResolveNext(g.Nodes["gw"], map[string]interface{}{"amount": c.amount})
+				if (err != nil) != c.wantErr || got != c.want {
+					t.Errorf("%s, amount=%v: got %q, %v; want %q (error %v)", mode.name, c.amount, got, err, c.want, c.wantErr)
+				}
+			}
+		})
 	}
 }
 
-func TestExclusiveGateway_ExplicitOutgoingOrderWins(t *testing.T) {
+// The gateway lists its <outgoing> flows: bpmn follows that list; camunda
+// ignores it and takes the last true flow of the file (Camunda 8.10.7 took
+// A with <outgoing> A,B,C and flows written C,B,A).
+func TestExclusiveGateway_ExplicitOutgoingOrder(t *testing.T) {
 	g, err := engine.BuildGraphForProcess([]byte(explicitOutgoingOrderXML), "p")
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := ResolveNext(g.Nodes["gw"], map[string]interface{}{"amount": 5000.0})
-	if err != nil || got != "huge" {
-		t.Fatalf("got %q, %v; want explicit first outgoing target %q", got, err, "huge")
+	vars := map[string]interface{}{"amount": 5000.0}
+	withExclusiveOrder(t, false, func() {
+		if got, err := ResolveNext(g.Nodes["gw"], vars); err != nil || got != "huge" {
+			t.Errorf("bpmn: got %q, %v; want the first <outgoing> target %q", got, err, "huge")
+		}
+	})
+	g2, err := engine.BuildGraphForProcess([]byte(outgoingAgainstFileOrderXML), "p")
+	if err != nil {
+		t.Fatal(err)
 	}
+	withExclusiveOrder(t, true, func() {
+		if got, err := ResolveNext(g2.Nodes["gw"], vars); err != nil || got != "big" {
+			t.Errorf("camunda: got %q, %v; want the last flow of the file %q", got, err, "big")
+		}
+	})
+	withExclusiveOrder(t, false, func() {
+		if got, err := ResolveNext(g2.Nodes["gw"], vars); err != nil || got != "huge" {
+			t.Errorf("bpmn: got %q, %v; want the first <outgoing> target %q", got, err, "huge")
+		}
+	})
 }
+
+// A graph stored before DocOrder was recorded: camunda falls back to its
+// stored order, from the end.
+func TestExclusiveGateway_GraphWithoutDocOrder(t *testing.T) {
+	g, err := engine.BuildGraphForProcess([]byte(firstTrueXML), "p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gw := *g.Nodes["gw"]
+	gw.Outgoing = slices.Clone(gw.Outgoing)
+	for i := range gw.Outgoing {
+		gw.Outgoing[i].DocOrder = 0
+	}
+	withExclusiveOrder(t, true, func() {
+		if got, err := ResolveNext(&gw, map[string]interface{}{"amount": 5000.0}); err != nil || got != "huge" {
+			t.Errorf("got %q, %v; want %q", got, err, "huge")
+		}
+	})
+}
+
+// outgoing: huge then big; file: huge's flow then big's.
+const outgoingAgainstFileOrderXML = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="d">
+  <bpmn:process id="p" isExecutable="true">
+    <bpmn:startEvent id="s"/><bpmn:sequenceFlow id="f0" sourceRef="s" targetRef="gw"/>
+    <bpmn:exclusiveGateway id="gw"><bpmn:outgoing>fHuge</bpmn:outgoing><bpmn:outgoing>fBig</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="fHuge" sourceRef="gw" targetRef="huge"><bpmn:conditionExpression>= amount &gt; 1000</bpmn:conditionExpression></bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="fBig" sourceRef="gw" targetRef="big"><bpmn:conditionExpression>= amount &gt; 100</bpmn:conditionExpression></bpmn:sequenceFlow>
+    <bpmn:userTask id="big"/><bpmn:userTask id="huge"/>
+  </bpmn:process></bpmn:definitions>`
 
 const explicitOutgoingOrderXML = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="d">
   <bpmn:process id="p" isExecutable="true">

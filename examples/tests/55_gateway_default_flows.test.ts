@@ -11,7 +11,10 @@
  *   A) Exclusive: no condition true -> the default flow.
  *   B) Exclusive: a condition true -> that flow, not the default, no incident
  *      (the default is listed first in the model on purpose).
- *   C) Exclusive: two conditions true -> the first in document order
+ *   C) Exclusive: two conditions true -> as Camunda 8, the last true flow of
+ *      the file (EXCLUSIVE_GATEWAY_ORDER=camunda, the default); with
+ *      EXCLUSIVE_GATEWAY_ORDER=bpmn on the server and for this suite, the
+ *      first, as BPMN 2.0 says
  *      (BPMN 2.0, Camunda 7 and 8).
  *   D) Inclusive: no branch true -> the default flow alone.
  *   E) Inclusive: one or two branches true -> those only, never the default;
@@ -91,10 +94,11 @@ async function main() {
         },
       },
       {
-        name: '[C] Exclusive: two true conditions take the first in document order',
+        name: '[C] Exclusive: two true conditions take the flow EXCLUSIVE_GATEWAY_ORDER says',
         async fn() {
+          const standard = (process.env.EXCLUSIVE_GATEWAY_ORDER ?? '').toLowerCase() === 'bpmn';
           const id = await start('ExclusiveDefault55', { amount: 5000 });
-          await expectOpenTasks(id, ['x_big']);
+          await expectOpenTasks(id, [standard ? 'x_big' : 'x_huge']);
           await finish(id);
         },
       },

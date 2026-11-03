@@ -69,6 +69,11 @@ SUPER_USER_PASSWORD=admin123
 # FEEL-to-CEL path decides, native FEEL runs alongside and mismatches are
 # logged), feel (native interpreter decides), cel (legacy only)
 # FEEL_MODE=shadow
+# Exclusive gateway with several conditions true: camunda (default) takes the
+# last true flow in the order of the sequenceFlow elements of the file, as
+# Camunda 8 does; bpmn takes the first, in the gateway's <outgoing> order
+# (else file order), as the BPMN 2.0 standard says.
+# EXCLUSIVE_GATEWAY_ORDER=camunda
 
 # Keys in /v2 (Camunda 8 API) answers: int by default (the gRPC gateway's
 # int64 key, as a string as Camunda 8 does) or uuid for the legacy BpmnGo

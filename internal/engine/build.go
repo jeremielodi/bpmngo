@@ -537,7 +537,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 	}
 
 	// ---- Add incoming/outgoing edges from Sequence Flows ----
-	for _, f := range process.SequenceFlows {
+	for i, f := range process.SequenceFlows {
 		source, ok := nodeMap[f.SourceRef]
 		if !ok {
 			return nil, fmt.Errorf("source node %s not found for flow %s", f.SourceRef, f.ID)
@@ -551,6 +551,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 			SourceRef: f.SourceRef,
 			TargetRef: f.TargetRef,
 			Condition: f.Condition,
+			DocOrder:  i + 1,
 		}
 		source.Outgoing = append(source.Outgoing, flow)
 		target.Incoming = append(target.Incoming, f.SourceRef)
