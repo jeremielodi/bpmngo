@@ -198,7 +198,7 @@ func main() {
 		}()
 	}
 	// Session-level work (advisory locks held across transactions) reaches
-	// Postgres directly, bypassing PgBouncer when there is one (DB_DIRECT_HOST).
+	// Postgres directly, bypassing PgBouncer when there is one (POSTGRES_DIRECT_HOST).
 	directDB, err := database.NewDirectPostgres(util)
 	if err != nil {
 		log.Fatalln("Postgres (direct): ", err)
@@ -218,7 +218,7 @@ func main() {
 		}
 		log.Printf("✅ Engine node %d (claimed; set ENGINE_NODE_ID to fix it)", node)
 	}
-	// History and analytics read a replica when DB_READ_HOST
+	// History and analytics read a replica when POSTGRES_READ_HOST
 	// is set (read-only, a few milliseconds behind), the primary otherwise.
 	readDB := db
 	if replica, err := database.NewReadPostgres(util); err != nil {
@@ -245,11 +245,11 @@ func main() {
 		if err := citus.EnsureDistributedTables(db); err != nil {
 			log.Fatalln("citus: failed to ensure distributed tables: ", err)
 		}
-		coordinatorPort, _ := strconv.Atoi(util.DotEnvVariable("DB_PORT"))
+		coordinatorPort, _ := strconv.Atoi(database.Env(util)("POSTGRES_PORT"))
 		if coordinatorPort == 0 {
 			coordinatorPort = 5432
 		}
-		if err := citus.EnsureLocalTablesInMetadata(db, util.DotEnvVariable("DB_HOST"), coordinatorPort); err != nil {
+		if err := citus.EnsureLocalTablesInMetadata(db, database.Env(util)("POSTGRES_HOST"), coordinatorPort); err != nil {
 			log.Fatalln("citus: failed to add the local tables to the metadata: ", err)
 		}
 		repository.SetDistributedClaims(true)

@@ -84,7 +84,7 @@ Phase 2 below for what it actually took).
   `postgres` service. The base file's `postgres` service does still start
   alongside Citus under the override (Compose merges services additively;
   cleanly excluding it would need version-dependent profile/depends_on
-  tricks) — harmless, just unused once `bpmngo`'s `DB_HOST` points at
+  tricks) — harmless, just unused once `bpmngo`'s `POSTGRES_HOST` points at
   `citus-coordinator` instead.
 - **`database/00_citus_extension.sql`** — a new file in the existing
   `database/` folder, guarded by
@@ -101,7 +101,7 @@ Phase 2 below for what it actually took).
   checks the `citus_tables` view before `create_reference_table`), safe to
   run on every boot/restart, fails fast with a clear error if
   `CITUS_ENABLED=true` but the citus extension isn't actually active
-  (e.g. `DB_HOST` still points at a plain Postgres). Converts exactly the
+  (e.g. `POSTGRES_HOST` still points at a plain Postgres). Converts exactly the
   11 reference-table candidates listed above — nothing else.
 - **`main.go`** — wired right after `database.NewPostgres(util)` (the
   earliest point the DB handle exists), gated on `CITUS_ENABLED` — unset

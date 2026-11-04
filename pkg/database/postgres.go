@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // the "pgx" driver
@@ -25,8 +25,8 @@ type PoolConfig struct {
 // Default pool configuration for production. MaxOpenConns must stay well
 // below Postgres's max_connections, multiplied by the number of BpmnGo
 // instances: past it Postgres refuses new connections ("too many clients
-// already") and requests fail. Override with DB_MAX_OPEN_CONNS and
-// DB_MAX_IDLE_CONNS.
+// already") and requests fail. Override with POSTGRES_MAX_OPEN_CONNS and
+// POSTGRES_MAX_IDLE_CONNS.
 var DefaultPoolConfig = PoolConfig{
 	MaxOpenConns:    80,               // Maximum number of open connections
 	MaxIdleConns:    40,               // Maximum number of idle connections
@@ -52,13 +52,13 @@ var HighPerfPoolConfig = PoolConfig{
 
 // NewPostgres creates a new PostgreSQL connection with connection pooling
 func NewPostgres(util common.Util) (*sqlx.DB, error) {
-	env := util.DotEnvVariable
+	env := Env(util)
 
-	DB_HOST := env("DB_HOST")
-	DB_NAME := env("DB_NAME")
-	DB_USER := env("DB_USER")
-	DB_PASSWORD := env("DB_PASS")
-	DB_PORT := env("DB_PORT")
+	host := env("POSTGRES_HOST")
+	dbname := env("POSTGRES_DB")
+	user := env("POSTGRES_USER")
+	password := env("POSTGRES_PASSWORD")
+	port := env("POSTGRES_PORT")
 
 	// Build connection string with additional performance parameters
 	connStr := fmt.Sprintf(
@@ -66,10 +66,10 @@ func NewPostgres(util common.Util) (*sqlx.DB, error) {
 			"connect_timeout=10 "+
 			"statement_timeout=30000 "+
 			"idle_in_transaction_session_timeout=60000",
-		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
+		host, port, user, password, dbname, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions(env))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -87,21 +87,21 @@ func NewPostgres(util common.Util) (*sqlx.DB, error) {
 
 // NewPostgresWithPool creates a PostgreSQL connection with custom pool configuration
 func NewPostgresWithPool(util common.Util, config PoolConfig) (*sqlx.DB, error) {
-	env := util.DotEnvVariable
+	env := Env(util)
 
-	DB_HOST := env("DB_HOST")
-	DB_NAME := env("DB_NAME")
-	DB_USER := env("DB_USER")
-	DB_PASSWORD := env("DB_PASS")
-	DB_PORT := env("DB_PORT")
+	host := env("POSTGRES_HOST")
+	dbname := env("POSTGRES_DB")
+	user := env("POSTGRES_USER")
+	password := env("POSTGRES_PASSWORD")
+	port := env("POSTGRES_PORT")
 
 	connStr := fmt.Sprintf(
 		"host=%s port=%v user=%s password=%s dbname=%s sslmode=%s "+
 			"connect_timeout=10",
-		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
+		host, port, user, password, dbname, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions(env))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -117,20 +117,20 @@ func NewPostgresWithPool(util common.Util, config PoolConfig) (*sqlx.DB, error) 
 
 // NewPostgresDev creates a development database connection with lower resource usage
 func NewPostgresDev(util common.Util) (*sqlx.DB, error) {
-	env := util.DotEnvVariable
+	env := Env(util)
 
-	DB_HOST := env("DB_HOST")
-	DB_NAME := env("DB_NAME")
-	DB_USER := env("DB_USER")
-	DB_PASSWORD := env("DB_PASS")
-	DB_PORT := env("DB_PORT")
+	host := env("POSTGRES_HOST")
+	dbname := env("POSTGRES_DB")
+	user := env("POSTGRES_USER")
+	password := env("POSTGRES_PASSWORD")
+	port := env("POSTGRES_PORT")
 
 	connStr := fmt.Sprintf(
 		"host=%s port=%v user=%s password=%s dbname=%s sslmode=%s",
-		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
+		host, port, user, password, dbname, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions(env))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -142,23 +142,23 @@ func NewPostgresDev(util common.Util) (*sqlx.DB, error) {
 
 // NewPostgresHighPerf creates a high-performance database connection
 func NewPostgresHighPerf(util common.Util) (*sqlx.DB, error) {
-	env := util.DotEnvVariable
+	env := Env(util)
 
-	DB_HOST := env("DB_HOST")
-	DB_NAME := env("DB_NAME")
-	DB_USER := env("DB_USER")
-	DB_PASSWORD := env("DB_PASS")
-	DB_PORT := env("DB_PORT")
+	host := env("POSTGRES_HOST")
+	dbname := env("POSTGRES_DB")
+	user := env("POSTGRES_USER")
+	password := env("POSTGRES_PASSWORD")
+	port := env("POSTGRES_PORT")
 
 	connStr := fmt.Sprintf(
 		"host=%s port=%v user=%s password=%s dbname=%s sslmode=%s "+
 			"connect_timeout=5 "+
 			"statement_timeout=60000 "+
 			"pool_max_conns=100",
-		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
+		host, port, user, password, dbname, sslMode(env),
 	)
 
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions(env))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -193,17 +193,17 @@ func configureConnectionPool(db *sqlx.DB, config PoolConfig) {
 // NewPostgres2 creates a new PostgreSQL connection using Open (not Connect)
 // Deprecated: Use NewPostgres instead
 func NewPostgres2(util common.Util) (*sqlx.DB, error) {
-	env := util.DotEnvVariable
+	env := Env(util)
 
-	DB_HOST := env("DB_HOST")
-	DB_NAME := env("DB_NAME")
-	DB_USER := env("DB_USER")
-	DB_PASSWORD := env("DB_PASS")
-	DB_PORT := env("DB_PORT")
+	host := env("POSTGRES_HOST")
+	dbname := env("POSTGRES_DB")
+	user := env("POSTGRES_USER")
+	password := env("POSTGRES_PASSWORD")
+	port := env("POSTGRES_PORT")
 
 	connStr := fmt.Sprintf(
 		"host=%s port=%v user=%s password=%s dbname=%s sslmode=%s",
-		DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, sslMode(env),
+		host, port, user, password, dbname, sslMode(env),
 	)
 
 	db, err := sqlx.Open("postgres", connStr)
@@ -234,23 +234,23 @@ func ConnStringForListener(util common.Util) string {
 }
 
 // directConnString reaches Postgres itself, bypassing a connection pooler
-// such as PgBouncer: DB_DIRECT_HOST / DB_DIRECT_PORT when set, otherwise
-// DB_HOST / DB_PORT (no pooler: the same database). Session-level features
+// such as PgBouncer: POSTGRES_DIRECT_HOST / POSTGRES_DIRECT_PORT when set, otherwise
+// POSTGRES_HOST / POSTGRES_PORT (no pooler: the same database). Session-level features
 // need it — LISTEN, and advisory locks held across transactions — since a
 // pooler in transaction mode hands each transaction to any server
 // connection.
 func directConnString(util common.Util) string {
-	env := util.DotEnvVariable
-	host, port := env("DB_DIRECT_HOST"), env("DB_DIRECT_PORT")
+	env := Env(util)
+	host, port := env("POSTGRES_DIRECT_HOST"), env("POSTGRES_DIRECT_PORT")
 	if host == "" {
-		host = env("DB_HOST")
+		host = env("POSTGRES_HOST")
 	}
 	if port == "" {
-		port = env("DB_PORT")
+		port = env("POSTGRES_PORT")
 	}
 	return fmt.Sprintf(
 		"host=%s port=%v user=%s password=%s dbname=%s sslmode=%s",
-		host, port, env("DB_USER"), env("DB_PASS"), env("DB_NAME"), sslMode(env),
+		host, port, env("POSTGRES_USER"), env("POSTGRES_PASSWORD"), env("POSTGRES_DB"), sslMode(env),
 	)
 }
 
@@ -258,7 +258,7 @@ func directConnString(util common.Util) string {
 // directConnString), for session-level work: the advisory locks of the
 // archiver and the retention job.
 func NewDirectPostgres(util common.Util) (*sqlx.DB, error) {
-	db, err := sqlx.Connect(driverName, directConnString(util)+" connect_timeout=10"+pgxOptions())
+	db, err := sqlx.Connect(driverName, directConnString(util)+" connect_timeout=10"+pgxOptions(Env(util)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database directly: %w", err)
 	}
@@ -287,21 +287,21 @@ func HealthCheck(db *sqlx.DB) error {
 	return db.Ping()
 }
 
-// sslMode returns DB_SSLMODE (disable, require, verify-ca, verify-full),
+// sslMode returns POSTGRES_SSLMODE (disable, require, verify-ca, verify-full),
 // defaulting to "disable" so existing deployments keep their behavior.
 func sslMode(env func(string) string) string {
-	if mode := env("DB_SSLMODE"); mode != "" {
+	if mode := env("POSTGRES_SSLMODE"); mode != "" {
 		return mode
 	}
 	return "disable"
 }
 
-// poolConfigFromEnv applies DB_MAX_OPEN_CONNS / DB_MAX_IDLE_CONNS over base.
+// poolConfigFromEnv applies POSTGRES_MAX_OPEN_CONNS / POSTGRES_MAX_IDLE_CONNS over base.
 func poolConfigFromEnv(env func(string) string, base PoolConfig) PoolConfig {
-	if n, err := strconv.Atoi(env("DB_MAX_OPEN_CONNS")); err == nil && n > 0 {
+	if n, err := strconv.Atoi(env("POSTGRES_MAX_OPEN_CONNS")); err == nil && n > 0 {
 		base.MaxOpenConns = n
 	}
-	if n, err := strconv.Atoi(env("DB_MAX_IDLE_CONNS")); err == nil && n >= 0 {
+	if n, err := strconv.Atoi(env("POSTGRES_MAX_IDLE_CONNS")); err == nil && n >= 0 {
 		base.MaxIdleConns = n
 	}
 	if base.MaxIdleConns > base.MaxOpenConns {
@@ -310,25 +310,25 @@ func poolConfigFromEnv(env func(string) string, base PoolConfig) PoolConfig {
 	return base
 }
 
-// NewReadPostgres opens a pool on a read replica (DB_READ_HOST,
-// DB_READ_PORT; same credentials), for read-only, lag-tolerant queries —
+// NewReadPostgres opens a pool on a read replica (POSTGRES_READ_HOST,
+// POSTGRES_READ_PORT; same credentials), for read-only, lag-tolerant queries —
 // history, analytics — so they don't load the primary.
-// nil when DB_READ_HOST isn't set: those queries then read the primary.
+// nil when POSTGRES_READ_HOST isn't set: those queries then read the primary.
 func NewReadPostgres(util common.Util) (*sqlx.DB, error) {
-	env := util.DotEnvVariable
-	host := env("DB_READ_HOST")
+	env := Env(util)
+	host := env("POSTGRES_READ_HOST")
 	if host == "" {
 		return nil, nil
 	}
-	port := env("DB_READ_PORT")
+	port := env("POSTGRES_READ_PORT")
 	if port == "" {
 		port = "5432"
 	}
 	connStr := fmt.Sprintf(
 		"host=%s port=%v user=%s password=%s dbname=%s sslmode=%s connect_timeout=10 statement_timeout=60000",
-		host, port, env("DB_USER"), env("DB_PASS"), env("DB_NAME"), sslMode(env),
+		host, port, env("POSTGRES_USER"), env("POSTGRES_PASSWORD"), env("POSTGRES_DB"), sslMode(env),
 	)
-	db, err := sqlx.Connect(driverName, connStr+pgxOptions())
+	db, err := sqlx.Connect(driverName, connStr+pgxOptions(env))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the read replica: %w", err)
 	}
@@ -345,7 +345,7 @@ func NewReadPostgres(util common.Util) (*sqlx.DB, error) {
 // connection.
 const driverName = "pgx"
 
-// pgxOptions picks how pgx sends queries (DB_QUERY_EXEC_MODE).
+// pgxOptions picks how pgx sends queries (POSTGRES_QUERY_EXEC_MODE).
 //
 // The default, cache_statement, prepares each query once per connection
 // under a name and reuses its plan: Postgres neither parses nor plans it
@@ -353,12 +353,12 @@ const driverName = "pgx"
 // the execution itself, so re-planning every call (cache_describe, which
 // runs the unnamed statement) roughly doubled Postgres's CPU on the hot
 // path. PgBouncer in transaction mode keeps named statements working from
-// 1.21 on (max_prepared_statements > 0); set DB_QUERY_EXEC_MODE=
+// 1.21 on (max_prepared_statements > 0); set POSTGRES_QUERY_EXEC_MODE=
 // cache_describe behind an older pooler or one without that support.
 // After a manual schema migration, restart BpmnGo: a cached plan whose
 // result columns changed fails once.
-func pgxOptions() string {
-	switch mode := os.Getenv("DB_QUERY_EXEC_MODE"); mode {
+func pgxOptions(env func(string) string) string {
+	switch mode := env("POSTGRES_QUERY_EXEC_MODE"); mode {
 	case "cache_describe", "describe_exec", "exec", "simple_protocol":
 		return " default_query_exec_mode=" + mode
 	default:
@@ -402,4 +402,47 @@ func ClaimEngineNode(db *sqlx.DB, maxNode int64) (int64, error) {
 	}
 	conn.Close()
 	return 0, fmt.Errorf("engine node claim: all %d node numbers are taken", maxNode+1)
+}
+
+// legacyNames maps each POSTGRES_* setting to the DB_* name it had before
+// the database settings were unified with those of the postgres image
+// (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB).
+var legacyNames = map[string]string{
+	"POSTGRES_HOST":            "DB_HOST",
+	"POSTGRES_PORT":            "DB_PORT",
+	"POSTGRES_USER":            "DB_USER",
+	"POSTGRES_PASSWORD":        "DB_PASS",
+	"POSTGRES_DB":              "DB_NAME",
+	"POSTGRES_SSLMODE":         "DB_SSLMODE",
+	"POSTGRES_DIRECT_HOST":     "DB_DIRECT_HOST",
+	"POSTGRES_DIRECT_PORT":     "DB_DIRECT_PORT",
+	"POSTGRES_READ_HOST":       "DB_READ_HOST",
+	"POSTGRES_READ_PORT":       "DB_READ_PORT",
+	"POSTGRES_MAX_OPEN_CONNS":  "DB_MAX_OPEN_CONNS",
+	"POSTGRES_MAX_IDLE_CONNS":  "DB_MAX_IDLE_CONNS",
+	"POSTGRES_QUERY_EXEC_MODE": "DB_QUERY_EXEC_MODE",
+}
+
+var legacyWarned sync.Map
+
+// Env reads the database settings (POSTGRES_*). A setting still given under
+// its former DB_* name is used, with a warning, so that an existing .env
+// keeps working until it is renamed.
+func Env(util common.Util) func(string) string {
+	return func(key string) string {
+		if v := util.DotEnvVariable(key); v != "" {
+			return v
+		}
+		old, ok := legacyNames[key]
+		if !ok {
+			return ""
+		}
+		v := util.DotEnvVariable(old)
+		if v != "" {
+			if _, warned := legacyWarned.LoadOrStore(old, true); !warned {
+				log.Printf("⚠️ %s is deprecated, rename it %s", old, key)
+			}
+		}
+		return v
+	}
 }

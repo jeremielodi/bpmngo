@@ -2,14 +2,16 @@
 
 Every variable can come either from the process environment or from a `.env` file (optional — real environment variables always win, and the Docker image no longer contains a `.env`). `docker-compose.yaml` reads secrets from `.env` next to it: without `JWT_SECRET_KEY` BpmnGo starts in demo mode (see below), `POSTGRES_PASSWORD` defaults to `goflow123`.
 
+The database settings use the names of the official `postgres` image (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`): with `docker compose` the same values create the Postgres container and configure BpmnGo's connection to it, and `POSTGRES_PORT` is also the port published on the host. The former `DB_*` names (`DB_HOST`, `DB_PASS`, `DB_NAME`, …) are still read, with a deprecation warning at startup.
+
 ```bash
 # Database
-DB_HOST=postgres
-DB_PORT=5432
-DB_USER=goflow
-DB_PASS=goflow123
-DB_SSLMODE=disable   # or require / verify-ca / verify-full
-DB_NAME=goflow
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=goflow
+POSTGRES_PASSWORD=goflow123
+POSTGRES_SSLMODE=disable   # or require / verify-ca / verify-full
+POSTGRES_DB=goflow
 
 # JWT signing key. Generate with:
 #   openssl rand -base64 48
@@ -83,12 +85,12 @@ SUPER_USER_PASSWORD=admin123
 
 # Connection pool per BpmnGo instance (keep instances × this under
 # Postgres's max_connections, or put PgBouncer in front)
-# DB_MAX_OPEN_CONNS=80
+# POSTGRES_MAX_OPEN_CONNS=80
 # How queries reach Postgres. Default cache_statement: each query is prepared
 # once per connection and its plan reused (no re-planning, ~3x less Postgres
 # CPU on the engine lookups). cache_describe re-plans every call; only for a
 # pooler without prepared-statement support (PgBouncer < 1.21).
-# DB_QUERY_EXEC_MODE=cache_statement
+# POSTGRES_QUERY_EXEC_MODE=cache_statement
 # Top-level runtime admission limit; default 4 × GOMAXPROCS (minimum 4).
 # On a two-CPU container, start with 8 and tune from
 # bpmngo_runtime_admission_wait_seconds.
@@ -118,11 +120,11 @@ SUPER_USER_PASSWORD=admin123
 # TASK_EVENTS_FANOUT=true
 # with PgBouncer in front of Postgres: where session-level work (LISTEN,
 # advisory locks) reaches Postgres directly
-# DB_DIRECT_HOST=postgres
-# DB_DIRECT_PORT=5432
+# POSTGRES_DIRECT_HOST=postgres
+# POSTGRES_DIRECT_PORT=5432
 # read replica for history and analytics (unset = the primary)
-# DB_READ_HOST=postgres-replica
-# DB_READ_PORT=5432
+# POSTGRES_READ_HOST=postgres-replica
+# POSTGRES_READ_PORT=5432
 
 # High-availability cluster (deploy/ha, see Operations): passwords of the
 # Patroni nodes, the same on every node
