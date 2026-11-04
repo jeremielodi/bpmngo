@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -117,6 +118,48 @@ func archiverRetryWait(failures int) time.Duration {
 	return min(wait, archiverRetryMax)
 }
 
+// terminationReason is the reason a terminated instance was stopped with,
+// kept in its variables until archiving (nil when it has none).
+func terminationReason(ctx context.Context, db *sqlx.DB, instanceID uuid.UUID) *string {
+	var r string
+	if err := db.GetContext(ctx, &r, `SELECT COALESCE(data ->> 'terminationReason', '') FROM public.variables WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)`, instanceID); err == nil && r != "" {
+		return &r
+	}
+	return nil
+}
+
+// ArchiveFinishedInstancesOf archives right away the finished instances of a
+// process definition that the background archiver has not reached yet, so
+// the definition can be deleted (they reference it). Running instances are
+// left alone.
+func ArchiveFinishedInstancesOf(ctx context.Context, db *sqlx.DB, definitionID uuid.UUID) error {
+	var finished []struct {
+		ID     uuid.UUID `db:"id"`
+		Status string    `db:"status"`
+	}
+	if err := db.SelectContext(ctx, &finished, `
+		SELECT id, status FROM public.process_instances
+		WHERE process_definition_id = $1 AND status IN ('completed', 'terminated')
+	`, definitionID); err != nil {
+		return err
+	}
+	for _, f := range finished {
+		var reason *string
+		if f.Status == "terminated" {
+			reason = terminationReason(ctx, db, f.ID)
+		}
+		if err := ArchiveAndDeleteProcessInstance(db, f.ID, reason); err != nil {
+			// The background archiver may have archived it meanwhile.
+			var stillLive bool
+			if qerr := db.GetContext(ctx, &stillLive, `SELECT EXISTS (SELECT 1 FROM public.process_instances WHERE id = $1)`, f.ID); qerr == nil && !stillLive {
+				continue
+			}
+			return fmt.Errorf("instance %s: %w", f.ID, err)
+		}
+	}
+	return nil
+}
+
 // archivePass archives up to archiverBatch finished instances and returns
 // how many it found and how many it archived.
 func archivePass(ctx context.Context, db, lockDB *sqlx.DB) (found, archived int) {
@@ -184,10 +227,7 @@ func archivePass(ctx context.Context, db, lockDB *sqlx.DB) (found, archived int)
 		}
 		var reason *string
 		if f.Status == "terminated" {
-			var r string
-			if err := db.GetContext(ctx, &r, `SELECT COALESCE(data ->> 'terminationReason', '') FROM public.variables WHERE process_instance_key = (SELECT engine_key FROM process_instances WHERE id = $1)`, f.ID); err == nil && r != "" {
-				reason = &r
-			}
+			reason = terminationReason(ctx, db, f.ID)
 		}
 		snapshot, err := prepareArchiveSnapshot(db, f.ID, reason)
 		if err != nil {
