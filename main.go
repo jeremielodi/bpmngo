@@ -680,19 +680,19 @@ func main() {
 	// (see process_authorization_service.go) — a per-resource grant can
 	// satisfy that without the global action.
 	app.Post("/engine-rest/v2/deployments", processDefinitionCtrl.DeployBPMN)
-	app.Post("/engine-rest/v2/process-definitions/:key/start", processInstanceCtrl.StartProcess)
+	app.Post("/engine-rest/v2/process-definitions/:key/start", api.Backpressure, processInstanceCtrl.StartProcess)
 	app.Get("/engine-rest/process-definition", processDefinitionCtrl.ListDefinitions)
 	// Camunda 7 process definition endpoints (by key, by id), Camunda 7
 	// request and response shapes.
 	c7ProcessCtrl := api.NewCamunda7ProcessController(db)
 	app.Get("/engine-rest/process-definition/key/:key", c7ProcessCtrl.GetDefinition)
 	app.Get("/engine-rest/process-definition/key/:key/tenant-id/:tenant", c7ProcessCtrl.GetDefinition)
-	app.Post("/engine-rest/process-definition/key/:key/start", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/key/:key/submit-form", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/start", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/submit-form", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/:id/start", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/:id/submit-form", c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/start", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/submit-form", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/start", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/submit-form", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/:id/start", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/:id/submit-form", api.Backpressure, c7ProcessCtrl.Start)
 	app.Get("/engine-rest/process-definition/:id", processDefinitionCtrl.GetDefinition)
 
 	// Per-resource process permissions (see process_authorization_service.go) —
@@ -809,8 +809,8 @@ func main() {
 	// MESSAGE & SIGNAL ROUTES
 	// ============================================================
 
-	app.Post("/engine-rest/message", messageCtrl.CorrelateMessage)
-	app.Post("/engine-rest/signal", signalCtrl.BroadcastSignal)
+	app.Post("/engine-rest/message", api.Backpressure, messageCtrl.CorrelateMessage)
+	app.Post("/engine-rest/signal", api.Backpressure, signalCtrl.BroadcastSignal)
 
 	// ============================================================
 	// CAMUNDA 8 REST API ("/v2/...")
@@ -823,7 +823,7 @@ func main() {
 	app.Post("/v2/resources/deployments", processDefinitionCtrl.DeployBPMN)
 
 	app.Get("/v2/topology", apiv2.GetTopology)
-	app.Post("/v2/process-instances", v2ProcessInstanceCtrl.CreateProcessInstance)
+	app.Post("/v2/process-instances", api.Backpressure, v2ProcessInstanceCtrl.CreateProcessInstance)
 	app.Get("/v2/process-instances/:id", v2ProcessInstanceCtrl.GetProcessInstance)
 	app.Post("/v2/process-instances/search", v2ProcessInstanceCtrl.SearchProcessInstances)
 
@@ -837,8 +837,8 @@ func main() {
 	app.Delete("/v2/user-tasks/:id/assignee", taskCtrl.UnClaim)
 	app.Post("/v2/user-tasks/search", permissions(db, "CAN_READ_TASKS"), v2UserTaskCtrl.SearchUserTasks)
 
-	app.Post("/v2/messages/publication", v2MessageCtrl.PublishMessage)
-	app.Post("/v2/signals/broadcast", v2SignalCtrl.BroadcastSignal)
+	app.Post("/v2/messages/publication", api.Backpressure, v2MessageCtrl.PublishMessage)
+	app.Post("/v2/signals/broadcast", api.Backpressure, v2SignalCtrl.BroadcastSignal)
 	app.Post("/v2/decisions/:key/evaluation", v2DecisionCtrl.EvaluateDecision)
 	app.Get("/v2/forms/:formKey", v2FormCtrl.GetForm)
 
@@ -871,7 +871,7 @@ func main() {
 	// ASYNC PROCESS START
 	// ============================================================
 
-	app.Post("/async/process-definitions/:key/start", processInstanceCtrl.StartProcessAsync)
+	app.Post("/async/process-definitions/:key/start", api.Backpressure, processInstanceCtrl.StartProcessAsync)
 
 	// ============================================================
 	// PROCESS INSTANCE VARIABLE ROUTES
@@ -944,7 +944,7 @@ func main() {
 	grpcAuth := zeebegrpc.NewAuthenticator(db, jwcService, oidcService, anonymousUserID)
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcAuth.UnaryInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcAuth.UnaryInterceptor(), zeebegrpc.BackpressureInterceptor()),
 		grpc.StreamInterceptor(grpcAuth.StreamInterceptor()),
 	)
 	pb.RegisterGatewayServer(grpcServer, zeebegrpc.NewServer(db, taskEventDispatcher))

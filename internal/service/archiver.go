@@ -69,16 +69,34 @@ func StartArchiver(ctx context.Context, db, lockDB *sqlx.DB) {
 	go func() {
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
+		var failures int
+		var retryAt time.Time
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
-				// Drain while full batches come back. The next pass observes the
-				// batch size adapted from the duration of the previous one.
+			case now := <-ticker.C:
+				if now.Before(retryAt) {
+					continue
+				}
+				// Drain while full batches get archived. The next pass observes
+				// the batch size adapted from the duration of the previous one.
 				for ctx.Err() == nil {
 					limit := currentArchiverBatch()
-					if archivePass(ctx, db, lockDB) < limit {
+					found, archived := archivePass(ctx, db, lockDB)
+					if found > 0 && archived == 0 {
+						// Nothing could be archived (e.g. a migration not applied):
+						// back off instead of retrying the same instances in a loop.
+						failures++
+						wait := archiverRetryWait(failures)
+						retryAt = time.Now().Add(wait)
+						log.Printf("archiver: %d finished instances, none archived; next try in %s", found, wait)
+						break
+					}
+					if archived > 0 {
+						failures = 0
+					}
+					if archived < limit {
 						break
 					}
 				}
@@ -87,9 +105,21 @@ func StartArchiver(ctx context.Context, db, lockDB *sqlx.DB) {
 	}()
 }
 
+const archiverRetryMax = time.Minute
+
+// archiverRetryWait is the pause after the given number of passes in a row
+// that archived nothing: 1 s, doubling, up to archiverRetryMax.
+func archiverRetryWait(failures int) time.Duration {
+	wait := time.Second
+	for i := 1; i < failures && wait < archiverRetryMax; i++ {
+		wait *= 2
+	}
+	return min(wait, archiverRetryMax)
+}
+
 // archivePass archives up to archiverBatch finished instances and returns
-// how many it found.
-func archivePass(ctx context.Context, db, lockDB *sqlx.DB) int {
+// how many it found and how many it archived.
+func archivePass(ctx context.Context, db, lockDB *sqlx.DB) (found, archived int) {
 	started := time.Now()
 	limit := currentArchiverBatch()
 	defer func() {
@@ -114,10 +144,10 @@ func archivePass(ctx context.Context, db, lockDB *sqlx.DB) int {
 		LIMIT $1
 	`, limit); err != nil {
 		log.Printf("archiver: %v", err)
-		return 0
+		return 0, 0
 	}
 	if len(finished) == 0 {
-		return 0
+		return 0, 0
 	}
 	// Establish one audit visibility barrier for the entire archive pass.
 	// Previously every instance forced its own writer flush and transaction.
@@ -125,7 +155,7 @@ func archivePass(ctx context.Context, db, lockDB *sqlx.DB) int {
 	conn, err := lockDB.Connx(ctx)
 	if err != nil {
 		log.Printf("archiver: %v", err)
-		return 0
+		return len(finished), 0
 	}
 	defer conn.Close()
 	var snapshots []archiveSnapshot
@@ -136,6 +166,8 @@ func archivePass(ctx context.Context, db, lockDB *sqlx.DB) int {
 		}
 		if err := writeArchiveSnapshots(db, snapshots); err != nil {
 			log.Printf("archiver: batch of %d instances: %v", len(snapshots), err)
+		} else {
+			archived += len(snapshots)
 		}
 		for _, id := range lockedIDs {
 			if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_unlock(hashtext('archive:' || $1))`, id.String()); err != nil {
@@ -172,5 +204,5 @@ func archivePass(ctx context.Context, db, lockDB *sqlx.DB) int {
 		}
 	}
 	flushSnapshots()
-	return len(finished)
+	return len(finished), archived
 }

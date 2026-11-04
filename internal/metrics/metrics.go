@@ -65,6 +65,10 @@ var (
 		Name: "bpmngo_runtime_archive_backlog",
 		Help: "Completed or terminated live instances waiting for archival, as observed by admission control.",
 	})
+	BackpressureRejections = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "bpmngo_backpressure_rejections_total",
+		Help: "Requests creating new work refused because the engine was overloaded, by API (grpc, rest).",
+	}, []string{"api"})
 	ArchiveBatchSize = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    "bpmngo_archive_transaction_instances",
 		Help:    "Number of process instances committed in one archive transaction.",
@@ -97,6 +101,7 @@ func Register(db *sqlx.DB) {
 		RuntimeInFlight,
 		RuntimeAdmissionLimit,
 		RuntimeArchiveBacklog,
+		BackpressureRejections,
 		ArchiveBatchSize,
 		EngineTransactions,
 		EngineTransactionDuration,

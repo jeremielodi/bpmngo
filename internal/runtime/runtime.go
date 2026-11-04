@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"container/list"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -82,6 +83,7 @@ type admissionController struct {
 	lastRefresh  time.Time
 	refreshing   bool
 	changed      chan struct{}
+	waiters      *list.List // start time of each acquire still waiting, oldest first
 }
 
 func configuredPositiveInt(name string, fallback int) int {
@@ -107,6 +109,7 @@ func admissionControl() *admissionController {
 			hardBacklog:  configuredPositiveInt("ARCHIVER_BACKLOG_HARD_LIMIT", 5000),
 			limit:        limit,
 			changed:      make(chan struct{}),
+			waiters:      list.New(),
 		}
 		metrics.RuntimeAdmissionLimit.Set(float64(limit))
 	})
@@ -161,11 +164,23 @@ func (a *admissionController) refreshBacklog(db *sqlx.DB) {
 
 func (a *admissionController) acquire(ctx context.Context, db *sqlx.DB) (func(), error) {
 	started := time.Now()
+	var waiting *list.Element
+	defer func() {
+		if waiting != nil {
+			a.mu.Lock()
+			a.waiters.Remove(waiting)
+			a.mu.Unlock()
+		}
+	}()
 	for {
 		a.refreshBacklog(db)
 		a.mu.Lock()
 		if a.inFlight < a.limit {
 			a.inFlight++
+			if waiting != nil {
+				a.waiters.Remove(waiting)
+				waiting = nil
+			}
 			a.mu.Unlock()
 			metrics.RuntimeAdmissionWait.Observe(time.Since(started).Seconds())
 			metrics.RuntimeInFlight.Inc()
@@ -176,6 +191,11 @@ func (a *admissionController) acquire(ctx context.Context, db *sqlx.DB) (func(),
 				a.mu.Unlock()
 				metrics.RuntimeInFlight.Dec()
 			}, nil
+		}
+		if waiting == nil {
+			// Waiters are kept oldest first, for the back-pressure check
+			// (see oldestWait in backpressure.go).
+			waiting = a.waiters.PushBack(started)
 		}
 		changed := a.changed
 		a.mu.Unlock()
