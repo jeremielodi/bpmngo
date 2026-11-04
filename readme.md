@@ -23,7 +23,7 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 **BpmnGo 1.0.4 is production ready.** What backs this:
 
 - **Tested end to end:** 53 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
-- **Same behaviour as Camunda 8:** the [benchmark](benchmark/README.md) drives BpmnGo and Camunda 8.10.7 with the same Zeebe gRPC and `/v2` client code, and all 87 scenarios (gateways, joins, loops, nested and interrupted sub-processes, multi-instance, events, timers, compensation, FEEL, DMN, models exported by Camunda Modeler…) behave the same. Where Camunda 8 departs from BPMN 2.0 — an exclusive gateway with several true conditions takes the last one, in file order — BpmnGo follows Camunda by default (`EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the BPMN 2.0 rule).
+- **Same behaviour as Camunda 8:** the [benchmark](benchmark/README.md) drives BpmnGo and Camunda 8.10.7 with the same Zeebe gRPC and `/v2` client code, and all 88 scenarios (gateways, joins, loops, nested and interrupted sub-processes, multi-instance, events, timers, compensation, FEEL, DMN, user tasks with forms, models exported by Camunda Modeler, and a 72-element model with a four-way parallel fork…) behave the same. Where Camunda 8 departs from BPMN 2.0 — an exclusive gateway with several true conditions takes the last one, in file order — BpmnGo follows Camunda by default (`EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the BPMN 2.0 rule).
 - **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
 - **Backups:** `pg_dump` backups, with a script that checks each backup restores. See [Operations](docs/operations.md#backups).
 - **Secure defaults:** with `BPMNGO_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
@@ -118,7 +118,7 @@ Design decisions and the partitioned write path: [docs/architecture.md](docs/arc
 - [Operations](docs/operations.md) — migrations, metrics, backups, scaling, high availability
 - [Ajouter des serveurs](docs/adding-servers.md) — de 1 à 4 serveurs et plus : quels fichiers, et ce qu'il faut faire côté base de données à chaque étape
 - [Integration Tests](docs/testing.md) — the suites and how to run them
-- [Benchmark](benchmark/README.md) — BpmnGo against Camunda 8: behaviour (87 scenarios), load, endurance, per-call latency
+- [Benchmark](benchmark/README.md) — BpmnGo against Camunda 8: behaviour (88 scenarios), load, endurance, per-call latency
 - [Roadmap](docs/roadmap.md) — what's done and what's next
 - [`architecture/`](architecture/) — design documents (partitioned write path, Citus storage, history of the event-sourced phases)
 - [`database/migrations/`](database/migrations/README.md) — the SQL migrations, applied by hand
