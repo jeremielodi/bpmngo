@@ -10,6 +10,7 @@ import { multiInstance } from './multi_instance';
 import { signalsTimers } from './signals_timers';
 import { tasksCompensation } from './tasks_compensation';
 import { robustness } from './robustness';
+import { scale } from './scale';
 
 export const SCENARIOS: Scenario[] = [
   ...gateways,
@@ -23,6 +24,7 @@ export const SCENARIOS: Scenario[] = [
   ...feel,
   ...tasksCompensation,
   ...robustness,
+  ...scale,
 ];
 
 // Scenario names must be unique: they are the trace file names.

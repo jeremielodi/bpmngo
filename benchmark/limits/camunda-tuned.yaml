@@ -1,0 +1,19 @@
+# Same capacity as camunda.yaml (2 cores, 2 GiB), but with the JVM allowed to
+# use the memory it is given, and thread counts that match two cores.
+#
+# Why: with no -Xmx, the JVM sizes its heap from the cgroup limit at
+# MaxRAMPercentage=25 %, i.e. 512 MiB out of 2 GiB, while BpmnGo's Go runtime
+# may use most of its 1 GiB. The distribution's own application-h2.yaml also
+# sets cpu-thread-count and io-thread-count to 3, on a container with 2 cores.
+# Apply on top of limits/camunda.yaml + limits/camunda-2p.yaml:
+#
+#   docker compose -f docker-compose.yaml -f ../limits/camunda.yaml \
+#     -f ../limits/camunda-2p.yaml -f ../limits/camunda-tuned.yaml up -d orchestration
+#
+# Use it to answer "is the gap the engine, or the default configuration?".
+services:
+  orchestration:
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+PrintFlagsFinal"
+      CAMUNDA_SYSTEM_CPUTHREADCOUNT: "2"
+      CAMUNDA_SYSTEM_IOTHREADCOUNT: "2"

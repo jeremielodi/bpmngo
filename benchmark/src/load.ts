@@ -33,8 +33,9 @@ interface LevelResult {
   level: number;                 // clients, or instances started per second
   durationS: number;
   started: number;               // starts sent in the measured window
-  completed: number;
-  throughput: number;            // instances completed per second
+  completed: number;             // of those, finished before the window closed
+  lateCompletions: number;       // of those, finished after it (backlog, not throughput)
+  throughput: number;            // completed per second of measured window
   latencyMs: { p50: number; p95: number; p99: number; max: number };
   errors: Record<string, number>; // gRPC code → count (starts and job completions)
   cpuSeconds: number | null;
@@ -80,7 +81,18 @@ function args(argv: string[]) {
     ],
     durationS: Number(get('duration', '60')),
     warmupS: Number(get('warmup', '10')),
+    // The first level's warm-up also has to absorb the engine's cold start
+    // (JVM class loading and JIT, connection pools, buffer cache). 10 s is
+    // not enough for Camunda: its per-instance CPU cost then falls by ~5x
+    // between level 1 and level 2, which is a measurement artifact, not a
+    // property of the engine. --first-warmup replaces --warmup on level 1.
+    firstWarmupS: Number(get('first-warmup', '60')),
     workers: Number(get('workers', '8')),
+    // A real model from bpmn/ instead of the generated 4-element process:
+    // realistic models cost parser time at deploy and more jobs per instance,
+    // neither of which the generated one can show. Job types are read from the
+    // model's zeebe:taskDefinition elements.
+    processFile: get('process'),
     repeat: Math.max(1, Number(get('repeat', '1'))),
     p99LimitMs: Number(get('p99-limit', '1000')),
     containers: {
@@ -125,8 +137,22 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
   const workerConn = [0, 1].map(() => new Engine(cfg));
   const all = [...starters, ...workerConn];
   const tag = `load_${Date.now().toString(36)}`;
-  await starters[0].deploy(`${tag}.bpmn`, Buffer.from(processXml(tag)));
+  let processId = tag;
+  let types = [`${tag}-first`, `${tag}-second`];
+  if (o.processFile) {
+    const xml = fs.readFileSync(path.resolve(o.processFile), 'utf8');
+    const id = /<bpmn:process[^>]*\bid="([^"]+)"/.exec(xml)?.[1];
+    if (!id) throw new Error(`--process: no <bpmn:process id="…"> in ${o.processFile}`);
+    const found = [...xml.matchAll(/<zeebe:taskDefinition\s+type="([^"]+)"/g)].map(m => m[1]);
+    if (!found.length) throw new Error(`--process: no zeebe:taskDefinition type in ${o.processFile}`);
+    processId = id;
+    types = [...new Set(found)];
+    await starters[0].deploy(path.basename(o.processFile), Buffer.from(xml));
+  } else {
+    await starters[0].deploy(`${tag}.bpmn`, Buffer.from(processXml(tag)));
+  }
   await sleep(1000);
+  console.log(`  process ${processId}, ${types.length} job types: ${types.join(', ')}`);
 
   const errors: Record<string, number> = {};
   const count = (e: unknown) => {
@@ -137,7 +163,7 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
   // Workers: long-poll for jobs, complete each batch in parallel. They run for every level.
   let stopWorkers = false;
   const workerLoops: Promise<void>[] = [];
-  for (const type of [`${tag}-first`, `${tag}-second`]) {
+  for (const type of types) {
     for (let i = 0; i < o.workers; i++) {
       const engine = workerConn[i % workerConn.length];
       workerLoops.push((async () => {
@@ -157,7 +183,7 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
   }
 
   const startInstance = (engine: Engine) => engine.call('CreateProcessInstanceWithResult', {
-    request: { bpmnProcessId: tag, version: -1, variables: VARIABLES, tenantId: '' },
+    request: { bpmnProcessId: processId, version: -1, variables: VARIABLES, tenantId: '' },
     requestTimeout: 30000, fetchVariables: [],
   }, 40000);
 
@@ -169,9 +195,10 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
     if (problem) console.log(`  ⚠ ${problem}`);
     if (problem?.startsWith('cannot')) pg = undefined;
   }
-  for (const { mode, level } of o.steps) {
+  for (const [stepIndex, { mode, level }] of o.steps.entries()) {
     process.stdout.write(`  ${String(level).padStart(4)} ${mode === 'clients' ? 'clients ' : 'inst/s  '} … `);
-    const warmEnd = Date.now() + o.warmupS * 1000;
+    const warmS = stepIndex === 0 ? Math.max(o.warmupS, o.firstWarmupS) : o.warmupS;
+    const warmEnd = Date.now() + warmS * 1000;
     const measureEnd = warmEnd + o.durationS * 1000;
     const done: { start: number; end: number }[] = [];
     let started = 0;
@@ -221,11 +248,11 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
         if (wait > 0) await sleep(wait);
         next += interval;
         const measured = Date.now() >= warmEnd;
-        if (measured) started++;
         if (inFlight >= MAX_IN_FLIGHT) {
           if (measured) count({ code: 'CLIENT_LIMIT' });
           continue;
         }
+        if (measured) started++;   // a start that is never sent is not a start
         inFlight++;
         const start = now();
         pending.push(startInstance(starters[n++ % starters.length]).then(
@@ -237,13 +264,18 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
       const usageAtEnd = monitor ? monitor.stop() : undefined;   // resources over the window only
       const pgStats = pgAtEnd();
       monitor = undefined;
+      // Completions that land after the window closes are not throughput: they
+      // are the backlog the engine was still working through. Count them apart,
+      // so an engine that queues instead of refusing is not credited with work
+      // that happened after the measurement stopped.
+      const completedInWindow = done.length;
       await Promise.all(pending);
-      results.push({ ...levelResult(mode, level, o, started, done, errors, await usageAtEnd), pg: await pgStats });
+      results.push({ ...levelResult(mode, level, o, started, done, completedInWindow, errors, await usageAtEnd), pg: await pgStats });
       printLevel(results[results.length - 1]);
       continue;
     }
     const usage = monitor ? await monitor.stop() : undefined;
-    results.push({ ...levelResult(mode, level, o, started, done, errors, usage), pg: await pgAtEnd() });
+    results.push({ ...levelResult(mode, level, o, started, done, done.length, errors, usage), pg: await pgAtEnd() });
     printLevel(results[results.length - 1]);
   }
 
@@ -254,15 +286,17 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
 }
 
 function levelResult(mode: Mode, level: number, o: Options, started: number, done: { start: number; end: number }[],
-                     errors: Record<string, number>, usage: Awaited<ReturnType<ResourceMonitor['stop']>> | undefined): LevelResult {
+                     completedInWindow: number, errors: Record<string, number>,
+                     usage: Awaited<ReturnType<ResourceMonitor['stop']>> | undefined): LevelResult {
   const lat = done.map(d => d.end - d.start).sort((a, b) => a - b);
   const cpuSeconds = usage?.total.cpuSeconds ?? null;
   return {
     mode, level,
     durationS: o.durationS,
     started,
-    completed: done.length,
-    throughput: done.length / o.durationS,
+    completed: completedInWindow,
+    lateCompletions: done.length - completedInWindow,
+    throughput: completedInWindow / o.durationS,
     latencyMs: { p50: percentile(lat, 0.5), p95: percentile(lat, 0.95), p99: percentile(lat, 0.99), max: lat[lat.length - 1] ?? NaN },
     errors: { ...errors },
     cpuSeconds,
@@ -272,7 +306,7 @@ function levelResult(mode: Mode, level: number, o: Options, started: number, don
     memPeakMiB: usage?.total.memPeakMiB ?? NaN,
     containers: (usage?.containers ?? []).map(c => ({ container: c.container, cpuAvgPct: c.cpuAvgPct, memPeakMiB: c.memPeakMiB })),
     // The monitor's window starts a moment after the measured one: scale its CPU rate to the whole window.
-    cpuMsPerInstance: usage && cpuSeconds !== null && done.length ? (usage.total.cpuAvgPct / 100) * o.durationS * 1000 / done.length : null,
+    cpuMsPerInstance: usage && cpuSeconds !== null && completedInWindow ? (usage.total.cpuAvgPct / 100) * o.durationS * 1000 / completedInWindow : null,
   };
 }
 
@@ -302,9 +336,11 @@ function report(runs: Record<string, LevelResult[]>[], o: Options): string {
   const lines = [
     'BpmnGo ⇄ Camunda 8 load test',
     `Date      : ${new Date().toISOString()}`,
-    `Workload  : start → 2 service tasks → end; ${o.workers} workers per job type; ` +
-      `${o.warmupS} s warm-up then ${o.durationS} s measured per level`,
-    `Runs      : ${o.repeat}${o.repeat > 1 ? ' (engine order alternating; values are mean±standard deviation)' : ''}`,
+    `Workload  : ${o.processFile ? `${o.processFile} (deployed as it is)` : 'start → 2 service tasks → end'}; ` +
+      `${o.workers} workers per job type; ` +
+      `${o.warmupS} s warm-up (${Math.max(o.warmupS, o.firstWarmupS)} s on the first level) then ${o.durationS} s measured per level`,
+    `Runs      : ${o.repeat}${o.repeat > 1 ? ' (engine order alternating; values are mean±standard deviation)'
+      : ' — single pass, no variance. Use --repeat 3 for figures you publish.'}`,
     '',
     `  ${'engine'.padEnd(9)}${'level'.padStart(12)}${'inst/s'.padStart(12)}${'p50'.padStart(12)}${'p95'.padStart(12)}${'p99'.padStart(14)}` +
       `${'errors'.padStart(9)}${'CPU avg'.padStart(9)}${'CPU/inst'.padStart(10)}${'mem peak'.padStart(10)}`,
@@ -333,6 +369,29 @@ function report(runs: Record<string, LevelResult[]>[], o: Options): string {
       lines.push(`  ${engine.padEnd(9)} ${best.map(b => b ? `${b} inst/s` : `below ${rateSteps[0].level} inst/s`).join(', ')}`);
     }
     lines.push('');
+    // Why each rate was not sustained: refused (the engine pushes back) or
+    // queued (it accepts everything and the p99 blows past the limit). Two
+    // different failure modes that one "sustained" column hides.
+    const verdict = (r: LevelResult) => {
+      if (sustained(r, o)) return 'sustained';
+      const why: string[] = [];
+      if (r.started - r.completed > 0) why.push(`${r.started - r.completed} of ${r.started} starts never completed`);
+      if (r.latencyMs.p99 > o.p99LimitMs) why.push(`p99 ${f(r.latencyMs.p99)} ms > ${o.p99LimitMs} ms`);
+      return `NOT sustained — ${why.join(', ') || 'errors'}`;
+    };
+    lines.push('Per level:');
+    for (const engine of engines) {
+      const rs = runs.flatMap(r => r[engine] ?? []).filter(x => x.mode === 'rate');
+      if (!rs.length) continue;
+      const byLevel = new Map<number, string[]>();
+      runs.forEach(r => (r[engine] ?? []).filter(x => x.mode === 'rate')
+        .forEach(x => byLevel.set(x.level, [...(byLevel.get(x.level) ?? []), verdict(x)])));
+      for (const level of [...byLevel.keys()].sort((a, b) => a - b)) {
+        const seen = [...new Set(byLevel.get(level)!)].join(' · ');
+        lines.push(`  ${engine} at ${level} inst/s: ${seen}`);
+      }
+    }
+    lines.push('');
   }
   const each = (g: (engine: string, r: LevelResult, run: number) => string | undefined) =>
     runs.flatMap((byEngine, run) => Object.entries(byEngine).flatMap(([engine, rs]) => rs.map(r => g(engine, r, run)))).filter((x): x is string => !!x);
@@ -351,7 +410,7 @@ function report(runs: Record<string, LevelResult[]>[], o: Options): string {
   });
   if (pgLines.length) {
     lines.push('PostgreSQL per completed instance (BpmnGo; planning counts only with pg_stat_statements.track_planning):', ...pgLines, '');
-    const last = runs[runs.length - 1].bpmngo?.filter(r => r.pg?.top.length).pop();
+    const last = runs[runs.length - 1].bpmngo?.filter(r => r.pg?.top.length && r.completed > 0).pop();
     if (last?.pg) {
       lines.push(`Heaviest statements at ${last.level} ${last.mode === 'clients' ? 'clients' : 'inst/s'} (ms per instance, calls per instance):`);
       for (const q of last.pg.top.slice(0, 5)) {
@@ -360,6 +419,10 @@ function report(runs: Record<string, LevelResult[]>[], o: Options): string {
       lines.push('');
     }
   }
+  const lateLines = each((engine, r, run) => r.lateCompletions > 0
+    ? `${where(engine, r, run)}: ${r.lateCompletions} starts finished after the window ` +
+      `(backlog, excluded from inst/s — the window counts ${r.completed})` : undefined);
+  if (lateLines.length) lines.push('Backlog at the end of the window:', ...lateLines, '');
   const errorLines = each((engine, r, run) => Object.keys(r.errors).length
     ? `${where(engine, r, run)}: ${Object.entries(r.errors).map(([k, v]) => `${k} ×${v}`).join(', ')}` : undefined);
   if (errorLines.length) lines.push('Errors:', ...errorLines, '');
@@ -367,8 +430,9 @@ function report(runs: Record<string, LevelResult[]>[], o: Options): string {
     lines.push('Each run:', ...each((engine, r, run) =>
       `${where(engine, r, run)}: ${f(r.throughput, 1)} inst/s, p50 ${f(r.latencyMs.p50)} ms, p99 ${f(r.latencyMs.p99)} ms, ${errorCount(r)} errors`), '');
   }
-  lines.push('inst/s: instances completed per second (start to end, both jobs done). p50/p95/p99: end-to-end');
-  lines.push('latency of CreateProcessInstanceWithResult. CPU avg in % of one core; CPU/inst: CPU time of the');
+  lines.push('inst/s: instances *started* in the measured window that finished inside it, per second —');
+  lines.push('completions after the window are backlog, reported separately. p50/p95/p99: end-to-end latency of');
+  lines.push('CreateProcessInstanceWithResult. CPU avg in % of one core; CPU/inst: CPU time of the');
   lines.push("engine's containers per completed instance. Resources measured over the measured window only.");
   lines.push('Clients levels: a refused client waits 0–100 ms, doubling up to 5 s, before trying again.');
   lines.push('Rate levels: starts sent at a fixed rate, a refused start is not retried.');

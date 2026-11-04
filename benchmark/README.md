@@ -7,7 +7,7 @@ for BpmnGo) and call by call (`npm run latency`).
 
 | Command | What |
 |---|---|
-| `npm run compare` | behaviour: 87 scenarios, every difference shown section by section |
+| `npm run compare` | behaviour: 88 scenarios + 5 API checks, every difference shown section by section |
 | `npm run load` | load: clients and fixed-rate levels, CPU and memory per instance, BpmnGo's PostgreSQL statements, commits and WAL per instance; a long `--duration` is an endurance run |
 | `npm run latency` | one call at a time, p50/p95 per call, two passes |
 | `npm run experiment` | `experiments/exclusive-order.ts`: which flow an exclusive gateway takes when several conditions are true |
@@ -28,8 +28,18 @@ the outcome; the final variables; the end state. Then it compares Camunda
 ## Latest results
 
 **2026-11-03, BpmnGo `main` (PostgreSQL 18) against a fresh Camunda 8.10.7,
-both run live, each on two physical cores and 2 GiB: 87 of the 87 scenarios
-behave the same.** Their traces are `reference-camunda-8.10.7/`.
+both run live, each on two physical cores and 2 GiB: the 87 checks the suite
+then had all behaved the same.** Their traces are `reference-camunda-8.10.7/`.
+
+**Added 2026-11-04** — six scenarios for the shapes the suite was missing: a
+realistic model of 72 elements (`large.bpmn`: four-way parallel fork in a
+sub-process, join, script task, default-branch gateway, sequential
+multi-instance, nested audit sub-process), user tasks carrying a form,
+candidate groups and a priority, and two chained DMN tables with FIRST and
+UNIQUE hit policies. Each was run against a live Camunda 8.10.7 and BpmnGo:
+6 of 6 the same. The suite is now **88 scenarios + 5 API checks**; the full
+93 have not yet been re-run in a single pass, and `reference-camunda-8.10.7/`
+still holds the 87-check traces.
 
 The 25 scenarios of the *Robustness* group cover the shapes real models
 are made of: loops back to a gateway; sub-processes nested, interrupted by
@@ -46,7 +56,10 @@ was ignored (every job started with 3), and the jobs of a parallel
 multi-instance were announced one at a time instead of in one batch.
 
 Over the whole suite, BpmnGo used 0.27× Camunda's CPU time and 0.22× its
-peak memory, and ran it in 0.81× the time.
+peak memory, and ran it in 0.81× the time. Most of that is *idle footprint* —
+the scenarios wait on real timers — not per-instance efficiency: under load,
+BpmnGo spends 39–45 ms of CPU per finished instance against Camunda's
+47–60 ms (`npm run load`, see below).
 
 The exclusive gateway with several conditions true follows Camunda: the
 **last** true flow, in the order of the `sequenceFlow` elements of the file,
@@ -288,6 +301,26 @@ without them is easy to spot. The cores and sizes are only a starting
 point: edit both files the same way to test another budget, and keep at
 least 2 GiB for Camunda.
 
+`limits/camunda.yaml` also sets `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70`:
+without it the JVM sizes its heap at 25 % of the 2 GiB limit (512 MiB) while
+BpmnGo's Go runtime may use most of its 1 GiB, so the budgets would not be
+equal in practice. It changes nothing measurable (23.3 vs 22.8 inst/s at 25
+offered) and removes the objection.
+
+`limits/camunda-tuned.yaml` is the "is the gap the engine, or the default
+configuration?" question: 70 % of the memory as heap, and `cpu-thread-count` /
+`io-thread-count` set to 2 for a 2-core container instead of the
+distribution's 3. Stack it on the other two:
+
+```shell
+BENCH_CAMUNDA_CPUS=2,4 docker compose -f docker-compose.yaml -f ../limits/camunda.yaml \
+  -f ../limits/camunda-2p.yaml -f ../limits/camunda-tuned.yaml up -d orchestration
+```
+
+Measured that way Camunda still tops out around 21–23 inst/s: the ceiling is
+its stream processor and exporter, not memory. Publish both figures, or the
+answer to "you did not configure Camunda properly" is left open.
+
 ### Load test
 
 The scenarios check behaviour one instance at a time. `npm run load` puts
@@ -301,7 +334,10 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
 
 - **Workload**: one process, start → two service tasks → end, with a few
   business variables. The same workers (8 per job type, batches of 32)
-  complete the jobs on both engines.
+  complete the jobs on both engines. With `--process bpmn/large.bpmn` the
+  generated process is replaced by a real model, deployed as it is: its job
+  types are read from the file and each gets `--workers` workers, so the
+  parser and deployment cost of a realistic model is paid too.
 - **Clients levels** (`--levels`): that many clients each start an
   instance with `CreateProcessInstanceWithResult`, wait for its end, and
   start the next. A refused client waits before trying again: 0–100 ms,
@@ -312,14 +348,18 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
   the engine answers, and a refused start is not retried. A rate is
   *sustained* when no start was refused, at least 98 % of the instances
   completed and the p99 stays under `--p99-limit` (1000 ms). The report
-  gives the highest rate each engine sustains: the measure that does not
-  depend on whether an engine refuses work or queues it.
-- **Measured**, after a warm-up (10 s by default), over the measured window
-  (60 s): instances completed per second, end-to-end latency (p50, p95,
-  p99), errors by gRPC code (`RESOURCE_EXHAUSTED` is back-pressure,
+  gives the highest rate each engine sustains **and, level by level, why the
+  others were not**: refused (the engine pushes back) or queued (it accepts
+  everything and the p99 grows). One column could not tell those apart.
+- **Measured**, after a warm-up (10 s per level, `--first-warmup` 60 s on the
+  first one, so the cold start — JVM class loading and JIT — is not counted),
+  over the measured window (60 s): instances per second, end-to-end latency
+  (p50, p95, p99), errors by gRPC code (`RESOURCE_EXHAUSTED` is back-pressure,
   `DEADLINE_EXCEEDED` a start that got no answer within 40 s), CPU and
-  memory of the engine's containers, and the CPU time per completed
-  instance.
+  memory of the engine's containers, and the CPU time per completed instance.
+  An instance counts only if it *started and finished inside* the window:
+  completions that land after it are the backlog the engine was still
+  working through, reported apart, not credited as throughput.
 - **Repeats** (`--repeat 3`): the whole test runs that many times, the
   engine order alternating; the report gives mean±standard deviation, and
   each run.
@@ -350,6 +390,10 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
 ```
 --levels 10,50,100   clients levels               --rates 5,10,20  fixed-rate levels (inst/s)
 --duration 60        measured seconds per level   --warmup 10      warm-up seconds per level
+--first-warmup 60    warm-up seconds on level 1: absorbs the engine's cold start (JVM class
+                     loading and JIT), which used to land in level 1's CPU and latency columns
+--process bpmn/large.bpmn   run a real model instead of the generated start → 2 tasks → end:
+                     its job types are read from the file, and its parser/deploy cost is paid
 --repeat 1           runs, engine order alternating --p99-limit 1000 p99 (ms) for a sustained rate
 --workers 8          workers per job type
 --bpmngo-postgres c   PostgreSQL container read   --no-pg-stats    skip PostgreSQL's figures
@@ -362,8 +406,9 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
 Topology, DeployResource, CreateProcessInstance, CreateProcessInstanceWithResult
 (start → end), creation → job (until ActivateJobs hands it out), CompleteJob.
 `--iterations 30` calls of each kind per pass, `--repeat 2` passes (engine
-order alternating); output in `results/latency-<date>/`. Warm both engines up
-first (a short `npm run load`): Camunda's JVM is slow on its first calls.
+order alternating), `--warmup 5` unmeasured rounds before each pass — without
+them the JVM's first calls, ~5× slower, were reported as the p50. Output in
+`results/latency-<date>/`.
 
 Limits of the result: one client machine, one short process (two service
 tasks; no timers, messages, gateways or large variables), Camunda's
@@ -444,9 +489,30 @@ Every run renames process ids, job types, message and signal names with a
 per-run suffix, so leftovers of earlier runs never interfere; traces store
 the original names.
 
+Two traps, both found while writing the `Large model` group:
+
+- **Do not give two parallel branches the same job type.** Jobs are activated
+  per type, and whether both arrive in one batch decides which variables they
+  carry: Camunda snapshots them at activation, so the second job sees only the
+  variables of the moment, while an engine that activates it later carries
+  the first branch's results. The trace then differs for a reason that
+  belongs to the harness, not to the engine.
+- **A `zeebe:formDefinition` whose form is not deployed gives Camunda an
+  incident** (`FORM_NOT_FOUND`, task stuck in ACTIVE) while BpmnGo completes
+  the task. Deploy the form with the model, and use `schemaVersion: 5` in it:
+  with `schemaVersion: 1` Camunda accepts the deployment and still cannot
+  resolve the form at runtime.
+
+A model written by hand also needs its `<bpmndi:BPMNDiagram>` section: the
+engines run it without one, but a modeler (BpmnGo's `/modeler`, Camunda
+Modeler) has nothing to draw and opens it empty. Several processes in one
+file go in a `bpmn:collaboration`, one pool each (see `gateways.bpmn`); the
+content of a sub-process can be drawn in its own drill-down diagram (see
+`large.bpmn`).
+
 ## 9. Scope and limits
 
-- 82 scenarios in 12 groups, plus 5 API checks (gRPC key usable in REST,
+- 88 scenarios, plus 5 API checks (gRPC key usable in REST,
   `/v2/element-instances/search`, searching finished instances, deploy
   response, timer accuracy).
 - Not the web UIs, not the Camunda 7 REST API (that needs a Camunda 7 next

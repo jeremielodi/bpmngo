@@ -27,6 +27,7 @@ function args(argv: string[]) {
     engines,
     run: get('engines', 'camunda,bpmngo')!.split(',').map(s => s.trim()).filter(Boolean),
     iterations: Number(get('iterations', '30')),
+    warmup: Number(get('warmup', '5')),
     repeat: Math.max(1, Number(get('repeat', '2'))),
     out: get('out', path.join('results', `latency-${stamp}`))!,
   };
@@ -53,34 +54,40 @@ const straight = (id: string) => `<?xml version="1.0" encoding="UTF-8"?>
 
 const now = () => Number(process.hrtime.bigint()) / 1e6;
 
-async function timed<T>(samples: number[], f: () => Promise<T>): Promise<T> {
+async function timed<T>(record: boolean, samples: number[], f: () => Promise<T>): Promise<T> {
   const t = now();
   const r = await f();
-  samples.push(now() - t);
+  if (record) samples.push(now() - t);
   return r;
 }
 
-async function measure(cfg: EngineConfig, iterations: number): Promise<Record<Call, number[]>> {
+/** One round of every call. `record` false = unmeasured warm-up. */
+async function round(engine: Engine, tag: string, samples: Record<Call, number[]>, record: boolean, id: string) {
+  await timed(record, samples.Topology, () => engine.call('Topology', {}));
+  await timed(record, samples.DeployResource, () => engine.deploy(`${tag}_${id}.bpmn`, Buffer.from(straight(`${tag}_${id}`))));
+  await timed(record, samples.CreateWithResult, () => engine.call('CreateProcessInstanceWithResult', {
+    request: { bpmnProcessId: `${tag}_s`, version: -1, variables: '{}', tenantId: '' }, requestTimeout: 30000, fetchVariables: [],
+  }, 40000));
+  const created = now();
+  await timed(record, samples.CreateProcessInstance, () => engine.call('CreateProcessInstance', { bpmnProcessId: tag, version: -1, variables: '{}' }));
+  let jobs = await engine.activateJobs(`${tag}-work`, 1, 5000);
+  for (let tries = 0; !jobs.length && tries < 5; tries++) jobs = await engine.activateJobs(`${tag}-work`, 1, 5000);
+  if (!jobs.length) throw new Error(`${engine.cfg.name}: a job never came`);
+  if (record) samples['Creation → job'].push(now() - created);
+  await timed(record, samples.CompleteJob, () => engine.call('CompleteJob', { jobKey: jobs[0].key, variables: '{}' }));
+}
+
+async function measure(cfg: EngineConfig, iterations: number, warmup: number): Promise<Record<Call, number[]>> {
   const engine = new Engine(cfg);
   const tag = `lat_${Date.now().toString(36)}`;
   const samples = Object.fromEntries(CALLS.map(c => [c, [] as number[]])) as Record<Call, number[]>;
   await engine.deploy(`${tag}.bpmn`, Buffer.from(oneTask(tag)));
   await engine.deploy(`${tag}_s.bpmn`, Buffer.from(straight(`${tag}_s`)));
-  for (let i = 0; i < iterations; i++) {
-    await timed(samples.Topology, () => engine.call('Topology', {}));
-    const id = `${tag}_d${i}`;
-    await timed(samples.DeployResource, () => engine.deploy(`${id}.bpmn`, Buffer.from(straight(id))));
-    await timed(samples.CreateWithResult, () => engine.call('CreateProcessInstanceWithResult', {
-      request: { bpmnProcessId: `${tag}_s`, version: -1, variables: '{}', tenantId: '' }, requestTimeout: 30000, fetchVariables: [],
-    }, 40000));
-    const created = now();
-    await timed(samples.CreateProcessInstance, () => engine.call('CreateProcessInstance', { bpmnProcessId: tag, version: -1, variables: '{}' }));
-    let jobs = await engine.activateJobs(`${tag}-work`, 1, 5000);
-    for (let tries = 0; !jobs.length && tries < 5; tries++) jobs = await engine.activateJobs(`${tag}-work`, 1, 5000);
-    if (!jobs.length) throw new Error(`${cfg.name}: the job of iteration ${i} never came`);
-    samples['Creation → job'].push(now() - created);
-    await timed(samples.CompleteJob, () => engine.call('CompleteJob', { jobKey: jobs[0].key, variables: '{}' }));
-  }
+  // Unmeasured rounds first: the first calls of a JVM engine are ~5x slower
+  // (class loading, JIT). Counting them as p50 measured the cold start, not
+  // the engine — the caller used to be told to warm up by hand.
+  for (let i = 0; i < warmup; i++) await round(engine, tag, samples, false, `w${i}`);
+  for (let i = 0; i < iterations; i++) await round(engine, tag, samples, true, `d${i}`);
   engine.close();
   return samples;
 }
@@ -100,7 +107,7 @@ async function main() {
       const cfg = o.engines[name];
       if (!cfg) throw new Error(`unknown engine "${name}"`);
       process.stdout.write(`▶ ${name}, pass ${p + 1}/${o.repeat} … `);
-      byEngine[name] = await measure(cfg, o.iterations);
+      byEngine[name] = await measure(cfg, o.iterations, o.warmup);
       console.log('done');
     }
     passes.push(byEngine);
@@ -109,6 +116,7 @@ async function main() {
     'BpmnGo ⇄ Camunda 8 latency per call',
     `Date       : ${new Date().toISOString()}`,
     `Iterations : ${o.iterations} sequential calls of each kind, per pass; ${o.repeat} passes (engine order alternating)`,
+    `Warm-up    : ${o.warmup} unmeasured rounds before each pass (cold-start calls are excluded)`,
     '',
     `  ${'call'.padEnd(22)}${o.run.map(e => `${e} p50 / p95 (ms), each pass`.padStart(36)).join('')}`,
   ];

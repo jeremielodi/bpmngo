@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Two decision tables, chained: the first picks a service level from the
+     order (FIRST hit policy, ranges), the second a shipping cost from that
+     level and the weight (UNIQUE, string match). The existing DMN fixture has
+     a single table with a single hit policy. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="dmn_two_tables_defs" name="Two tables" namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="dmn_level" name="Service level">
+    <decisionTable id="dmn_level_table" hitPolicy="FIRST">
+      <input id="lv_amount" label="Amount">
+        <inputExpression id="lv_amount_expr" typeRef="number"><text>amount</text></inputExpression>
+      </input>
+      <input id="lv_tier" label="Tier">
+        <inputExpression id="lv_tier_expr" typeRef="string"><text>tier</text></inputExpression>
+      </input>
+      <output id="lv_out" name="level" typeRef="string"/>
+      <rule id="lv_r1">
+        <inputEntry id="lv_r1_a"><text>&gt; 1000</text></inputEntry>
+        <inputEntry id="lv_r1_t"><text>"gold"</text></inputEntry>
+        <outputEntry id="lv_r1_o"><text>"platinum"</text></outputEntry>
+      </rule>
+      <rule id="lv_r2">
+        <inputEntry id="lv_r2_a"><text>&gt; 1000</text></inputEntry>
+        <inputEntry id="lv_r2_t"><text>-</text></inputEntry>
+        <outputEntry id="lv_r2_o"><text>"gold"</text></outputEntry>
+      </rule>
+      <rule id="lv_r3">
+        <inputEntry id="lv_r3_a"><text>-</text></inputEntry>
+        <inputEntry id="lv_r3_t"><text>-</text></inputEntry>
+        <outputEntry id="lv_r3_o"><text>"standard"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+  <decision id="dmn_ship" name="Shipping cost">
+    <decisionTable id="dmn_ship_table" hitPolicy="UNIQUE">
+      <input id="sh_level" label="Level">
+        <inputExpression id="sh_level_expr" typeRef="string"><text>level</text></inputExpression>
+      </input>
+      <input id="sh_weight" label="Weight">
+        <inputExpression id="sh_weight_expr" typeRef="number"><text>weight</text></inputExpression>
+      </input>
+      <output id="sh_out" name="cost" typeRef="number"/>
+      <rule id="sh_r1">
+        <inputEntry id="sh_r1_l"><text>"platinum"</text></inputEntry>
+        <inputEntry id="sh_r1_w"><text>-</text></inputEntry>
+        <outputEntry id="sh_r1_o"><text>0</text></outputEntry>
+      </rule>
+      <rule id="sh_r2">
+        <inputEntry id="sh_r2_l"><text>"gold"</text></inputEntry>
+        <inputEntry id="sh_r2_w"><text>&lt; 10</text></inputEntry>
+        <outputEntry id="sh_r2_o"><text>4.5</text></outputEntry>
+      </rule>
+      <rule id="sh_r3">
+        <inputEntry id="sh_r3_l"><text>"gold"</text></inputEntry>
+        <inputEntry id="sh_r3_w"><text>&gt;= 10</text></inputEntry>
+        <outputEntry id="sh_r3_o"><text>12.0</text></outputEntry>
+      </rule>
+      <rule id="sh_r4">
+        <inputEntry id="sh_r4_l"><text>"standard"</text></inputEntry>
+        <inputEntry id="sh_r4_w"><text>-</text></inputEntry>
+        <outputEntry id="sh_r4_o"><text>9.5</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

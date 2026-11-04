@@ -9,3 +9,10 @@ services:
   orchestration:
     cpuset: "${BENCH_CAMUNDA_CPUS:-2,4}"
     mem_limit: 2g
+    environment:
+      # Without this the JVM sizes its heap at 25 % of the cgroup limit (512 MiB
+      # of 2 GiB) while BpmnGo's Go runtime may use most of its 1 GiB: the
+      # budgets would not be equal in practice. Measured effect on throughput
+      # is nil (23.3 vs 22.8 inst/s at 25 offered), but it removes the
+      # objection. See results/AUDIT-2026-11-04.md §4.10.
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70"
