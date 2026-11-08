@@ -19,6 +19,13 @@ type SimulationService struct {
 	repository *repository.SimulationRepository
 }
 
+// SimulationValidationError distinguishes user configuration errors from
+// persistence failures when queuing a saved simulation.
+type SimulationValidationError struct{ Err error }
+
+func (e *SimulationValidationError) Error() string { return e.Err.Error() }
+func (e *SimulationValidationError) Unwrap() error { return e.Err }
+
 func NewSimulationService(repository *repository.SimulationRepository) *SimulationService {
 	return &SimulationService{repository: repository}
 }
@@ -180,10 +187,10 @@ func (s *SimulationService) EnqueueSimulation(id, userID uuid.UUID, tenantID str
 		return nil, err
 	}
 	if err := simulation.ValidateRunnable(scenario); err != nil {
-		return nil, err
+		return nil, &SimulationValidationError{Err: err}
 	}
 	if _, err := simulation.Analyze(scenario); err != nil {
-		return nil, err
+		return nil, &SimulationValidationError{Err: err}
 	}
 	return s.repository.CreateRun(id, userID, "simulation", nil)
 }

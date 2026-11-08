@@ -1,0 +1,448 @@
+{
+  "projectId": "e0838c17-b473-4e97-a455-3336b4af80a1",
+  "url": "http://localhost:3001/simulation?project=e0838c17-b473-4e97-a455-3336b4af80a1",
+  "baseline": {
+    "id": "b46e0b16-c3fa-49f4-ba82-83c209073349",
+    "metrics": {
+      "arrived": 2869,
+      "elements": [
+        {
+          "completed": 571,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+          "elementName": "Send resolution",
+          "meanQueueMinutes": 0.0049908175093138244,
+          "meanServiceMinutes": 5.284588056775498
+        },
+        {
+          "completed": 2874,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+          "elementName": "Receive response",
+          "meanQueueMinutes": 1200,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 2869,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+          "elementName": "Check request",
+          "meanQueueMinutes": 0.005973281947629693,
+          "meanServiceMinutes": 10
+        },
+        {
+          "completed": 2874,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+          "elementName": "Write resolution",
+          "meanQueueMinutes": 24505.58838725486,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 2874,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+          "elementName": "Solve Request",
+          "meanQueueMinutes": 24663.45556357742,
+          "meanServiceMinutes": 120
+        },
+        {
+          "completed": 576,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1lho2iu",
+          "elementName": "Forward to Level-2",
+          "meanQueueMinutes": 0.004873137224611052,
+          "meanServiceMinutes": 2
+        },
+        {
+          "completed": 2297,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+          "elementName": "Evaluate request",
+          "meanQueueMinutes": 16442.070132895416,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 2874,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+          "elementName": "Send resolution",
+          "meanQueueMinutes": 0.002156981094764853,
+          "meanServiceMinutes": 20.000941221016685
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1krfj9q",
+          "elementName": "Request solved",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1u1d1b4",
+          "elementName": "Request solved",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_12y6m03",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_18x5arg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_1i01pjg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::StartEvent_1wsxujp",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        }
+      ],
+      "meanCost": 177.25547231905938,
+      "completed": 2869,
+      "resources": [
+        {
+          "name": "level 1",
+          "capacity": 5,
+          "resourceId": "level 1",
+          "busyMinutes": 90365.3765676016,
+          "utilization": 0.11774179903878608,
+          "meanQueueLength": 0.00018950475631273746,
+          "maximumQueueSize": 2
+        },
+        {
+          "name": "level 2",
+          "capacity": 3,
+          "resourceId": "level 2",
+          "busyMinutes": 448398,
+          "utilization": 0.9736766186379422,
+          "meanQueueLength": 1166.9208251552898,
+          "maximumQueueSize": 1935
+        }
+      ],
+      "traceTruncated": true,
+      "p90CycleMinutes": 113947.33639659993,
+      "p95CycleMinutes": 120554.11064152766,
+      "meanCycleMinutes": 63821.54561696523,
+      "throughputPerHour": 1.1217710396108282,
+      "meanWaitingMinutes": 63633.792999672274,
+      "medianCycleMinutes": 81877.11293335936,
+      "cycleTimeEfficiency": 0.0029382396844053,
+      "meanProcessingMinutes": 187.752617292939
+    },
+    "cycleTime95": {
+      "mean": 63821.54561696523,
+      "lower": 62827.20486388679,
+      "upper": 64815.88637004367
+    },
+    "cost95": {
+      "mean": 177.25547231905938,
+      "lower": 176.3331695308489,
+      "upper": 178.17777510726987
+    },
+    "throughput95": {
+      "mean": 1.1217710396108282,
+      "lower": 1.1143624599351483,
+      "upper": 1.1291796192865082
+    }
+  },
+  "comparison": {
+    "id": "01d1074d-01a0-4e6a-b86b-7b7df033862f",
+    "metrics": {
+      "arrived": 2869,
+      "elements": [
+        {
+          "completed": 565,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+          "elementName": "Send resolution",
+          "meanQueueMinutes": 0.2066842996892543,
+          "meanServiceMinutes": 5.340909584096532
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+          "elementName": "Receive response",
+          "meanQueueMinutes": 1200,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 2869,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+          "elementName": "Check request",
+          "meanQueueMinutes": 0.19887858075990808,
+          "meanServiceMinutes": 10
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+          "elementName": "Write resolution",
+          "meanQueueMinutes": 13.555968044830413,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+          "elementName": "Solve Request",
+          "meanQueueMinutes": 13.098727299392559,
+          "meanServiceMinutes": 120
+        },
+        {
+          "completed": 571,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1lho2iu",
+          "elementName": "Forward to Level-2",
+          "meanQueueMinutes": 0.18410790805056393,
+          "meanServiceMinutes": 2
+        },
+        {
+          "completed": 2303,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+          "elementName": "Evaluate request",
+          "meanQueueMinutes": 13.330839702756904,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+          "elementName": "Send resolution",
+          "meanQueueMinutes": 0.17566257769142835,
+          "meanServiceMinutes": 19.996920840418397
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1krfj9q",
+          "elementName": "Request solved",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1u1d1b4",
+          "elementName": "Request solved",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_12y6m03",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_18x5arg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_1i01pjg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::StartEvent_1wsxujp",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        }
+      ],
+      "meanCost": 177.3639883696849,
+      "completed": 2869,
+      "resources": [
+        {
+          "name": "level 1",
+          "capacity": 5,
+          "resourceId": "level 1",
+          "busyMinutes": 90364.12198466623,
+          "utilization": 0.3785829608903722,
+          "meanQueueLength": 0.027220474882198246,
+          "maximumQueueSize": 5
+        },
+        {
+          "name": "level 2",
+          "capacity": 12,
+          "resourceId": "level 2",
+          "busyMinutes": 448676,
+          "utilization": 0.7832292879223755,
+          "meanQueueLength": 2.252614945058696,
+          "maximumQueueSize": 24
+        }
+      ],
+      "traceTruncated": true,
+      "p90CycleMinutes": 2789.859513342878,
+      "p95CycleMinutes": 2894.059792102022,
+      "meanCycleMinutes": 1428.4083044606998,
+      "throughputPerHour": 3.6065830880607805,
+      "meanWaitingMinutes": 1240.5468936132597,
+      "medianCycleMinutes": 1405.1144465813086,
+      "cycleTimeEfficiency": 0.13124607276024683,
+      "meanProcessingMinutes": 187.86141084743994
+    },
+    "cycleTime95": {
+      "mean": 1428.4083044606998,
+      "lower": 1420.7222682444606,
+      "upper": 1436.094340676939
+    },
+    "cost95": {
+      "mean": 177.3639883696849,
+      "lower": 176.67304030229784,
+      "upper": 178.05493643707197
+    },
+    "throughput95": {
+      "mean": 3.6065830880607805,
+      "lower": 3.568507160895999,
+      "upper": 3.644659015225562
+    }
+  },
+  "campaignId": "c22fa1da-b5c4-4f34-b204-ec904fb7bb27",
+  "experiment": {
+    "points": [
+      {
+        "meanCost": 176.91436050868197,
+        "parameters": {
+          "resource.level 1.capacity": 3,
+          "resource.level 2.capacity": 3
+        },
+        "p95CycleMinutes": 120158.7755089318,
+        "meanCycleMinutes": 63413.78917220943,
+        "meetsConstraints": true,
+        "throughputPerHour": 1.1277727563512419
+      },
+      {
+        "meanCost": 176.41380491897218,
+        "parameters": {
+          "resource.level 1.capacity": 3,
+          "resource.level 2.capacity": 6
+        },
+        "p95CycleMinutes": 42926.853653000246,
+        "meanCycleMinutes": 18997.539316741713,
+        "meetsConstraints": true,
+        "throughputPerHour": 2.202246011623875
+      },
+      {
+        "meanCost": 176.63068331294386,
+        "parameters": {
+          "resource.level 1.capacity": 3,
+          "resource.level 2.capacity": 9
+        },
+        "p95CycleMinutes": 12062.177317498605,
+        "meanCycleMinutes": 4927.252140781187,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.131384621925218
+      },
+      {
+        "meanCost": 177.2164241905592,
+        "parameters": {
+          "resource.level 1.capacity": 3,
+          "resource.level 2.capacity": 11
+        },
+        "p95CycleMinutes": 3282.8288183099294,
+        "meanCycleMinutes": 1541.6837065683662,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.6104645298675946
+      },
+      {
+        "meanCost": 177.0850502831221,
+        "parameters": {
+          "resource.level 1.capacity": 3,
+          "resource.level 2.capacity": 12
+        },
+        "p95CycleMinutes": 2905.6507756984684,
+        "meanCycleMinutes": 1433.2194947872135,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.576591582678976
+      },
+      {
+        "meanCost": 177.16419104168966,
+        "parameters": {
+          "resource.level 1.capacity": 3,
+          "resource.level 2.capacity": 15
+        },
+        "p95CycleMinutes": 2804.314930061908,
+        "meanCycleMinutes": 1403.472988198346,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.58828676224253
+      },
+      {
+        "meanCost": 177.25547231905938,
+        "parameters": {
+          "resource.level 1.capacity": 5,
+          "resource.level 2.capacity": 3
+        },
+        "p95CycleMinutes": 120554.11064152766,
+        "meanCycleMinutes": 63821.54561696523,
+        "meetsConstraints": true,
+        "throughputPerHour": 1.1217710396108282
+      },
+      {
+        "meanCost": 177.5502506945174,
+        "parameters": {
+          "resource.level 1.capacity": 5,
+          "resource.level 2.capacity": 6
+        },
+        "p95CycleMinutes": 43221.36278864343,
+        "meanCycleMinutes": 19267.328344920745,
+        "meetsConstraints": true,
+        "throughputPerHour": 2.1779992300453728
+      },
+      {
+        "meanCost": 177.53966935789387,
+        "parameters": {
+          "resource.level 1.capacity": 5,
+          "resource.level 2.capacity": 9
+        },
+        "p95CycleMinutes": 12479.116109183782,
+        "meanCycleMinutes": 5103.918404943343,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.1683731278414284
+      },
+      {
+        "meanCost": 177.06398481845625,
+        "parameters": {
+          "resource.level 1.capacity": 5,
+          "resource.level 2.capacity": 11
+        },
+        "p95CycleMinutes": 3248.667458204781,
+        "meanCycleMinutes": 1525.302054796211,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.625010485071294
+      },
+      {
+        "meanCost": 177.3639883696849,
+        "parameters": {
+          "resource.level 1.capacity": 5,
+          "resource.level 2.capacity": 12
+        },
+        "p95CycleMinutes": 2894.059792102022,
+        "meanCycleMinutes": 1428.4083044606998,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.6065830880607805
+      },
+      {
+        "meanCost": 176.68995369653263,
+        "parameters": {
+          "resource.level 1.capacity": 5,
+          "resource.level 2.capacity": 15
+        },
+        "p95CycleMinutes": 2771.4333007535297,
+        "meanCycleMinutes": 1389.2390283548789,
+        "meetsConstraints": true,
+        "throughputPerHour": 3.608129227619751
+      }
+    ],
+    "objective": "mean_cycle",
+    "scenarioName": "Assignment 2 — Exercise 3 — Staffing experiment",
+    "recommendedPoint": 11
+  }
+}

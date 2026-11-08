@@ -28,6 +28,8 @@ transactional runtime.
   exception dates; work pauses outside configured availability;
 - skill-based eligible resource pools, fixed/least-queue/round-robin routing,
   and priority queues with FIFO ordering inside the same priority;
+- per-activity team sizes: reserve one or more people from a shared resource
+  pool, wait for the whole team, and account for each person's labor cost;
 - structured parallel and inclusive fork/join gateways, including nested
   forks and inclusive branches selected independently;
 - asynchronous, resumable campaigns with progress, cancellation, and a
@@ -89,6 +91,34 @@ a required workflow or a special execution mode.
    change capacity or process parameters, and compare the new result.
 10. Track detected and manually observed problems in **Issues**. Use **Modeler**
    to draw the selected to-be process.
+
+## One shared pool, different activity team sizes
+
+Create a resource pool once in **Workload & resources** and set its **Capacity**
+to the total number of people. In **Project & models**, select each activity,
+choose the same **Resource pool**, and set **People required** individually.
+For example, a four-person pool can run a one-person review and a three-person
+installation together. With only three people, one activity waits until enough
+people are free. Do not duplicate the resource pool for the second activity.
+
+The API field is `activities[elementKey].resourceUnits`. Omitted or zero values
+retain the previous one-person default. Team size must be an integer; an
+activity cannot request more people than any eligible pool can provide. All
+members are reserved together from one selected pool and released together on
+completion. Requests keep their priority/FIFO position: smaller jobs do not
+bypass a queued team request. Active tasks retain their allocation through
+calendar pauses, and earlier work retains precedence when shifts reduce capacity.
+
+Processing time is the elapsed working duration for the configured team; it is
+not automatically divided by team size. Resource cost is per person per hour,
+so a three-person activity lasting 20 working minutes at 60 per person/hour
+costs 60, plus any fixed activity cost once. Utilization uses person-minutes;
+replay/export events include `resourceUnits`. A team only works while its full
+required capacity is available, including when shifts change during execution.
+
+Team size can also be varied in factorial experiments with
+`activity.<elementKey>.resourceUnits`. For capacity sweeps, choose a range that
+can accommodate the required teams; an impossible pool configuration is rejected.
 
 ## API
 

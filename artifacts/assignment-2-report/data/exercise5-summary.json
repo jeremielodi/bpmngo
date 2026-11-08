@@ -1,0 +1,1316 @@
+{
+  "projectId": "7d7e9c09-be11-4d7a-aa1a-83c19c0f1444",
+  "url": "http://localhost:3001/simulation?project=7d7e9c09-be11-4d7a-aa1a-83c19c0f1444",
+  "sourceProjectId": "e0838c17-b473-4e97-a455-3336b4af80a1",
+  "baseline": {
+    "id": "ffedf848-77ba-4f23-b652-567361d7c0bc",
+    "metrics": {
+      "arrived": 2869,
+      "elements": [
+        {
+          "completed": 565,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+          "elementName": "Send resolution",
+          "meanQueueMinutes": 0.2066842996892543,
+          "meanServiceMinutes": 5.340909584096532
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+          "elementName": "Receive response",
+          "meanQueueMinutes": 1200,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 2869,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+          "elementName": "Check request",
+          "meanQueueMinutes": 0.19887858075990808,
+          "meanServiceMinutes": 10
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+          "elementName": "Write resolution",
+          "meanQueueMinutes": 13.555968044830413,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+          "elementName": "Solve Request",
+          "meanQueueMinutes": 13.098727299392559,
+          "meanServiceMinutes": 120
+        },
+        {
+          "completed": 571,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1lho2iu",
+          "elementName": "Forward to Level-2",
+          "meanQueueMinutes": 0.18410790805056393,
+          "meanServiceMinutes": 2
+        },
+        {
+          "completed": 2303,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+          "elementName": "Evaluate request",
+          "meanQueueMinutes": 13.330839702756904,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 2875,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+          "elementName": "Send resolution",
+          "meanQueueMinutes": 0.17566257769142835,
+          "meanServiceMinutes": 19.996920840418397
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1krfj9q",
+          "elementName": "Request solved",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1u1d1b4",
+          "elementName": "Request solved",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_12y6m03",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_18x5arg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_1i01pjg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::StartEvent_1wsxujp",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        }
+      ],
+      "meanCost": 177.3639883696849,
+      "completed": 2869,
+      "resources": [
+        {
+          "name": "level 1",
+          "capacity": 5,
+          "resourceId": "level 1",
+          "busyMinutes": 90364.12198466623,
+          "utilization": 0.3785829608903722,
+          "meanQueueLength": 0.027220474882198246,
+          "maximumQueueSize": 5
+        },
+        {
+          "name": "level 2",
+          "capacity": 12,
+          "resourceId": "level 2",
+          "busyMinutes": 448676,
+          "utilization": 0.7832292879223755,
+          "meanQueueLength": 2.252614945058696,
+          "maximumQueueSize": 24
+        }
+      ],
+      "traceTruncated": true,
+      "p90CycleMinutes": 2789.859513342878,
+      "p95CycleMinutes": 2894.059792102022,
+      "meanCycleMinutes": 1428.4083044606998,
+      "throughputPerHour": 3.6065830880607805,
+      "meanWaitingMinutes": 1240.5468936132597,
+      "medianCycleMinutes": 1405.1144465813086,
+      "cycleTimeEfficiency": 0.13124607276024683,
+      "meanProcessingMinutes": 187.86141084743994
+    },
+    "cycleTime95": {
+      "mean": 1428.4083044606998,
+      "lower": 1420.7222682444606,
+      "upper": 1436.094340676939
+    },
+    "cost95": {
+      "mean": 177.3639883696849,
+      "lower": 176.67304030229784,
+      "upper": 178.05493643707197
+    },
+    "analytic": {
+      "elements": [
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+          "resourceId": "level 1",
+          "elementName": "Send resolution",
+          "expectedCost": 0.6666666666666666,
+          "expectedVisits": 0.2,
+          "processingMinutes": 1,
+          "valueAddedMinutes": 1,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+          "elementName": "Receive response",
+          "expectedCost": 0,
+          "expectedVisits": 0.9999999999672321,
+          "processingMinutes": 0,
+          "valueAddedMinutes": 0,
+          "explicitWaitMinutes": 1199.9999999606785
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+          "resourceId": "level 1",
+          "elementName": "Check request",
+          "expectedCost": 6.666666666666666,
+          "expectedVisits": 1,
+          "processingMinutes": 10,
+          "valueAddedMinutes": 10,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+          "resourceId": "level 2",
+          "elementName": "Write resolution",
+          "expectedCost": 19.99999999934464,
+          "expectedVisits": 0.9999999999672321,
+          "processingMinutes": 19.99999999934464,
+          "valueAddedMinutes": 19.99999999934464,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+          "resourceId": "level 2",
+          "elementName": "Solve Request",
+          "expectedCost": 119.99999999606786,
+          "expectedVisits": 0.9999999999672321,
+          "processingMinutes": 119.99999999606786,
+          "valueAddedMinutes": 119.99999999606786,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1lho2iu",
+          "resourceId": "level 1",
+          "elementName": "Forward to Level-2",
+          "expectedCost": 0.2666666666579286,
+          "expectedVisits": 0.19999999999344642,
+          "processingMinutes": 0.39999999998689284,
+          "valueAddedMinutes": 0,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+          "resourceId": "level 2",
+          "elementName": "Evaluate request",
+          "expectedCost": 16,
+          "expectedVisits": 0.8,
+          "processingMinutes": 16,
+          "valueAddedMinutes": 16,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+          "resourceId": "level 1",
+          "elementName": "Send resolution",
+          "expectedCost": 13.333333332896428,
+          "expectedVisits": 0.9999999999672321,
+          "processingMinutes": 19.99999999934464,
+          "valueAddedMinutes": 19.99999999934464,
+          "explicitWaitMinutes": 0
+        }
+      ],
+      "waitingMinutes": 1199.9999999606785,
+      "costPerExecution": 176.93333332830017,
+      "cycleTimeMinutes": 1387.3999999554226,
+      "processingMinutes": 187.39999999474406,
+      "valueAddedMinutes": 186.99999999475716,
+      "cycleTimeEfficiency": 0.13478448897272993
+    }
+  },
+  "primary": {
+    "id": "fde64022-6858-4f8a-967a-77b5d7b575b6",
+    "metrics": {
+      "arrived": 2869,
+      "elements": [
+        {
+          "completed": 574,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+          "elementName": "Send known resolution",
+          "meanQueueMinutes": 0.003905699380276055,
+          "meanServiceMinutes": 5.32473682737798
+        },
+        {
+          "completed": 2873,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+          "elementName": "Receive client test result",
+          "meanQueueMinutes": 1200,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 2869,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+          "elementName": "Check request",
+          "meanQueueMinutes": 0.004845502166444729,
+          "meanServiceMinutes": 10
+        },
+        {
+          "completed": 2873,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+          "elementName": "Write resolution",
+          "meanQueueMinutes": 14.216517132955719,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 2873,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+          "elementName": "Solve request",
+          "meanQueueMinutes": 13.765818356812275,
+          "meanServiceMinutes": 120
+        },
+        {
+          "completed": 2294,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+          "elementName": "Evaluate request",
+          "meanQueueMinutes": 13.919321155772149,
+          "meanServiceMinutes": 20
+        },
+        {
+          "completed": 292,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+          "elementName": "Explain and send resolution",
+          "meanQueueMinutes": 0.0032232128133435297,
+          "meanServiceMinutes": 19.99746384917913
+        },
+        {
+          "completed": 2581,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoNotify",
+          "elementName": "Notify client automatically",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 1
+        },
+        {
+          "completed": 578,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+          "elementName": "Route feedback to Level-2",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 1
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1krfj9q",
+          "elementName": "Request closed",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1u1d1b4",
+          "elementName": "Known request closed",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_12y6m03",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_18x5arg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_1i01pjg",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_AssistedDelivery",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_DeliveryMerge",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        },
+        {
+          "completed": 0,
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::StartEvent_1wsxujp",
+          "elementName": "",
+          "meanQueueMinutes": 0,
+          "meanServiceMinutes": 0
+        }
+      ],
+      "meanCost": 164.93554789870217,
+      "completed": 2869,
+      "resources": [
+        {
+          "name": "level 1",
+          "capacity": 5,
+          "resourceId": "level 1",
+          "busyMinutes": 37592.327011670524,
+          "utilization": 0.15717650456435295,
+          "meanQueueLength": 0.00035652864377300295,
+          "maximumQueueSize": 1
+        },
+        {
+          "name": "level 2",
+          "capacity": 12,
+          "resourceId": "level 2",
+          "busyMinutes": 448187,
+          "utilization": 0.7807276297574375,
+          "meanQueueLength": 2.3611609835732135,
+          "maximumQueueSize": 24
+        }
+      ],
+      "traceTruncated": true,
+      "p90CycleMinutes": 2758.3863376242634,
+      "p95CycleMinutes": 2867.4370389207625,
+      "meanCycleMinutes": 1411.3801358921867,
+      "throughputPerHour": 3.5990108304154367,
+      "meanWaitingMinutes": 1240.9764012481687,
+      "medianCycleMinutes": 1388.7409502614255,
+      "cycleTimeEfficiency": 0.11997304479770807,
+      "meanProcessingMinutes": 170.40373464401733
+    },
+    "cycleTime95": {
+      "mean": 1411.3801358921867,
+      "lower": 1400.1674404269663,
+      "upper": 1422.592831357407
+    },
+    "cost95": {
+      "mean": 164.93554789870217,
+      "lower": 164.1246887100892,
+      "upper": 165.74640708731513
+    },
+    "analytic": {
+      "elements": [
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+          "resourceId": "level 1",
+          "elementName": "Send known resolution",
+          "expectedCost": 0.6666666666666666,
+          "expectedVisits": 0.2,
+          "processingMinutes": 1,
+          "valueAddedMinutes": 1,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+          "elementName": "Receive client test result",
+          "expectedCost": 0,
+          "expectedVisits": 0.9999999999672322,
+          "processingMinutes": 0,
+          "valueAddedMinutes": 0,
+          "explicitWaitMinutes": 1199.9999999606787
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+          "resourceId": "level 1",
+          "elementName": "Check request",
+          "expectedCost": 6.666666666666666,
+          "expectedVisits": 1,
+          "processingMinutes": 10,
+          "valueAddedMinutes": 10,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+          "resourceId": "level 2",
+          "elementName": "Write resolution",
+          "expectedCost": 19.99999999934464,
+          "expectedVisits": 0.9999999999672321,
+          "processingMinutes": 19.99999999934464,
+          "valueAddedMinutes": 19.99999999934464,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+          "resourceId": "level 2",
+          "elementName": "Solve request",
+          "expectedCost": 119.99999999606786,
+          "expectedVisits": 0.9999999999672321,
+          "processingMinutes": 119.99999999606786,
+          "valueAddedMinutes": 119.99999999606786,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+          "resourceId": "level 2",
+          "elementName": "Evaluate request",
+          "expectedCost": 16,
+          "expectedVisits": 0.8,
+          "processingMinutes": 16,
+          "valueAddedMinutes": 16,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+          "resourceId": "level 1",
+          "elementName": "Explain and send resolution",
+          "expectedCost": 1.3333333332896427,
+          "expectedVisits": 0.09999999999672321,
+          "processingMinutes": 1.9999999999344642,
+          "valueAddedMinutes": 1.9999999999344642,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoNotify",
+          "elementName": "Notify client automatically",
+          "expectedCost": 0,
+          "expectedVisits": 0.899999999970509,
+          "processingMinutes": 0.899999999970509,
+          "valueAddedMinutes": 0,
+          "explicitWaitMinutes": 0
+        },
+        {
+          "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+          "elementName": "Route feedback to Level-2",
+          "expectedCost": 0,
+          "expectedVisits": 0.19999999999344645,
+          "processingMinutes": 0.19999999999344645,
+          "valueAddedMinutes": 0,
+          "explicitWaitMinutes": 0
+        }
+      ],
+      "waitingMinutes": 1199.9999999606787,
+      "costPerExecution": 164.66666666203545,
+      "cycleTimeMinutes": 1370.0999999559897,
+      "processingMinutes": 170.09999999531092,
+      "valueAddedMinutes": 168.99999999534697,
+      "cycleTimeEfficiency": 0.12334866068226814
+    }
+  },
+  "variants": [
+    {
+      "file": "to-be-5-3-90pct",
+      "capacity": 3,
+      "coverage": 0.9,
+      "run": {
+        "id": "f178cc17-0010-483d-82ac-73489f7aac3f",
+        "metrics": {
+          "arrived": 2869,
+          "elements": [
+            {
+              "completed": 579,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+              "elementName": "Send known resolution",
+              "meanQueueMinutes": 0.0023769400815406164,
+              "meanServiceMinutes": 5.287238108525232
+            },
+            {
+              "completed": 2861,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+              "elementName": "Receive client test result",
+              "meanQueueMinutes": 1200,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 2869,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+              "elementName": "Check request",
+              "meanQueueMinutes": 0.0024650923530385037,
+              "meanServiceMinutes": 10
+            },
+            {
+              "completed": 2861,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+              "elementName": "Write resolution",
+              "meanQueueMinutes": 24421.551258381205,
+              "meanServiceMinutes": 20
+            },
+            {
+              "completed": 2861,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+              "elementName": "Solve request",
+              "meanQueueMinutes": 24579.1157986307,
+              "meanServiceMinutes": 120
+            },
+            {
+              "completed": 2289,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+              "elementName": "Evaluate request",
+              "meanQueueMinutes": 16323.82627148508,
+              "meanServiceMinutes": 20
+            },
+            {
+              "completed": 285,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+              "elementName": "Explain and send resolution",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 20.038583172637722
+            },
+            {
+              "completed": 2575,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoNotify",
+              "elementName": "Notify client automatically",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 1
+            },
+            {
+              "completed": 571,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+              "elementName": "Route feedback to Level-2",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 1
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1krfj9q",
+              "elementName": "Request closed",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1u1d1b4",
+              "elementName": "Known request closed",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_12y6m03",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_18x5arg",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_1i01pjg",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_AssistedDelivery",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_DeliveryMerge",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::StartEvent_1wsxujp",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            }
+          ],
+          "meanCost": 164.2564002020047,
+          "completed": 2869,
+          "resources": [
+            {
+              "name": "level 1",
+              "capacity": 5,
+              "resourceId": "level 1",
+              "busyMinutes": 37486.26345534574,
+              "utilization": 0.04913985583937046,
+              "meanQueueLength": 0.00005552047576594072,
+              "maximumQueueSize": 1
+            },
+            {
+              "name": "level 2",
+              "capacity": 3,
+              "resourceId": "level 2",
+              "busyMinutes": 446353,
+              "utilization": 0.9750606790007739,
+              "meanQueueLength": 1163.7601383854756,
+              "maximumQueueSize": 1927
+            }
+          ],
+          "traceTruncated": true,
+          "p90CycleMinutes": 112902.13252950308,
+          "p95CycleMinutes": 119934.74922250673,
+          "meanCycleMinutes": 63259.052886008576,
+          "throughputPerHour": 1.128422305583448,
+          "meanWaitingMinutes": 63089.345311512785,
+          "medianCycleMinutes": 81587.58242251619,
+          "cycleTimeEfficiency": 0.0026685883116438045,
+          "meanProcessingMinutes": 169.70757449579375
+        },
+        "cycleTime95": {
+          "mean": 63259.052886008576,
+          "lower": 62205.564039040895,
+          "upper": 64312.54173297626
+        },
+        "cost95": {
+          "mean": 164.2564002020047,
+          "lower": 163.5881437110134,
+          "upper": 164.924656692996
+        },
+        "analytic": {
+          "elements": [
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+              "resourceId": "level 1",
+              "elementName": "Send known resolution",
+              "expectedCost": 0.6666666666666666,
+              "expectedVisits": 0.2,
+              "processingMinutes": 1,
+              "valueAddedMinutes": 1,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+              "elementName": "Receive client test result",
+              "expectedCost": 0,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 0,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 1199.9999999606785
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+              "resourceId": "level 1",
+              "elementName": "Check request",
+              "expectedCost": 6.666666666666666,
+              "expectedVisits": 1,
+              "processingMinutes": 10,
+              "valueAddedMinutes": 10,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+              "resourceId": "level 2",
+              "elementName": "Write resolution",
+              "expectedCost": 19.99999999934464,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 19.99999999934464,
+              "valueAddedMinutes": 19.99999999934464,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+              "resourceId": "level 2",
+              "elementName": "Solve request",
+              "expectedCost": 119.99999999606786,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 119.99999999606786,
+              "valueAddedMinutes": 119.99999999606786,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+              "resourceId": "level 2",
+              "elementName": "Evaluate request",
+              "expectedCost": 16,
+              "expectedVisits": 0.8,
+              "processingMinutes": 16,
+              "valueAddedMinutes": 16,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+              "resourceId": "level 1",
+              "elementName": "Explain and send resolution",
+              "expectedCost": 1.3333333332896424,
+              "expectedVisits": 0.09999999999672318,
+              "processingMinutes": 1.9999999999344635,
+              "valueAddedMinutes": 1.9999999999344635,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoNotify",
+              "elementName": "Notify client automatically",
+              "expectedCost": 0,
+              "expectedVisits": 0.899999999970509,
+              "processingMinutes": 0.899999999970509,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+              "elementName": "Route feedback to Level-2",
+              "expectedCost": 0,
+              "expectedVisits": 0.19999999999344642,
+              "processingMinutes": 0.19999999999344642,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 0
+            }
+          ],
+          "waitingMinutes": 1199.9999999606785,
+          "costPerExecution": 164.66666666203545,
+          "cycleTimeMinutes": 1370.0999999559895,
+          "processingMinutes": 170.09999999531092,
+          "valueAddedMinutes": 168.99999999534697,
+          "cycleTimeEfficiency": 0.12334866068226816
+        }
+      }
+    },
+    {
+      "file": "to-be-5-12-0pct",
+      "capacity": 12,
+      "coverage": 0,
+      "run": {
+        "id": "dec6ae0d-01d6-49f1-a9cd-a76407d7123f",
+        "metrics": {
+          "arrived": 2869,
+          "elements": [
+            {
+              "completed": 580,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+              "elementName": "Send known resolution",
+              "meanQueueMinutes": 0.20501012687983544,
+              "meanServiceMinutes": 5.329640747293438
+            },
+            {
+              "completed": 2866,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+              "elementName": "Receive client test result",
+              "meanQueueMinutes": 1200,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 2869,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+              "elementName": "Check request",
+              "meanQueueMinutes": 0.18647838363481167,
+              "meanServiceMinutes": 10
+            },
+            {
+              "completed": 2866,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+              "elementName": "Write resolution",
+              "meanQueueMinutes": 14.5806509207959,
+              "meanServiceMinutes": 20
+            },
+            {
+              "completed": 2866,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+              "elementName": "Solve request",
+              "meanQueueMinutes": 14.143488648244675,
+              "meanServiceMinutes": 120
+            },
+            {
+              "completed": 2288,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+              "elementName": "Evaluate request",
+              "meanQueueMinutes": 14.380674504772108,
+              "meanServiceMinutes": 20
+            },
+            {
+              "completed": 2866,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+              "elementName": "Explain and send resolution",
+              "meanQueueMinutes": 0.17200650417557722,
+              "meanServiceMinutes": 20.00652201500063
+            },
+            {
+              "completed": 577,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+              "elementName": "Route feedback to Level-2",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 1
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1krfj9q",
+              "elementName": "Request closed",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1u1d1b4",
+              "elementName": "Known request closed",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_12y6m03",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_18x5arg",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_1i01pjg",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_AssistedDelivery",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_DeliveryMerge",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::StartEvent_1wsxujp",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            }
+          ],
+          "meanCost": 176.48970816097943,
+          "completed": 2869,
+          "resources": [
+            {
+              "name": "level 1",
+              "capacity": 5,
+              "resourceId": "level 1",
+              "busyMinutes": 89130.16904762153,
+              "utilization": 0.3707421908582516,
+              "meanQueueLength": 0.023861030530441134,
+              "maximumQueueSize": 5
+            },
+            {
+              "name": "level 2",
+              "capacity": 12,
+              "resourceId": "level 2",
+              "busyMinutes": 447030,
+              "utilization": 0.7747865449961867,
+              "meanQueueLength": 2.405538780236639,
+              "maximumQueueSize": 25
+            }
+          ],
+          "traceTruncated": true,
+          "p90CycleMinutes": 2792.843636667107,
+          "p95CycleMinutes": 2903.983410911108,
+          "meanCycleMinutes": 1426.1752186699825,
+          "throughputPerHour": 3.5805759305898435,
+          "meanWaitingMinutes": 1239.1308355100698,
+          "medianCycleMinutes": 1405.3564472614714,
+          "cycleTimeEfficiency": 0.13102258561456287,
+          "meanProcessingMinutes": 187.04438315991248
+        },
+        "cycleTime95": {
+          "mean": 1426.1752186699825,
+          "lower": 1416.7281867766612,
+          "upper": 1435.6222505633039
+        },
+        "cost95": {
+          "mean": 176.48970816097943,
+          "lower": 175.75406537521744,
+          "upper": 177.22535094674143
+        },
+        "analytic": {
+          "elements": [
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+              "resourceId": "level 1",
+              "elementName": "Send known resolution",
+              "expectedCost": 0.6666666666666666,
+              "expectedVisits": 0.2,
+              "processingMinutes": 1,
+              "valueAddedMinutes": 1,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+              "elementName": "Receive client test result",
+              "expectedCost": 0,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 0,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 1199.9999999606785
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+              "resourceId": "level 1",
+              "elementName": "Check request",
+              "expectedCost": 6.666666666666666,
+              "expectedVisits": 1,
+              "processingMinutes": 10,
+              "valueAddedMinutes": 10,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+              "resourceId": "level 2",
+              "elementName": "Write resolution",
+              "expectedCost": 19.99999999934464,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 19.99999999934464,
+              "valueAddedMinutes": 19.99999999934464,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+              "resourceId": "level 2",
+              "elementName": "Solve request",
+              "expectedCost": 119.99999999606786,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 119.99999999606786,
+              "valueAddedMinutes": 119.99999999606786,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+              "resourceId": "level 2",
+              "elementName": "Evaluate request",
+              "expectedCost": 16,
+              "expectedVisits": 0.8,
+              "processingMinutes": 16,
+              "valueAddedMinutes": 16,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+              "resourceId": "level 1",
+              "elementName": "Explain and send resolution",
+              "expectedCost": 13.333333332896428,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 19.99999999934464,
+              "valueAddedMinutes": 19.99999999934464,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoNotify",
+              "elementName": "Notify client automatically",
+              "expectedCost": 0,
+              "expectedVisits": 0,
+              "processingMinutes": 0,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+              "elementName": "Route feedback to Level-2",
+              "expectedCost": 0,
+              "expectedVisits": 0.19999999999344642,
+              "processingMinutes": 0.19999999999344642,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 0
+            }
+          ],
+          "waitingMinutes": 1199.9999999606785,
+          "costPerExecution": 176.66666666164224,
+          "cycleTimeMinutes": 1387.1999999554291,
+          "processingMinutes": 187.1999999947506,
+          "valueAddedMinutes": 186.99999999475716,
+          "cycleTimeEfficiency": 0.13480392156917928
+        }
+      }
+    },
+    {
+      "file": "to-be-5-12-100pct",
+      "capacity": 12,
+      "coverage": 1,
+      "run": {
+        "id": "ac327f03-8e89-4b02-afd3-54533f17c93e",
+        "metrics": {
+          "arrived": 2869,
+          "elements": [
+            {
+              "completed": 578,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+              "elementName": "Send known resolution",
+              "meanQueueMinutes": 0.00287076219971106,
+              "meanServiceMinutes": 5.299732900039375
+            },
+            {
+              "completed": 2874,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+              "elementName": "Receive client test result",
+              "meanQueueMinutes": 1200,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 2869,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+              "elementName": "Check request",
+              "meanQueueMinutes": 0.002546862650631302,
+              "meanServiceMinutes": 10
+            },
+            {
+              "completed": 2874,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+              "elementName": "Write resolution",
+              "meanQueueMinutes": 14.367766645948606,
+              "meanServiceMinutes": 20
+            },
+            {
+              "completed": 2874,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+              "elementName": "Solve request",
+              "meanQueueMinutes": 13.918116544532392,
+              "meanServiceMinutes": 120
+            },
+            {
+              "completed": 2290,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+              "elementName": "Evaluate request",
+              "meanQueueMinutes": 14.081376527712255,
+              "meanServiceMinutes": 20
+            },
+            {
+              "completed": 2874,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoNotify",
+              "elementName": "Notify client automatically",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 1
+            },
+            {
+              "completed": 584,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+              "elementName": "Route feedback to Level-2",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 1
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1krfj9q",
+              "elementName": "Request closed",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Event_1u1d1b4",
+              "elementName": "Known request closed",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_12y6m03",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_18x5arg",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_1i01pjg",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_AssistedDelivery",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Gateway_DeliveryMerge",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            },
+            {
+              "completed": 0,
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::StartEvent_1wsxujp",
+              "elementName": "",
+              "meanQueueMinutes": 0,
+              "meanServiceMinutes": 0
+            }
+          ],
+          "meanCost": 163.5868963185348,
+          "completed": 2869,
+          "resources": [
+            {
+              "name": "level 1",
+              "capacity": 5,
+              "resourceId": "level 1",
+              "busyMinutes": 31762.824409134795,
+              "utilization": 0.13308412423904953,
+              "meanQueueLength": 0.00018722084140556375,
+              "maximumQueueSize": 1
+            },
+            {
+              "name": "level 2",
+              "capacity": 12,
+              "resourceId": "level 2",
+              "busyMinutes": 448255,
+              "utilization": 0.7824317323708327,
+              "meanQueueLength": 2.391910587873134,
+              "maximumQueueSize": 24
+            }
+          ],
+          "traceTruncated": true,
+          "p90CycleMinutes": 2759.7122160021054,
+          "p95CycleMinutes": 2864.2021833636727,
+          "meanCycleMinutes": 1410.238647654773,
+          "throughputPerHour": 3.606699404526295,
+          "meanWaitingMinutes": 1241.7567055809945,
+          "medianCycleMinutes": 1386.8487518653399,
+          "cycleTimeEfficiency": 0.11863739591571107,
+          "meanProcessingMinutes": 168.4819420737783
+        },
+        "cycleTime95": {
+          "mean": 1410.238647654773,
+          "lower": 1396.9603028617776,
+          "upper": 1423.5169924477686
+        },
+        "cost95": {
+          "mean": 163.5868963185348,
+          "lower": 162.6291946137236,
+          "upper": 164.544598023346
+        },
+        "analytic": {
+          "elements": [
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0ouwyd5",
+              "resourceId": "level 1",
+              "elementName": "Send known resolution",
+              "expectedCost": 0.6666666666666666,
+              "expectedVisits": 0.2,
+              "processingMinutes": 1,
+              "valueAddedMinutes": 1,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+              "elementName": "Receive client test result",
+              "expectedCost": 0,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 0,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 1199.9999999606785
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+              "resourceId": "level 1",
+              "elementName": "Check request",
+              "expectedCost": 6.666666666666666,
+              "expectedVisits": 1,
+              "processingMinutes": 10,
+              "valueAddedMinutes": 10,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+              "resourceId": "level 2",
+              "elementName": "Write resolution",
+              "expectedCost": 19.99999999934464,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 19.99999999934464,
+              "valueAddedMinutes": 19.99999999934464,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+              "resourceId": "level 2",
+              "elementName": "Solve request",
+              "expectedCost": 119.99999999606786,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 119.99999999606786,
+              "valueAddedMinutes": 119.99999999606786,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1npzcct",
+              "resourceId": "level 2",
+              "elementName": "Evaluate request",
+              "expectedCost": 16,
+              "expectedVisits": 0.8,
+              "processingMinutes": 16,
+              "valueAddedMinutes": 16,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+              "resourceId": "level 1",
+              "elementName": "Explain and send resolution",
+              "expectedCost": 0,
+              "expectedVisits": 0,
+              "processingMinutes": 0,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoNotify",
+              "elementName": "Notify client automatically",
+              "expectedCost": 0,
+              "expectedVisits": 0.9999999999672321,
+              "processingMinutes": 0.9999999999672321,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 0
+            },
+            {
+              "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_AutoRoute",
+              "elementName": "Route feedback to Level-2",
+              "expectedCost": 0,
+              "expectedVisits": 0.19999999999344642,
+              "processingMinutes": 0.19999999999344642,
+              "valueAddedMinutes": 0,
+              "explicitWaitMinutes": 0
+            }
+          ],
+          "waitingMinutes": 1199.9999999606785,
+          "costPerExecution": 163.33333332874582,
+          "cycleTimeMinutes": 1368.1999999560517,
+          "processingMinutes": 168.1999999953732,
+          "valueAddedMinutes": 166.9999999954125,
+          "cycleTimeEfficiency": 0.12205817862942316
+        }
+      }
+    }
+  ],
+  "assumptions": {
+    "arrivalRate": 4,
+    "durationHours": 720,
+    "replications": 20,
+    "seed": 42,
+    "automationCoverage": 0.9,
+    "automatedStepMinutes": 1,
+    "automatedStepIncrementalCost": 0,
+    "clientWaitMinutes": 1200,
+    "knownProbability": 0.2,
+    "reworkProbability": 0.2
+  }
+}

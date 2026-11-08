@@ -1,0 +1,134 @@
+{
+  "projectId": "e0838c17-b473-4e97-a455-3336b4af80a1",
+  "projectUrl": "http://localhost:3001/simulation?project=e0838c17-b473-4e97-a455-3336b4af80a1",
+  "sourceRuns": {
+    "baseline": "b46e0b16-c3fa-49f4-ba82-83c209073349",
+    "comparison": "01d1074d-01a0-4e6a-b86b-7b7df033862f",
+    "factorial": "c22fa1da-b5c4-4f34-b204-ec904fb7bb27"
+  },
+  "heuristicSource": "https://hreijers.win.tue.nl/H.A.%20Reijers%20Bestanden/BPRpractices.pdf",
+  "issues": [
+    {
+      "code": "EX4_I1",
+      "title": "I1 — Level-2 capacity cannot sustain the incoming workload",
+      "category": "capacity",
+      "severity": "high",
+      "priority": 1,
+      "heuristics": [
+        "Extra resources"
+      ],
+      "evidence": "Exercise 3 baseline run b46e0b16-c3fa-49f4-ba82-83c209073349: 4 arrivals/hour, Level-1/Level-2 capacities 5/3, 720-hour admission horizon and 20 replications. Mean cycle 1063.69 hours; Level-2 utilization 97.37%, mean queue 1166.92. Expected Level-2 work is 156 minutes per incoming case, or 10.4 staff-hours/hour. These are finite-horizon results including backlog drain, not steady-state waits.",
+      "change": "Validate and provision sufficient qualified Level-2 capacity; use 12 as a candidate at the original demand and routing, and reassess staffing after redesign.",
+      "justification": "Available capacity is below the workload even before considering variability. At 5/12, the measured mean cycle falls to 23.81 hours and Level-2 mean queue to 2.25 requests. Capacity relief directly addresses this bottleneck.",
+      "tradeoff": "The fully staffed hourly budget rises from €380 at 5/3 to €920 at 5/12. This differs from processing labor cost per case. No service-level target or staffing budget establishes a unique optimum.",
+      "validation": "Use the completed 3, 6, 9, 11, 12, 15 Level-2 capacity comparisons. Retest candidate capacities after changing routing or tasks; assess mean/p95 cycle, queues and hourly staffing budget.",
+      "evidenceType": "Measured in Exercise 3; capacity requirement also calculated",
+      "owner": "Service desk manager",
+      "status": "open",
+      "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1kwn3zv",
+      "suggestion": "Proposal C1 — Validate and provision sufficient qualified Level-2 capacity; use 12 as a candidate at the original demand and routing, and reassess staffing after redesign. Heuristic(s): Extra resources. Justification: Available capacity is below the workload even before considering variability. At 5/12, the measured mean cycle falls to 23.81 hours and Level-2 mean queue to 2.25 requests. Capacity relief directly addresses this bottleneck. Trade-off: The fully staffed hourly budget rises from €380 at 5/3 to €920 at 5/12. This differs from processing labor cost per case. No service-level target or staffing budget establishes a unique optimum. Validation: Use the completed 3, 6, 9, 11, 12, 15 Level-2 capacity comparisons. Retest candidate capacities after changing routing or tasks; assess mean/p95 cycle, queues and hourly staffing budget. Proposed owner: Service desk manager."
+    },
+    {
+      "code": "EX4_I2",
+      "title": "I2 — Internal pickup delays dominate the as-is elapsed time",
+      "category": "waiting",
+      "severity": "high",
+      "priority": 2,
+      "heuristics": [
+        "Task automation"
+      ],
+      "evidence": "Assignment assumptions: 1 hour before checking, 2 hours before evaluation, 20 hours before resolution work and 20 hours before Level-1 fetches the written result. With the given probabilities and repeat visits, these contribute 42.6 expected hours per initial request in Exercise 1. Exercise 3 explicitly removes these fixed delays; it cannot measure a further reduction of them.",
+      "change": "Introduce event-driven work assignment and notifications instead of periodic/manual pickup; instrument queue entry, assignment and start times.",
+      "justification": "Prompt dispatch can remove avoidable polling or batch-release time. Real resource queues must remain in the model, because an alert cannot create missing staff capacity.",
+      "tradeoff": "The assignment does not establish how much of each observed delay is polling versus staff shortage. Removing all delays is an upper-bound scenario, not a demonstrated benefit. Avoid adding observed waits on top of modeled queues without separating their causes.",
+      "validation": "Use a separate Exercise-1-based timing scenario for fixed-delay sensitivity, retaining the client delay. In an operational pilot measure dispatch latency separately from resource waiting. Do not claim these savings from the Exercise 3 comparison.",
+      "evidenceType": "Assignment assumption; causes and achievable savings need validation",
+      "owner": "Workflow/platform owner",
+      "status": "open",
+      "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+      "suggestion": "Proposal C2 — Introduce event-driven work assignment and notifications instead of periodic/manual pickup; instrument queue entry, assignment and start times. Heuristic(s): Task automation. Justification: Prompt dispatch can remove avoidable polling or batch-release time. Real resource queues must remain in the model, because an alert cannot create missing staff capacity. Trade-off: The assignment does not establish how much of each observed delay is polling versus staff shortage. Removing all delays is an upper-bound scenario, not a demonstrated benefit. Avoid adding observed waits on top of modeled queues without separating their causes. Validation: Use a separate Exercise-1-based timing scenario for fixed-delay sensitivity, retaining the client delay. In an operational pilot measure dispatch latency separately from resource waiting. Do not claim these savings from the Exercise 3 comparison. Proposed owner: Workflow/platform owner."
+    },
+    {
+      "code": "EX4_I3",
+      "title": "I3 — Written resolutions pass through an avoidable Level-1 relay",
+      "category": "handoff",
+      "severity": "medium",
+      "priority": 3,
+      "heuristics": [
+        "Task elimination",
+        "Task automation"
+      ],
+      "evidence": "The assignment routes a Level-2 written resolution back through Level-1, which spends 20 minutes sending it to the client. If unsuccessful, Level-1 spends another 2 minutes forwarding it back. Both occur on the repeated resolution path; the known-resolution branch is a different activity.",
+      "change": "After Level-2 completes the resolution, notify the client automatically and route unsuccessful feedback directly to the appropriate Level-2 queue. Retain a named contact and an exception path for cases needing explanation.",
+      "justification": "Eliminating duplicate forwarding reduces work and transfers while preserving diagnosis, resolution and client confirmation. Automating delivery targets the relay rather than the problem-solving task.",
+      "tradeoff": "The relay may contain useful explanation, so validate which requests can bypass it. Assign automation latency and operating cost explicitly; do not assume all technical work is free.",
+      "validation": "In a separate to-be model replace only the post-writing Send resolution and failed-feedback forwarding steps. Hold staffing and probabilities constant first; compare labor cost, cycle time and communication quality.",
+      "evidenceType": "Assignment process structure; benefit is a proposal",
+      "owner": "Service desk process owner",
+      "status": "open",
+      "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1pt3bpc",
+      "suggestion": "Proposal C3 — After Level-2 completes the resolution, notify the client automatically and route unsuccessful feedback directly to the appropriate Level-2 queue. Retain a named contact and an exception path for cases needing explanation. Heuristic(s): Task elimination, Task automation. Justification: Eliminating duplicate forwarding reduces work and transfers while preserving diagnosis, resolution and client confirmation. Automating delivery targets the relay rather than the problem-solving task. Trade-off: The relay may contain useful explanation, so validate which requests can bypass it. Assign automation latency and operating cost explicitly; do not assume all technical work is free. Validation: In a separate to-be model replace only the post-writing Send resolution and failed-feedback forwarding steps. Hold staffing and probabilities constant first; compare labor cost, cycle time and communication quality. Proposed owner: Service desk process owner."
+    },
+    {
+      "code": "EX4_I4",
+      "title": "I4 — Eighty percent of incoming requests require escalation",
+      "category": "routing",
+      "severity": "medium",
+      "priority": 4,
+      "heuristics": [
+        "Specialist-generalist"
+      ],
+      "evidence": "The supplied known-resolution probability is 20%, so 80% of initial requests reach Level-2. At 4 requests/hour this means 3.2 new Level-2 requests/hour before repeated attempts. The assignment describes Level-1 staff as junior; it does not establish that they are underperforming.",
+      "change": "Broaden Level-1 competence through targeted training and a maintained knowledge base, while retaining escalation for difficult or uncertain cases.",
+      "justification": "Broader skills can allow genuinely suitable requests to finish at Level-1 and reduce specialist demand. Under unchanged task times and rework, moving the known rate from 20% to 40% would reduce expected Level-2 workload from 10.4 to 7.8 staff-hours/hour; this is a conditional calculation.",
+      "tradeoff": "Training, knowledge maintenance and longer initial checking consume effort. The 40% known rate is a proposed sensitivity value, not a measured improvement; monitor incorrect closures.",
+      "validation": "Test known/unknown pairs 0.2/0.8, 0.3/0.7 and 0.4/0.6 together, always summing to one. Include added checking/training effort and check quality before adopting new probabilities.",
+      "evidenceType": "Assignment routing probability; improvement is conditional",
+      "owner": "Knowledge and training lead",
+      "status": "open",
+      "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0rt6ids",
+      "suggestion": "Proposal C4 — Broaden Level-1 competence through targeted training and a maintained knowledge base, while retaining escalation for difficult or uncertain cases. Heuristic(s): Specialist-generalist. Justification: Broader skills can allow genuinely suitable requests to finish at Level-1 and reduce specialist demand. Under unchanged task times and rework, moving the known rate from 20% to 40% would reduce expected Level-2 workload from 10.4 to 7.8 staff-hours/hour; this is a conditional calculation. Trade-off: Training, knowledge maintenance and longer initial checking consume effort. The 40% known rate is a proposed sensitivity value, not a measured improvement; monitor incorrect closures. Validation: Test known/unknown pairs 0.2/0.8, 0.3/0.7 and 0.4/0.6 together, always summing to one. Include added checking/training effort and check quality before adopting new probabilities. Proposed owner: Knowledge and training lead."
+    },
+    {
+      "code": "EX4_I5",
+      "title": "I5 — Unsuccessful resolutions create repeated work and client delays",
+      "category": "quality",
+      "severity": "high",
+      "priority": 5,
+      "heuristics": [
+        "Control addition"
+      ],
+      "evidence": "The assignment uses a 20% unsuccessful-resolution probability on each attempt. Given escalation and a constant independent retry probability, expected attempts are 1/(1−0.2)=1.25. Each retry repeats resolution, writing, delivery and a client-response wait; evaluation is not repeated in the supplied model.",
+      "change": "Add a proportionate validation/checklist step before delivery, with effort targeted to the likely causes of failure.",
+      "justification": "An output check may reduce failed deliveries and repeat work. It must be justified against its added processing cost and potential pressure on the same Level-2 pool.",
+      "tradeoff": "Extra checking can make an overloaded queue worse. A reduced failure probability is unverified and must be paired with the added validation duration and resource consumption.",
+      "validation": "Test paired assumptions such as validation times 0, 5, 10 minutes and failure rates 0.20, 0.15, 0.10; maintain solved=1−failed. Compare total labor cost, mean/p95 cycle and observed quality. Treat each pair as a hypothesis.",
+      "evidenceType": "Assignment failure rate; validation effect unmeasured",
+      "owner": "Level-2 quality lead",
+      "status": "open",
+      "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_1afil2e",
+      "suggestion": "Proposal C5 — Add a proportionate validation/checklist step before delivery, with effort targeted to the likely causes of failure. Heuristic(s): Control addition. Justification: An output check may reduce failed deliveries and repeat work. It must be justified against its added processing cost and potential pressure on the same Level-2 pool. Trade-off: Extra checking can make an overloaded queue worse. A reduced failure probability is unverified and must be paired with the added validation duration and resource consumption. Validation: Test paired assumptions such as validation times 0, 5, 10 minutes and failure rates 0.20, 0.15, 0.10; maintain solved=1−failed. Compare total labor cost, mean/p95 cycle and observed quality. Treat each pair as a hypothesis. Proposed owner: Level-2 quality lead."
+    },
+    {
+      "code": "EX4_I6",
+      "title": "I6 — Client feedback imposes a long external wait",
+      "category": "waiting",
+      "severity": "medium",
+      "priority": 6,
+      "heuristics": [
+        "Integration",
+        "Task automation"
+      ],
+      "evidence": "The assignment specifies a 20-hour client response delay per delivered resolution. It is retained in Exercise 3 as an unresourced 1200-minute wait. At 80% escalation and 20% rework, expected response-wait visits per initial case are 0.8/(1−0.2)=1, contributing about 20 hours to the mean cycle. The 5/12 mean cycle is 23.81 hours.",
+      "change": "Provide a direct test-result submission channel with clear instructions and proportionate reminders; route the result automatically to closure or rework.",
+      "justification": "Integrating client feedback into the workflow can reduce avoidable response friction. Once staffing is sufficient, this external wait is the main remaining elapsed-time component.",
+      "tradeoff": "Customer availability and test duration are not controlled by the helpdesk. Reminders may not shorten them. Preserve human confirmation; do not assume silence means success.",
+      "validation": "Test response delays of 20, 10 and 5 hours as explicit sensitivity assumptions, then measure actual response times in a pilot. Do not report the lower delays as achieved benefits.",
+      "evidenceType": "Assignment delay and Exercise 3 result; proposed reduction unmeasured",
+      "owner": "Client-service owner",
+      "status": "open",
+      "elementId": "model-f8c2e6a7e03826f6db530b4506f7a1c5::Activity_0pwue36",
+      "suggestion": "Proposal C6 — Provide a direct test-result submission channel with clear instructions and proportionate reminders; route the result automatically to closure or rework. Heuristic(s): Integration, Task automation. Justification: Integrating client feedback into the workflow can reduce avoidable response friction. Once staffing is sufficient, this external wait is the main remaining elapsed-time component. Trade-off: Customer availability and test duration are not controlled by the helpdesk. Reminders may not shorten them. Preserve human confirmation; do not assume silence means success. Validation: Test response delays of 20, 10 and 5 hours as explicit sensitivity assumptions, then measure actual response times in a pilot. Do not report the lower delays as achieved benefits. Proposed owner: Client-service owner."
+    }
+  ]
+}

@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Helpdesk_ToBe" targetNamespace="https://bpmngo.local/assignment2/to-be">
+  <bpmn:collaboration id="Collaboration_ToBe">
+    <bpmn:participant id="Pool_Helpdesk" name="IT helpdesk — proposed to-be" processRef="Process_Helpdesk_ToBe" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Helpdesk_ToBe" name="Helpdesk — automated delivery and feedback" isExecutable="false">
+    <bpmn:documentation>Exercise 5 proposal C3/C6: automated delivery and direct feedback routing, retaining human-assisted delivery. Original known/rework probabilities and 20-hour client delay are preserved. Automation coverage 90% is an illustrative scenario assumption, not observed evidence. Automated steps are one simulated minute with zero modeled incremental cost; implementation and operating costs remain unestimated. This is a simulation model, not a deployed notification service.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_ToBe">
+      <bpmn:lane id="Lane_Level1" name="Level 1">
+        <bpmn:flowNodeRef>StartEvent_1wsxujp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_0rt6ids</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_1i01pjg</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_0ouwyd5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_1u1d1b4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_1pt3bpc</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Level2" name="Level 2">
+        <bpmn:flowNodeRef>Activity_1npzcct</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_18x5arg</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_1kwn3zv</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_1afil2e</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_AssistedDelivery</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Automation" name="Workflow automation / client response channel">
+        <bpmn:flowNodeRef>Activity_AutoNotify</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_DeliveryMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_0pwue36</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_12y6m03</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_1krfj9q</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_AutoRoute</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_1wsxujp" name="Request received">
+      <bpmn:outgoing>Flow_00jaexq</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Activity_0rt6ids" name="Check request">
+      <bpmn:incoming>Flow_00jaexq</bpmn:incoming>
+      <bpmn:outgoing>Flow_1kodptn</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_1i01pjg" name="Known resolution?">
+      <bpmn:incoming>Flow_1kodptn</bpmn:incoming>
+      <bpmn:outgoing>Flow_1pizyqk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_10wb9z2</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Activity_0ouwyd5" name="Send known resolution">
+      <bpmn:incoming>Flow_1pizyqk</bpmn:incoming>
+      <bpmn:outgoing>Flow_0686v9i</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="Event_1u1d1b4" name="Known request closed">
+      <bpmn:incoming>Flow_0686v9i</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Activity_1npzcct" name="Evaluate request">
+      <bpmn:incoming>Flow_10wb9z2</bpmn:incoming>
+      <bpmn:outgoing>Flow_1kv2krp</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_18x5arg">
+      <bpmn:incoming>Flow_1kv2krp</bpmn:incoming>
+      <bpmn:incoming>Flow_ReworkDirect</bpmn:incoming>
+      <bpmn:outgoing>Flow_19xg58x</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Activity_1kwn3zv" name="Solve request">
+      <bpmn:incoming>Flow_19xg58x</bpmn:incoming>
+      <bpmn:outgoing>Flow_02psej3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Activity_1afil2e" name="Write resolution">
+      <bpmn:incoming>Flow_02psej3</bpmn:incoming>
+      <bpmn:outgoing>Flow_DeliveryDecision</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_AssistedDelivery" name="Human assistance needed?">
+      <bpmn:incoming>Flow_DeliveryDecision</bpmn:incoming>
+      <bpmn:outgoing>Flow_Assisted</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Automated</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Activity_1pt3bpc" name="Explain and send resolution">
+      <bpmn:incoming>Flow_Assisted</bpmn:incoming>
+      <bpmn:outgoing>Flow_AssistedMerge</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Activity_AutoNotify" name="Notify client automatically">
+      <bpmn:incoming>Flow_Automated</bpmn:incoming>
+      <bpmn:outgoing>Flow_AutoMerge</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_DeliveryMerge">
+      <bpmn:incoming>Flow_AssistedMerge</bpmn:incoming>
+      <bpmn:incoming>Flow_AutoMerge</bpmn:incoming>
+      <bpmn:outgoing>Flow_Receive</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:receiveTask id="Activity_0pwue36" name="Receive client test result">
+      <bpmn:incoming>Flow_Receive</bpmn:incoming>
+      <bpmn:outgoing>Flow_0g9e1mi</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:exclusiveGateway id="Gateway_12y6m03" name="Resolved?">
+      <bpmn:incoming>Flow_0g9e1mi</bpmn:incoming>
+      <bpmn:outgoing>Flow_1eqnu7k</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0g0xphy</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="Event_1krfj9q" name="Request closed">
+      <bpmn:incoming>Flow_1eqnu7k</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Activity_AutoRoute" name="Route feedback to Level-2">
+      <bpmn:incoming>Flow_0g0xphy</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReworkDirect</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_00jaexq" sourceRef="StartEvent_1wsxujp" targetRef="Activity_0rt6ids" />
+    <bpmn:sequenceFlow id="Flow_1kodptn" sourceRef="Activity_0rt6ids" targetRef="Gateway_1i01pjg" />
+    <bpmn:sequenceFlow id="Flow_1pizyqk" name="Known" sourceRef="Gateway_1i01pjg" targetRef="Activity_0ouwyd5" />
+    <bpmn:sequenceFlow id="Flow_10wb9z2" name="Unknown" sourceRef="Gateway_1i01pjg" targetRef="Activity_1npzcct" />
+    <bpmn:sequenceFlow id="Flow_0686v9i" sourceRef="Activity_0ouwyd5" targetRef="Event_1u1d1b4" />
+    <bpmn:sequenceFlow id="Flow_1kv2krp" sourceRef="Activity_1npzcct" targetRef="Gateway_18x5arg" />
+    <bpmn:sequenceFlow id="Flow_19xg58x" sourceRef="Gateway_18x5arg" targetRef="Activity_1kwn3zv" />
+    <bpmn:sequenceFlow id="Flow_02psej3" sourceRef="Activity_1kwn3zv" targetRef="Activity_1afil2e" />
+    <bpmn:sequenceFlow id="Flow_DeliveryDecision" sourceRef="Activity_1afil2e" targetRef="Gateway_AssistedDelivery" />
+    <bpmn:sequenceFlow id="Flow_Assisted" name="Yes — assisted" sourceRef="Gateway_AssistedDelivery" targetRef="Activity_1pt3bpc" />
+    <bpmn:sequenceFlow id="Flow_Automated" name="No — automated" sourceRef="Gateway_AssistedDelivery" targetRef="Activity_AutoNotify" />
+    <bpmn:sequenceFlow id="Flow_AssistedMerge" sourceRef="Activity_1pt3bpc" targetRef="Gateway_DeliveryMerge" />
+    <bpmn:sequenceFlow id="Flow_AutoMerge" sourceRef="Activity_AutoNotify" targetRef="Gateway_DeliveryMerge" />
+    <bpmn:sequenceFlow id="Flow_Receive" sourceRef="Gateway_DeliveryMerge" targetRef="Activity_0pwue36" />
+    <bpmn:sequenceFlow id="Flow_0g9e1mi" sourceRef="Activity_0pwue36" targetRef="Gateway_12y6m03" />
+    <bpmn:sequenceFlow id="Flow_1eqnu7k" name="Yes" sourceRef="Gateway_12y6m03" targetRef="Event_1krfj9q" />
+    <bpmn:sequenceFlow id="Flow_0g0xphy" name="No — rework" sourceRef="Gateway_12y6m03" targetRef="Activity_AutoRoute" />
+    <bpmn:sequenceFlow id="Flow_ReworkDirect" sourceRef="Activity_AutoRoute" targetRef="Gateway_18x5arg" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_ToBe">
+    <bpmndi:BPMNPlane id="Plane_ToBe" bpmnElement="Collaboration_ToBe">
+      <bpmndi:BPMNShape id="Pool_Helpdesk_di" bpmnElement="Pool_Helpdesk" isHorizontal="true">
+        <dc:Bounds x="100" y="180" width="2100" height="700" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Automation_di" bpmnElement="Lane_Automation" isHorizontal="true">
+        <dc:Bounds x="130" y="570" width="2070" height="310" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Level2_di" bpmnElement="Lane_Level2" isHorizontal="true">
+        <dc:Bounds x="130" y="360" width="2070" height="210" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Level1_di" bpmnElement="Lane_Level1" isHorizontal="true">
+        <dc:Bounds x="130" y="180" width="2070" height="180" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_1wsxujp_di" bpmnElement="StartEvent_1wsxujp">
+        <dc:Bounds x="160" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="125" y="296" width="120" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0rt6ids_di" bpmnElement="Activity_0rt6ids">
+        <dc:Bounds x="230" y="230" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1i01pjg_di" bpmnElement="Gateway_1i01pjg" isMarkerVisible="true">
+        <dc:Bounds x="400" y="245" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="365" y="303" width="120" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0ouwyd5_di" bpmnElement="Activity_0ouwyd5">
+        <dc:Bounds x="510" y="210" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1u1d1b4_di" bpmnElement="Event_1u1d1b4">
+        <dc:Bounds x="690" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="655" y="276" width="120" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1npzcct_di" bpmnElement="Activity_1npzcct">
+        <dc:Bounds x="510" y="390" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_18x5arg_di" bpmnElement="Gateway_18x5arg" isMarkerVisible="true">
+        <dc:Bounds x="720" y="405" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1kwn3zv_di" bpmnElement="Activity_1kwn3zv">
+        <dc:Bounds x="860" y="390" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1afil2e_di" bpmnElement="Activity_1afil2e">
+        <dc:Bounds x="1050" y="390" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_AssistedDelivery_di" bpmnElement="Gateway_AssistedDelivery" isMarkerVisible="true">
+        <dc:Bounds x="1240" y="405" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1205" y="463" width="120" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1pt3bpc_di" bpmnElement="Activity_1pt3bpc">
+        <dc:Bounds x="1360" y="240" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_AutoNotify_di" bpmnElement="Activity_AutoNotify">
+        <dc:Bounds x="1360" y="620" width="150" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_DeliveryMerge_di" bpmnElement="Gateway_DeliveryMerge" isMarkerVisible="true">
+        <dc:Bounds x="1570" y="635" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0pwue36_di" bpmnElement="Activity_0pwue36">
+        <dc:Bounds x="1680" y="620" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_12y6m03_di" bpmnElement="Gateway_12y6m03" isMarkerVisible="true">
+        <dc:Bounds x="1900" y="635" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1865" y="693" width="120" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1krfj9q_di" bpmnElement="Event_1krfj9q">
+        <dc:Bounds x="2090" y="642" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2055" y="686" width="120" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_AutoRoute_di" bpmnElement="Activity_AutoRoute">
+        <dc:Bounds x="1680" y="770" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_00jaexq_di" bpmnElement="Flow_00jaexq">
+        <di:waypoint x="196" y="270" />
+        <di:waypoint x="230" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1kodptn_di" bpmnElement="Flow_1kodptn">
+        <di:waypoint x="360" y="270" />
+        <di:waypoint x="400" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1pizyqk_di" bpmnElement="Flow_1pizyqk">
+        <di:waypoint x="450" y="270" />
+        <di:waypoint x="480" y="270" />
+        <di:waypoint x="480" y="250" />
+        <di:waypoint x="510" y="250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="415" y="245" width="120" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10wb9z2_di" bpmnElement="Flow_10wb9z2">
+        <di:waypoint x="425" y="295" />
+        <di:waypoint x="425" y="430" />
+        <di:waypoint x="510" y="430" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="360" y="405" width="120" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0686v9i_di" bpmnElement="Flow_0686v9i">
+        <di:waypoint x="650" y="250" />
+        <di:waypoint x="690" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1kv2krp_di" bpmnElement="Flow_1kv2krp">
+        <di:waypoint x="650" y="430" />
+        <di:waypoint x="720" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19xg58x_di" bpmnElement="Flow_19xg58x">
+        <di:waypoint x="770" y="430" />
+        <di:waypoint x="860" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02psej3_di" bpmnElement="Flow_02psej3">
+        <di:waypoint x="1000" y="430" />
+        <di:waypoint x="1050" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DeliveryDecision_di" bpmnElement="Flow_DeliveryDecision">
+        <di:waypoint x="1190" y="430" />
+        <di:waypoint x="1240" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Assisted_di" bpmnElement="Flow_Assisted">
+        <di:waypoint x="1265" y="405" />
+        <di:waypoint x="1265" y="280" />
+        <di:waypoint x="1360" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1200" y="255" width="120" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Automated_di" bpmnElement="Flow_Automated">
+        <di:waypoint x="1265" y="455" />
+        <di:waypoint x="1265" y="660" />
+        <di:waypoint x="1360" y="660" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1200" y="635" width="120" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AssistedMerge_di" bpmnElement="Flow_AssistedMerge">
+        <di:waypoint x="1510" y="280" />
+        <di:waypoint x="1595" y="280" />
+        <di:waypoint x="1595" y="635" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AutoMerge_di" bpmnElement="Flow_AutoMerge">
+        <di:waypoint x="1510" y="660" />
+        <di:waypoint x="1570" y="660" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Receive_di" bpmnElement="Flow_Receive">
+        <di:waypoint x="1620" y="660" />
+        <di:waypoint x="1680" y="660" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0g9e1mi_di" bpmnElement="Flow_0g9e1mi">
+        <di:waypoint x="1840" y="660" />
+        <di:waypoint x="1900" y="660" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1eqnu7k_di" bpmnElement="Flow_1eqnu7k">
+        <di:waypoint x="1950" y="660" />
+        <di:waypoint x="2090" y="660" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2025" y="635" width="120" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0g0xphy_di" bpmnElement="Flow_0g0xphy">
+        <di:waypoint x="1925" y="685" />
+        <di:waypoint x="1925" y="810" />
+        <di:waypoint x="1840" y="810" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1860" y="785" width="120" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReworkDirect_di" bpmnElement="Flow_ReworkDirect">
+        <di:waypoint x="1680" y="810" />
+        <di:waypoint x="745" y="810" />
+        <di:waypoint x="745" y="455" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

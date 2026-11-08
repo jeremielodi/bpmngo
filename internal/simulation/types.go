@@ -26,11 +26,20 @@ type ActivityParameters struct {
 	ProcessingTime Distribution `json:"processingTime"`
 	WaitingTime    Distribution `json:"waitingTime,omitempty"`
 	ResourceID     string       `json:"resourceId,omitempty"`
+	ResourceUnits  int          `json:"resourceUnits,omitempty"`
 	ResourceIDs    []string     `json:"resourceIds,omitempty"`
 	RequiredSkills []string     `json:"requiredSkills,omitempty"`
 	RoutingRule    string       `json:"routingRule,omitempty"`
 	Priority       int          `json:"priority,omitempty"`
 	ValueAdded     bool         `json:"valueAdded"`
+}
+
+// Missing/zero resourceUnits preserves the one-person behavior of older scenarios.
+func (a ActivityParameters) requiredUnits() int {
+	if a.ResourceUnits == 0 {
+		return 1
+	}
+	return a.ResourceUnits
 }
 
 // BusinessCalendar expresses recurring local-time availability. Weekdays use
@@ -116,12 +125,13 @@ type ModelTransfer struct {
 }
 
 type TraceEvent struct {
-	CaseID     int     `json:"caseId"`
-	At         float64 `json:"at"`
-	Kind       string  `json:"kind"`
-	ElementID  string  `json:"elementId"`
-	FlowID     string  `json:"flowId,omitempty"`
-	ResourceID string  `json:"resourceId,omitempty"`
+	ResourceUnits int     `json:"resourceUnits,omitempty"`
+	CaseID        int     `json:"caseId"`
+	At            float64 `json:"at"`
+	Kind          string  `json:"kind"`
+	ElementID     string  `json:"elementId"`
+	FlowID        string  `json:"flowId,omitempty"`
+	ResourceID    string  `json:"resourceId,omitempty"`
 }
 
 type FlowMetrics struct {

@@ -223,6 +223,10 @@ func (ctrl *SimulationController) RunScenario(c *fiber.Ctx) error {
 	}
 	run, err := ctrl.service.EnqueueSimulation(id, currentUserID(c), common.GetTenantId(c))
 	if err != nil {
+		var validation *service.SimulationValidationError
+		if errors.As(err, &validation) {
+			return badRequest(c, validation)
+		}
 		return repositoryError(c, err)
 	}
 	return c.Status(fiber.StatusAccepted).JSON(run)

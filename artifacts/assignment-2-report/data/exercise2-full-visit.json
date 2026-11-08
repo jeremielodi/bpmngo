@@ -1,0 +1,103 @@
+{
+  "input": {
+    "arrivalRatePerHour": 1,
+    "serviceTimeHours": 2.6666666666666665,
+    "targetWaitingHours": 2,
+    "maxServers": 10
+  },
+  "result": {
+    "minimumServers": 4,
+    "points": [
+      {
+        "servers": 1,
+        "utilization": 2.6666666666666665,
+        "probabilityOfWait": 0,
+        "meanWaitingHours": 0,
+        "meanSystemHours": 0,
+        "meetsTarget": false,
+        "stable": false
+      },
+      {
+        "servers": 2,
+        "utilization": 1.3333333333333333,
+        "probabilityOfWait": 0,
+        "meanWaitingHours": 0,
+        "meanSystemHours": 0,
+        "meetsTarget": false,
+        "stable": false
+      },
+      {
+        "servers": 3,
+        "utilization": 0.8888888888888888,
+        "probabilityOfWait": 0.7975077881619937,
+        "meanWaitingHours": 6.38006230529595,
+        "meanSystemHours": 9.046728971962617,
+        "meetsTarget": false,
+        "stable": true
+      },
+      {
+        "servers": 4,
+        "utilization": 0.6666666666666666,
+        "probabilityOfWait": 0.3784183296378418,
+        "meanWaitingHours": 0.7568366592756836,
+        "meanSystemHours": 3.42350332594235,
+        "meetsTarget": true,
+        "stable": true
+      },
+      {
+        "servers": 5,
+        "utilization": 0.5333333333333333,
+        "probabilityOfWait": 0.16163529458190282,
+        "meanWaitingHours": 0.18472605095074607,
+        "meanSystemHours": 2.8513927176174128,
+        "meetsTarget": true,
+        "stable": true
+      },
+      {
+        "servers": 6,
+        "utilization": 0.4444444444444444,
+        "probabilityOfWait": 0.06194586542351477,
+        "meanWaitingHours": 0.04955669233881181,
+        "meanSystemHours": 2.7162233590054785,
+        "meetsTarget": true,
+        "stable": true
+      },
+      {
+        "servers": 7,
+        "utilization": 0.38095238095238093,
+        "probabilityOfWait": 0.021313487229745867,
+        "meanWaitingHours": 0.013115992141382073,
+        "meanSystemHours": 2.6797826588080484,
+        "meetsTarget": true,
+        "stable": true
+      },
+      {
+        "servers": 8,
+        "utilization": 0.3333333333333333,
+        "probabilityOfWait": 0.0066070903427055076,
+        "meanWaitingHours": 0.0033035451713527538,
+        "meanSystemHours": 2.6699702118380193,
+        "meetsTarget": true,
+        "stable": true
+      },
+      {
+        "servers": 9,
+        "utilization": 0.2962962962962963,
+        "probabilityOfWait": 0.001855267004094839,
+        "meanWaitingHours": 0.0007811650543557216,
+        "meanSystemHours": 2.6674478317210224,
+        "meetsTarget": true,
+        "stable": true
+      },
+      {
+        "servers": 10,
+        "utilization": 0.26666666666666666,
+        "probabilityOfWait": 0.0004747840489069624,
+        "meanWaitingHours": 0.00017264874505707725,
+        "meanSystemHours": 2.666839315411724,
+        "meetsTarget": true,
+        "stable": true
+      }
+    ]
+  }
+}

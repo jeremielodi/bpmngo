@@ -7,7 +7,7 @@ export type BusinessCalendar = { id:string;name:string;timezone:string;shifts:Ca
 export type ArrivalSegment = { startMinute:number;endMinute:number;ratePerHour:number };
 export type ArrivalPattern = { type:'poisson'|'piecewise_poisson'|'scheduled'|'batch_poisson';ratePerHour?:number;segments?:ArrivalSegment[];repeatMinutes?:number;scheduledMinutes?:number[];batchSize?:number };
 export type SimulationResource = { id: string; name: string; capacity: number; costPerHour: number; calendarId?:string;skills?:string[] };
-export type ActivityParameters = { fixedCost?:number;processingTime: Distribution; waitingTime?: Distribution; resourceId?: string;resourceIds?:string[];requiredSkills?:string[];routingRule?:'fixed'|'least_queue'|'round_robin';priority?:number;valueAdded: boolean };
+export type ActivityParameters = { fixedCost?:number;processingTime: Distribution; waitingTime?: Distribution; resourceId?: string;resourceUnits?:number;resourceIds?:string[];requiredSkills?:string[];routingRule?:'fixed'|'least_queue'|'round_robin';priority?:number;valueAdded: boolean };
 export type Scenario = {
 	models?:ProjectModel[];entryModelId?:string;transfers?:ModelTransfer[];
   name: string; bpmnXml: string; arrivalRatePerHour: number; durationHours: number;
@@ -16,7 +16,7 @@ export type Scenario = {
 };
 export type ProjectModel = { id:string;name:string;bpmnXml:string };
 export type ModelTransfer = { id:string;sourceModelId:string;sourceNodeId:string;targetModelId:string;targetNodeId:string;delay:Distribution;cost?:number };
-export type TraceEvent = { caseId:number;at:number;kind:string;elementId:string;flowId?:string;resourceId?:string };
+export type TraceEvent = { caseId:number;at:number;kind:string;elementId:string;flowId?:string;resourceId?:string;resourceUnits?:number };
 export type AnalyticResult = { processingMinutes: number; waitingMinutes: number; cycleTimeMinutes: number; valueAddedMinutes: number; cycleTimeEfficiency: number; costPerExecution: number; elements: Array<{ elementId: string; elementName: string; expectedVisits: number; processingMinutes: number; explicitWaitMinutes: number; expectedCost: number }> };
 export type ResourceMetrics = { resourceId: string; name: string; capacity: number; utilization: number; meanQueueLength: number; maximumQueueSize: number; busyMinutes: number };
 export type Issue = { id?: string; code: string; elementId?: string; title: string; evidence: string; category: string; severity: 'low'|'medium'|'high'; metric?: number; suggestion: string; status?: string };

@@ -59,6 +59,9 @@ func compileScenario(s Scenario) (*compiledScenario, error) {
 		return nil, err
 	}
 	for id, activity := range s.Activities {
+		if activity.ResourceUnits < 0 {
+			return nil, fmt.Errorf("activity %q resourceUnits must be a positive integer (or omitted for one person)", id)
+		}
 		if activity.FixedCost < 0 {
 			return nil, fmt.Errorf("activity %q fixed cost must be non-negative", id)
 		}
@@ -78,8 +81,33 @@ func compileScenario(s Scenario) (*compiledScenario, error) {
 		default:
 			return nil, fmt.Errorf("activity %q has unsupported routing rule %q", id, activity.RoutingRule)
 		}
-		if len(activity.RequiredSkills) > 0 && len(eligibleResourceIDs(resources, activity)) == 0 {
-			return nil, fmt.Errorf("activity %q has no resource matching skills %v", id, activity.RequiredSkills)
+		if (activity.ResourceID != "" || len(activity.ResourceIDs) > 0 || len(activity.RequiredSkills) > 0 || activity.requiredUnits() > 1) && len(eligibleResourceIDs(resources, activity)) == 0 {
+			name := graph.Nodes[id].Name
+			if name == "" {
+				name = id
+			}
+			if activity.ResourceID != "" && len(activity.ResourceIDs) == 0 {
+				resource := resources[activity.ResourceID]
+				poolName := resource.Name
+				if poolName == "" {
+					poolName = resource.ID
+				}
+				reasons := []string{}
+				if resource.Capacity < activity.requiredUnits() {
+					reasons = append(reasons, fmt.Sprintf("pool %q has capacity %d, but this activity needs %d people", poolName, resource.Capacity, activity.requiredUnits()))
+				}
+				missingSkills := []string{}
+				for _, skill := range activity.RequiredSkills {
+					if !resourceHasSkills(resource, []string{skill}) {
+						missingSkills = append(missingSkills, skill)
+					}
+				}
+				if len(missingSkills) > 0 {
+					reasons = append(reasons, fmt.Sprintf("pool %q is missing required skills %q", poolName, missingSkills))
+				}
+				return nil, fmt.Errorf("activity %q: %s", name, strings.Join(reasons, "; "))
+			}
+			return nil, fmt.Errorf("activity %q needs a resource pool with at least %d people and matching skills %q", name, activity.requiredUnits(), activity.RequiredSkills)
 		}
 		if _, err := activity.ProcessingTime.Expected(); err != nil {
 			return nil, fmt.Errorf("activity %q processing time: %w", id, err)
@@ -242,7 +270,7 @@ func eligibleResourceIDs(resources map[string]Resource, activity ActivityParamet
 	result := candidates[:0]
 	for _, id := range candidates {
 		resource, ok := resources[id]
-		if ok && resourceHasSkills(resource, activity.RequiredSkills) {
+		if ok && resource.Capacity >= activity.requiredUnits() && resourceHasSkills(resource, activity.RequiredSkills) {
 			result = append(result, id)
 		}
 	}

@@ -1,0 +1,88 @@
+{
+  "processingMinutes": 186.99999999475716,
+  "waitingMinutes": 3756.3999998820223,
+  "cycleTimeMinutes": 3943.3999998767795,
+  "valueAddedMinutes": 186.99999999475716,
+  "cycleTimeEfficiency": 0.04742100725277689,
+  "costPerExecution": 176.66666666164224,
+  "elements": [
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_0ouwyd5",
+      "elementName": "Send resolution",
+      "expectedVisits": 0.2,
+      "processingMinutes": 1,
+      "explicitWaitMinutes": 0,
+      "expectedCost": 0.6666666666666666,
+      "resourceId": "level 1",
+      "valueAddedMinutes": 1
+    },
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_0pwue36",
+      "elementName": "Receive response",
+      "expectedVisits": 0.9999999999672321,
+      "processingMinutes": 0,
+      "explicitWaitMinutes": 1199.9999999606785,
+      "expectedCost": 0,
+      "valueAddedMinutes": 0
+    },
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_0rt6ids",
+      "elementName": "Check request",
+      "expectedVisits": 1,
+      "processingMinutes": 10,
+      "explicitWaitMinutes": 60,
+      "expectedCost": 6.666666666666666,
+      "resourceId": "level 1",
+      "valueAddedMinutes": 10
+    },
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_1afil2e",
+      "elementName": "Write resolution",
+      "expectedVisits": 0.9999999999672321,
+      "processingMinutes": 19.99999999934464,
+      "explicitWaitMinutes": 0,
+      "expectedCost": 19.99999999934464,
+      "resourceId": "level 2",
+      "valueAddedMinutes": 19.99999999934464
+    },
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_1kwn3zv",
+      "elementName": "Solve Request",
+      "expectedVisits": 0.9999999999672321,
+      "processingMinutes": 119.99999999606786,
+      "explicitWaitMinutes": 1199.9999999606785,
+      "expectedCost": 119.99999999606786,
+      "resourceId": "level 2",
+      "valueAddedMinutes": 119.99999999606786
+    },
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_1lho2iu",
+      "elementName": "Forward to Level-2",
+      "expectedVisits": 0.19999999999344642,
+      "processingMinutes": 0,
+      "explicitWaitMinutes": 0.39999999998689284,
+      "expectedCost": 0,
+      "valueAddedMinutes": 0
+    },
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_1npzcct",
+      "elementName": "Evaluate request",
+      "expectedVisits": 0.8,
+      "processingMinutes": 16,
+      "explicitWaitMinutes": 96,
+      "expectedCost": 16,
+      "resourceId": "level 2",
+      "valueAddedMinutes": 16
+    },
+    {
+      "elementId": "model-bedc9b0e2e160d82a3c2a5b830d9ca55::Activity_1pt3bpc",
+      "elementName": "Send resolution",
+      "expectedVisits": 0.9999999999672321,
+      "processingMinutes": 19.99999999934464,
+      "explicitWaitMinutes": 1199.9999999606785,
+      "expectedCost": 13.333333332896428,
+      "resourceId": "level 1",
+      "valueAddedMinutes": 19.99999999934464
+    }
+  ]
+}

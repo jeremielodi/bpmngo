@@ -196,12 +196,19 @@ func setScenarioPath(s *Scenario, path string, value float64) error {
 		}
 		flow.Probability = value
 		s.Flows[parts[1]] = flow
-	case len(parts) == 3 && parts[0] == "activity" && parts[2] == "priority":
+	case len(parts) == 3 && parts[0] == "activity" && (parts[2] == "priority" || parts[2] == "resourceUnits"):
 		activity, ok := s.Activities[parts[1]]
 		if !ok {
 			return fmt.Errorf("experiment path %q references unknown activity", path)
 		}
-		activity.Priority = int(math.Round(value))
+		if parts[2] == "resourceUnits" {
+			if value < 1 || value != math.Trunc(value) {
+				return fmt.Errorf("resourceUnits must be a positive integer")
+			}
+			activity.ResourceUnits = int(value)
+		} else {
+			activity.Priority = int(math.Round(value))
+		}
 		s.Activities[parts[1]] = activity
 	case len(parts) == 4 && parts[0] == "activity" && (parts[2] == "processingTime" || parts[2] == "waitingTime"):
 		activity, ok := s.Activities[parts[1]]

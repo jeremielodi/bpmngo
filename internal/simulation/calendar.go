@@ -151,44 +151,62 @@ func (p *calendarPlan) nextChange(at float64) (float64, bool) {
 	return 0, false
 }
 
-func (p *calendarPlan) nextAvailable(at float64) (float64, bool) {
-	if p.capacityAt(at) > 0 {
+func (p *calendarPlan) nextAvailableUnits(at float64, units int) (float64, bool) {
+	if p.capacityAt(at) >= units {
 		return at, true
 	}
+	at = math.Floor(at) + 1
 	for range 14 * 24 * 60 {
-		next, ok := p.nextChange(at)
-		if !ok {
-			return 0, false
-		}
-		at = next
-		if p.capacityAt(at) > 0 {
+		if p.capacityAt(at) >= units {
 			return at, true
 		}
+		at++
 	}
 	return 0, false
 }
 
-func (p *calendarPlan) completionAt(start, workMinutes float64) (float64, error) {
-	at, ok := p.nextAvailable(start)
-	if !ok {
-		return 0, fmt.Errorf("calendar %q has no availability within two weeks", p.calendar.ID)
-	}
-	remaining := workMinutes
+type capacityReservation struct {
+	start, end float64
+	units      int
+}
+
+// Reserve working intervals atomically for the whole team. Existing work keeps
+// its reservation through calendar pauses; later tasks use the remaining shift
+// capacity. This prevents two running tasks from overbooking a reduced shift.
+func (p *calendarPlan) reserveWork(start, workMinutes float64, units int, existing []capacityReservation) (float64, []capacityReservation, error) {
+	at, remaining := start, workMinutes
+	booked := []capacityReservation{}
+	waitUntil := at + 14*24*60
 	for remaining > 0 {
-		if p.capacityAt(at) == 0 {
-			at, ok = p.nextAvailable(at)
-			if !ok {
-				return 0, fmt.Errorf("calendar %q has no future availability", p.calendar.ID)
+		available := p.capacityAt(at)
+		next, hasChange := p.nextChange(at)
+		for _, reservation := range existing {
+			if reservation.start <= at && at < reservation.end {
+				available -= reservation.units
+			}
+			for _, boundary := range []float64{reservation.start, reservation.end} {
+				if boundary > at && (!hasChange || boundary < next) {
+					next, hasChange = boundary, true
+				}
 			}
 		}
-		next, hasChange := p.nextChange(at)
-		if !hasChange || remaining <= next-at {
-			return at + remaining, nil
+		if available < units {
+			if !hasChange || next > waitUntil {
+				return 0, nil, fmt.Errorf("calendar %q cannot provide %d people together within two weeks", p.calendar.ID, units)
+			}
+			at = next
+			continue
 		}
-		remaining -= next - at
-		at = next
+		end := at + remaining
+		if hasChange && next < end {
+			end = next
+		}
+		booked = append(booked, capacityReservation{start: at, end: end, units: units})
+		remaining -= end - at
+		at = end
+		waitUntil = at + 14*24*60
 	}
-	return at, nil
+	return at, booked, nil
 }
 
 func (p *calendarPlan) capacityMinutesBetween(start, end float64) float64 {

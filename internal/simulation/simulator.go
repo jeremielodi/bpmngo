@@ -91,8 +91,10 @@ type queuedWork struct {
 	frames   []syncFrame
 }
 type resourceState struct {
+	reservations                                    []capacityReservation
 	resource                                        Resource
 	busy                                            int
+	queuedUnits                                     int
 	busyMinutes, queueArea, capacityMinutes, lastAt float64
 	maxQueue                                        int
 	queue                                           []queuedWork
@@ -184,7 +186,11 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 			traceTruncated = true
 			return
 		}
-		trace = append(trace, TraceEvent{CaseID: caseID, At: at, Kind: kind, ElementID: nodeID, FlowID: flowID, ResourceID: resourceID})
+		units := 0
+		if resourceID != "" {
+			units = c.scenario.Activities[nodeID].requiredUnits()
+		}
+		trace = append(trace, TraceEvent{CaseID: caseID, At: at, Kind: kind, ElementID: nodeID, FlowID: flowID, ResourceID: resourceID, ResourceUnits: units})
 	}
 	push := func(e simEvent) { sequence++; e.seq = sequence; q.push(e) }
 	arrivals := scheduleArrivals(c.scenario, rng)
@@ -228,29 +234,39 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 	var drainQueue func(string, float64) error
 	var scheduleWake func(string, float64)
 	var dispatch func(int, string, float64, []syncFrame) error
-	var release func(string, float64) error
+	var release func(string, int, float64) error
 	routingIndexes := map[string]int{}
 	var queueSequence int64
 	startWork = func(resourceID string, r *resourceState, w queuedWork, at float64) error {
 		p := c.scenario.Activities[w.nodeID]
+		units := p.requiredUnits()
 		service, e := p.ProcessingTime.Sample(rng)
 		if e != nil {
 			return e
 		}
 		completedAt := at + service
 		if plan := c.calendars[resourceID]; plan != nil {
-			completedAt, e = plan.completionAt(at, service)
+			future := r.reservations[:0]
+			for _, reservation := range r.reservations {
+				if reservation.end > at {
+					future = append(future, reservation)
+				}
+			}
+			r.reservations = future
+			var booked []capacityReservation
+			completedAt, booked, e = plan.reserveWork(at, service, units, r.reservations)
 			if e != nil {
 				return e
 			}
+			r.reservations = append(r.reservations, booked...)
 		}
-		r.busy++
+		r.busy += units
 		logEvent(w.caseID, at, "start", w.nodeID, "", resourceID)
-		r.busyMinutes += service
+		r.busyMinutes += service * float64(units)
 		st := cases[w.caseID]
 		st.waiting += at - w.queuedAt
 		st.processing += service
-		st.cost += service / 60 * r.resource.CostPerHour
+		st.cost += service / 60 * r.resource.CostPerHour * float64(units)
 		el := elements[w.nodeID]
 		el.queue += at - w.queuedAt
 		el.service += service
@@ -276,7 +292,11 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 		capacity := capacityAt(resourceID, at)
 		for len(r.queue) > 0 && r.busy < capacity {
 			work := r.queue[0]
+			if r.busy+c.scenario.Activities[work.nodeID].requiredUnits() > capacity {
+				break
+			}
 			r.queue = r.queue[1:]
+			r.queuedUnits -= c.scenario.Activities[work.nodeID].requiredUnits()
 			if err := startWork(resourceID, r, work, at); err != nil {
 				return err
 			}
@@ -303,11 +323,11 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 		for _, resourceID := range candidates {
 			r := resources[resourceID]
 			capacity := capacityAt(resourceID, at)
-			score := float64(r.busy + len(r.queue))
-			if capacity > 0 {
+			score := float64(r.busy + r.queuedUnits)
+			if capacity >= p.requiredUnits() {
 				score /= float64(capacity)
 			} else if plan := c.calendars[resourceID]; plan != nil {
-				next, ok := plan.nextAvailable(at)
+				next, ok := plan.nextAvailableUnits(at, p.requiredUnits())
 				if !ok {
 					continue
 				}
@@ -336,14 +356,15 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 		}
 		r := resources[resourceID]
 		updateArea(resourceID, r, at)
-		if plan := c.calendars[resourceID]; plan != nil && plan.capacityAt(at) == 0 {
-			if _, ok := plan.nextAvailable(at); !ok {
-				return fmt.Errorf("resource %q calendar has no availability within two weeks", resourceID)
+		if plan := c.calendars[resourceID]; plan != nil && plan.capacityAt(at) < p.requiredUnits() {
+			if _, ok := plan.nextAvailableUnits(at, p.requiredUnits()); !ok {
+				return fmt.Errorf("resource %q calendar cannot provide %d people together within two weeks", resourceID, p.requiredUnits())
 			}
 		}
 		queueSequence++
 		logEvent(caseID, at, "queue", nodeID, "", resourceID)
 		r.queue = append(r.queue, queuedWork{caseID: caseID, nodeID: nodeID, queuedAt: at, priority: p.Priority, sequence: queueSequence, frames: frames})
+		r.queuedUnits += p.requiredUnits()
 		sort.SliceStable(r.queue, func(i, j int) bool {
 			return r.queue[i].priority > r.queue[j].priority || (r.queue[i].priority == r.queue[j].priority && r.queue[i].sequence < r.queue[j].sequence)
 		})
@@ -352,10 +373,10 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 		}
 		return drainQueue(resourceID, at)
 	}
-	release = func(resourceID string, at float64) error {
+	release = func(resourceID string, units int, at float64) error {
 		r := resources[resourceID]
 		updateArea(resourceID, r, at)
-		r.busy--
+		r.busy -= units
 		return drainQueue(resourceID, at)
 	}
 	enter = func(caseID int, nodeID string, at float64, frames []syncFrame) error {
@@ -442,7 +463,7 @@ func runOnce(ctx context.Context, c *compiledScenario, rng *rand.Rand) (RunMetri
 			logEvent(e.caseID, e.at, "complete", e.nodeID, "", e.resourceID)
 			elements[e.nodeID].completed++
 			if e.resourceID != "" {
-				err = release(e.resourceID, e.at)
+				err = release(e.resourceID, c.scenario.Activities[e.nodeID].requiredUnits(), e.at)
 			}
 			if err == nil {
 				err = routeAfterActivity(c, c.graph.Nodes[e.nodeID], e.caseID, e.at, rng, e.frames, push, &nextGroupID, cases)

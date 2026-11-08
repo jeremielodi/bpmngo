@@ -8,10 +8,12 @@ describe('Simulation projects',()=>{
   it('isolates duplicate BPMN IDs across models and preserves constraints when replacing a model',()=>{
     let s=upsertProjectModel(emptyScenario(),xml,'Orders','one');
     s.activities['one::work'].fixedCost=17;
+    s.activities['one::work'].resourceUnits=3;
     s=upsertProjectModel(s,xml,'Fulfillment','two');
     expect(Object.keys(s.activities)).toEqual(['one::work','two::work']);
     s=upsertProjectModel(s,xml,'Orders','one');
     expect(s.activities['one::work'].fixedCost).toBe(17);
+    expect(s.activities['one::work'].resourceUnits).toBe(3);
     expect(s.activities['two::work']).toBeDefined();
     expect(s.models).toHaveLength(2);
   });
