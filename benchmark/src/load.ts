@@ -154,10 +154,30 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
   await sleep(1000);
   console.log(`  process ${processId}, ${types.length} job types: ${types.join(', ')}`);
 
+  // Worker errors are kept apart (`job <code>`): they are shown, but only a
+  // refused start makes a rate level not sustained.
   const errors: Record<string, number> = {};
-  const count = (e: unknown) => {
-    const code = (e as CallError)?.code ?? 'ERROR';
+  const count = (e: unknown, prefix = '') => {
+    const code = prefix + ((e as CallError)?.code ?? 'ERROR');
     errors[code] = (errors[code] ?? 0) + 1;
+  };
+  const countJob = (e: unknown) => count(e, JOB_ERROR);
+
+  // A refused completion is retried after the same backoff as a refused start,
+  // as the official SDKs do. Dropping it would leave the job locked for its
+  // whole activation timeout (60 s) and punish the engine that pushes back on
+  // job commands (Camunda) for a behaviour its real clients do not have.
+  const completeJob = async (engine: Engine, key: string) => {
+    for (let refusals = 0; ; refusals++) {
+      try {
+        await engine.call('CompleteJob', { jobKey: key, variables: '{}' });
+        return;
+      } catch (e) {
+        countJob(e);
+        if ((e as CallError)?.code !== 'RESOURCE_EXHAUSTED' || stopWorkers) return;
+        await sleep(backoffMs(refusals));
+      }
+    }
   };
 
   // Workers: long-poll for jobs, complete each batch in parallel. They run for every level.
@@ -172,11 +192,11 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
           try {
             jobs = await engine.activateJobs(type, 32, 1000);
           } catch (e) {
-            count(e);
+            countJob(e);
             await sleep(100);
             continue;
           }
-          await Promise.all(jobs.map(j => engine.call('CompleteJob', { jobKey: j.key, variables: '{}' }).catch(count)));
+          await Promise.all(jobs.map(j => completeJob(engine, j.key)));
         }
       })());
     }
@@ -310,7 +330,10 @@ function levelResult(mode: Mode, level: number, o: Options, started: number, don
   };
 }
 
+const JOB_ERROR = 'job ';
 const errorCount = (r: LevelResult) => Object.values(r.errors).reduce((a, b) => a + b, 0);
+const startErrorCount = (r: LevelResult) => Object.entries(r.errors)
+  .filter(([k]) => !k.startsWith(JOB_ERROR)).reduce((a, [, v]) => a + v, 0);
 
 function printLevel(r: LevelResult) {
   console.log(`${r.throughput.toFixed(1)} inst/s, p50 ${r.latencyMs.p50.toFixed(0)} ms, p99 ${r.latencyMs.p99.toFixed(0)} ms, ${errorCount(r)} errors`);
@@ -319,7 +342,7 @@ function printLevel(r: LevelResult) {
 // A fixed rate is sustained when every start was accepted, (almost) every
 // instance completed, and the p99 stays under the limit.
 const sustained = (r: LevelResult, o: Options) =>
-  r.mode === 'rate' && errorCount(r) === 0 && r.completed >= 0.98 * r.started && r.latencyMs.p99 <= o.p99LimitMs;
+  r.mode === 'rate' && startErrorCount(r) === 0 && r.completed >= 0.98 * r.started && r.latencyMs.p99 <= o.p99LimitMs;
 
 function stats(values: number[]) {
   const v = values.filter(x => !Number.isNaN(x));

@@ -338,6 +338,12 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
   generated process is replaced by a real model, deployed as it is: its job
   types are read from the file and each gets `--workers` workers, so the
   parser and deployment cost of a realistic model is paid too.
+- **Refused job commands**: a `CompleteJob` refused with `RESOURCE_EXHAUSTED`
+  (Camunda's back-pressure also covers job commands; BpmnGo's does not) is
+  retried after the same backoff as a refused start, as the official SDKs do.
+  Dropping it would leave the job locked for its 60 s activation timeout.
+  Worker errors are reported as `job <code>` and do not make a rate level
+  "not sustained": only a refused start does.
 - **Clients levels** (`--levels`): that many clients each start an
   instance with `CreateProcessInstanceWithResult`, wait for its end, and
   start the next. A refused client waits before trying again: 0–100 ms,
