@@ -23,7 +23,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { CallError, Engine, EngineConfig } from './engine';
-import { checkContainers, ResourceMonitor } from './resources';
+import { checkContainers, cpuSecondsNow, ResourceMonitor } from './resources';
 import { checkPg, PgLevelStats, PgTarget, startPgWindow } from './pgstats';
 
 type Mode = 'clients' | 'rate';
@@ -38,6 +38,7 @@ interface LevelResult {
   throughput: number;            // completed per second of measured window
   latencyMs: { p50: number; p95: number; p99: number; max: number };
   errors: Record<string, number>; // gRPC code → count (starts and job completions)
+  errorMessages: Record<string, string[]>; // first messages of each code other than back-pressure
   cpuSeconds: number | null;
   cpuAvgPct: number;
   cpuPeakPct: number;
@@ -46,7 +47,26 @@ interface LevelResult {
   cpuMsPerInstance: number | null;
   containers: { container: string; cpuAvgPct: number; memPeakMiB: number }[];
   pg?: PgLevelStats;             // BpmnGo: PostgreSQL over the measured window
+  drain?: Drain;                 // after the window, until the engine is idle again
 }
+
+// Work an engine defers past the window (BpmnGo's archiver, Camunda's
+// exporters) is paid after it: in the next level's window if nothing waits
+// for it. After each level the workers keep running, no instance is started,
+// and the bench waits until the engine's containers are back to their idle
+// CPU; what that costs belongs to the level that caused it.
+interface Drain {
+  seconds: number;
+  cpuSeconds: number | null;     // all CPU used while draining
+  excessCpuSeconds: number | null; // above the idle CPU measured before level 1
+  timedOut: boolean;             // not idle within --drain-timeout
+  pg?: PgLevelStats;
+}
+
+// Messages are kept for codes that are not plain back-pressure, so an error
+// such as INTERNAL can be traced afterwards.
+const SAMPLED_MESSAGES = 5;
+const isBackPressure = (code: string) => code.endsWith('RESOURCE_EXHAUSTED') || code === 'CLIENT_LIMIT';
 
 const now = () => Number(process.hrtime.bigint()) / 1e6;
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -58,6 +78,11 @@ const backoffMs = (n: number) => Math.random() * Math.min(5000, 100 * 2 ** Math.
 // In rate mode, starts still waiting for an answer beyond this are not sent
 // (counted as CLIENT_LIMIT): the client must not become the bottleneck.
 const MAX_IN_FLIGHT = 2000;
+
+// Idle CPU is measured over IDLE_SAMPLE_MS before level 1; a drain checks the
+// CPU every DRAIN_CHECK_MS.
+const IDLE_SAMPLE_MS = 10000;
+const DRAIN_CHECK_MS = 5000;
 
 function args(argv: string[]) {
   const get = (name: string, def?: string) => {
@@ -87,6 +112,8 @@ function args(argv: string[]) {
     // between level 1 and level 2, which is a measurement artifact, not a
     // property of the engine. --first-warmup replaces --warmup on level 1.
     firstWarmupS: Number(get('first-warmup', '60')),
+    // Longest wait for the engine to drain after a level; 0 skips draining.
+    drainTimeoutS: Number(get('drain-timeout', '300')),
     workers: Number(get('workers', '8')),
     // A real model from bpmn/ instead of the generated 4-element process:
     // realistic models cost parser time at deploy and more jobs per instance,
@@ -157,9 +184,16 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
   // Worker errors are kept apart (`job <code>`): they are shown, but only a
   // refused start makes a rate level not sustained.
   const errors: Record<string, number> = {};
+  const errorMessages: Record<string, string[]> = {};
   const count = (e: unknown, prefix = '') => {
     const code = prefix + ((e as CallError)?.code ?? 'ERROR');
     errors[code] = (errors[code] ?? 0) + 1;
+    const message = (e as CallError)?.message;
+    if (message && !isBackPressure(code) && (errorMessages[code] ??= []).length < SAMPLED_MESSAGES) errorMessages[code].push(message);
+  };
+  const resetErrors = () => {
+    for (const k of Object.keys(errors)) delete errors[k];
+    for (const k of Object.keys(errorMessages)) delete errorMessages[k];
   };
   const countJob = (e: unknown) => count(e, JOB_ERROR);
 
@@ -215,6 +249,42 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
     if (problem) console.log(`  ⚠ ${problem}`);
     if (problem?.startsWith('cannot')) pg = undefined;
   }
+  // Idle CPU of the engine's containers, workers polling, nothing started:
+  // the level a drain waits to get back to.
+  let idleCpuPct: number | null = null;
+  if (o.drainTimeoutS > 0 && containers.length) {
+    const c0 = await cpuSecondsNow(containers);
+    await sleep(IDLE_SAMPLE_MS);
+    const c1 = await cpuSecondsNow(containers);
+    if (c0 !== null && c1 !== null) idleCpuPct = (c1 - c0) / (IDLE_SAMPLE_MS / 1000) * 100;
+  }
+  const drain = async (): Promise<Drain | undefined> => {
+    if (idleCpuPct === null) return undefined;
+    // Idle again: two checks in a row at most 50 % (and at least 10 points)
+    // above the idle CPU. Camunda's JVM idles noisily, hence the margin.
+    const limit = idleCpuPct + Math.max(10, idleCpuPct / 2);
+    const t0 = Date.now();
+    const c0 = await cpuSecondsNow(containers);
+    const pgDrain = pg ? await startPgWindow(pg).catch(() => undefined) : undefined;
+    let quiet = 0, prev = c0, prevT = t0;
+    while (quiet < 2 && prev !== null && Date.now() - t0 < o.drainTimeoutS * 1000) {
+      await sleep(DRAIN_CHECK_MS);
+      const c = await cpuSecondsNow(containers);
+      const t = Date.now();
+      if (c === null) { prev = null; break; }
+      quiet = (c - prev) / ((t - prevT) / 1000) * 100 <= limit ? quiet + 1 : 0;
+      prev = c; prevT = t;
+    }
+    const seconds = (prevT - t0) / 1000;
+    const cpuSeconds = c0 !== null && prev !== null ? prev - c0 : null;
+    return {
+      seconds, cpuSeconds,
+      excessCpuSeconds: cpuSeconds === null ? null : Math.max(0, cpuSeconds - idleCpuPct / 100 * seconds),
+      timedOut: quiet < 2,
+      pg: pgDrain ? await pgDrain().catch(() => undefined) : undefined,
+    };
+  };
+
   for (const [stepIndex, { mode, level }] of o.steps.entries()) {
     process.stdout.write(`  ${String(level).padStart(4)} ${mode === 'clients' ? 'clients ' : 'inst/s  '} … `);
     const warmS = stepIndex === 0 ? Math.max(o.warmupS, o.firstWarmupS) : o.warmupS;
@@ -222,13 +292,13 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
     const measureEnd = warmEnd + o.durationS * 1000;
     const done: { start: number; end: number }[] = [];
     let started = 0;
-    for (const k of Object.keys(errors)) delete errors[k];
+    resetErrors();
 
     let monitor: ResourceMonitor | undefined;
     let pgWindow: (() => Promise<PgLevelStats>) | undefined;
     const startMonitor = (async () => {
       await sleep(Math.max(0, warmEnd - Date.now()));
-      for (const k of Object.keys(errors)) delete errors[k];   // count only the measured window
+      resetErrors();   // count only the measured window
       if (pg) pgWindow = await startPgWindow(pg).catch(() => undefined);
       if (containers.length) {
         monitor = new ResourceMonitor(cfg.name, containers);
@@ -238,6 +308,9 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
     const pgAtEnd = () => pgWindow ? pgWindow().catch(() => undefined) : Promise.resolve(undefined);
 
     if (mode === 'clients') {
+      // As in rate mode, a start that finishes after the window is a late
+      // completion: counted apart, not as throughput, but no longer dropped.
+      let inWindow = 0;
       const clients = Array.from({ length: level }, (_, i) => (async () => {
         const engine = starters[i % starters.length];
         let refusals = 0;
@@ -248,7 +321,10 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
           try {
             await startInstance(engine);
             refusals = 0;
-            if (startedAt >= warmEnd && Date.now() <= measureEnd) done.push({ start, end: now() });
+            if (startedAt >= warmEnd) {
+              done.push({ start, end: now() });
+              if (Date.now() <= measureEnd) inWindow++;
+            }
           } catch (e) {
             if (startedAt >= warmEnd) count(e);
             await sleep(backoffMs(refusals++));
@@ -257,6 +333,8 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
       })());
       await startMonitor;
       await Promise.all(clients);
+      const usage = monitor ? await monitor.stop() : undefined;
+      results.push({ ...levelResult(mode, level, o, started, done, inWindow, errors, errorMessages, usage), pg: await pgAtEnd() });
     } else {
       // Open loop: one start every 1000/level ms. Every instance started in
       // the measured window counts once it completes, even after the window.
@@ -290,13 +368,11 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
       // that happened after the measurement stopped.
       const completedInWindow = done.length;
       await Promise.all(pending);
-      results.push({ ...levelResult(mode, level, o, started, done, completedInWindow, errors, await usageAtEnd), pg: await pgStats });
-      printLevel(results[results.length - 1]);
-      continue;
+      results.push({ ...levelResult(mode, level, o, started, done, completedInWindow, errors, errorMessages, await usageAtEnd), pg: await pgStats });
     }
-    const usage = monitor ? await monitor.stop() : undefined;
-    results.push({ ...levelResult(mode, level, o, started, done, done.length, errors, usage), pg: await pgAtEnd() });
-    printLevel(results[results.length - 1]);
+    const r = results[results.length - 1];
+    r.drain = await drain();
+    printLevel(r);
   }
 
   stopWorkers = true;
@@ -306,7 +382,7 @@ async function runEngine(cfg: EngineConfig, o: Options): Promise<LevelResult[]> 
 }
 
 function levelResult(mode: Mode, level: number, o: Options, started: number, done: { start: number; end: number }[],
-                     completedInWindow: number, errors: Record<string, number>,
+                     completedInWindow: number, errors: Record<string, number>, errorMessages: Record<string, string[]>,
                      usage: Awaited<ReturnType<ResourceMonitor['stop']>> | undefined): LevelResult {
   const lat = done.map(d => d.end - d.start).sort((a, b) => a - b);
   const cpuSeconds = usage?.total.cpuSeconds ?? null;
@@ -319,6 +395,7 @@ function levelResult(mode: Mode, level: number, o: Options, started: number, don
     throughput: completedInWindow / o.durationS,
     latencyMs: { p50: percentile(lat, 0.5), p95: percentile(lat, 0.95), p99: percentile(lat, 0.99), max: lat[lat.length - 1] ?? NaN },
     errors: { ...errors },
+    errorMessages: Object.fromEntries(Object.entries(errorMessages).map(([k, v]) => [k, [...v]])),
     cpuSeconds,
     cpuAvgPct: usage?.total.cpuAvgPct ?? NaN,
     cpuPeakPct: usage?.total.cpuPeakPct ?? NaN,
@@ -449,6 +526,39 @@ function report(runs: Record<string, LevelResult[]>[], o: Options): string {
   const errorLines = each((engine, r, run) => Object.keys(r.errors).length
     ? `${where(engine, r, run)}: ${Object.entries(r.errors).map(([k, v]) => `${k} ×${v}`).join(', ')}` : undefined);
   if (errorLines.length) lines.push('Errors:', ...errorLines, '');
+  const messageLines = each((engine, r, run) => Object.keys(r.errorMessages ?? {}).length
+    ? Object.entries(r.errorMessages).map(([k, v]) => `${where(engine, r, run)}: ${k}: ${[...new Set(v)].join(' | ')}`).join('\n') : undefined);
+  if (messageLines.length) lines.push('Error messages (first ones of each code other than back-pressure):', ...messageLines, '');
+
+  // Durable cost: the window's CPU plus what the engine spent above idle
+  // finishing the level's deferred work, per instance that finished at all.
+  const drained = runs.some(r => Object.values(r).some(rs => rs.some(x => x.drain)));
+  if (drained) {
+    lines.push(`After each level, until the engine's CPU is back to idle (at most ${o.drainTimeoutS} s):`);
+    lines.push(`  ${'engine'.padEnd(9)}${'level'.padStart(12)}${'drain'.padStart(10)}${'CPU above idle'.padStart(16)}` +
+      `${'CPU/inst window'.padStart(17)}${'CPU/inst durable'.padStart(18)}${'SQL/inst durable'.padStart(18)}${'timeouts'.padStart(10)}`);
+    for (const { mode, level } of o.steps) {
+      for (const engine of engines) {
+        const rs = runs.map(r => r[engine]?.find(x => x.mode === mode && x.level === level)).filter((x): x is LevelResult => !!x?.drain);
+        if (!rs.length) continue;
+        const finished = (r: LevelResult) => r.completed + r.lateCompletions;
+        const durable = (r: LevelResult) => r.drain!.excessCpuSeconds === null || !finished(r) ? NaN
+          : ((r.cpuAvgPct / 100) * r.durationS + r.drain!.excessCpuSeconds) * 1000 / finished(r);
+        const sql = (r: LevelResult) => r.pg?.statements && r.drain!.pg?.statements && finished(r)
+          ? (r.pg.statements.calls + r.drain!.pg.statements.calls) / finished(r) : NaN;
+        const pick = (g: (r: LevelResult) => number) => stats(rs.map(g));
+        const label = mode === 'clients' ? `${level} clients` : `${level} inst/s`;
+        lines.push(`  ${engine.padEnd(9)}${label.padStart(12)}${(ms(pick(r => r.drain!.seconds)) + ' s').padStart(10)}` +
+          `${(ms(pick(r => r.drain!.excessCpuSeconds ?? NaN)) + ' s').padStart(16)}` +
+          `${(f(pick(r => r.cpuMsPerInstance ?? NaN).mean, 1) + ' ms').padStart(17)}${(f(pick(durable).mean, 1) + ' ms').padStart(18)}` +
+          `${f(pick(sql).mean, 1).padStart(18)}${String(rs.filter(r => r.drain!.timedOut).length).padStart(10)}`);
+      }
+    }
+    lines.push('  CPU/inst durable = (window CPU + CPU above idle while draining) / instances started in the window that finished;');
+    lines.push('  SQL/inst durable = BpmnGo statements in the window and the drain, per such instance. A timeout means the');
+    lines.push('  engine was still busy when the drain gave up: its durable figures are then a lower bound.');
+    lines.push('');
+  }
   if (o.repeat > 1) {
     lines.push('Each run:', ...each((engine, r, run) =>
       `${where(engine, r, run)}: ${f(r.throughput, 1)} inst/s, p50 ${f(r.latencyMs.p50)} ms, p99 ${f(r.latencyMs.p99)} ms, ${errorCount(r)} errors`), '');
@@ -485,9 +595,10 @@ async function main() {
     for (const name of order) {
       console.log(`\n▶ ${name}${o.repeat > 1 ? ` (run ${i + 1}/${o.repeat})` : ''}`);
       byEngine[name] = await runEngine(o.engines[name], o);
+      // After each engine, so a series cut short keeps what it measured.
+      fs.writeFileSync(path.join(o.out, 'load.json'), JSON.stringify([...runs, byEngine], null, 2));
     }
     runs.push(byEngine);
-    fs.writeFileSync(path.join(o.out, 'load.json'), JSON.stringify(runs, null, 2));
   }
   const text = report(runs, o);
   fs.writeFileSync(path.join(o.out, 'load-report.txt'), text);
