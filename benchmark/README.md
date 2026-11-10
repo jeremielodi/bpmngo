@@ -328,9 +328,13 @@ both engines under the same sustained load:
 
 ```shell
 npm run load                                  # levels 10, 50, 100 clients, 60 s each
-npm run load -- --rates 5,10,15,20,25         # fixed rates, in instances started per second
-npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
+npm run load -- --rates 5,10,15,20,25,30,40,50,60,70   # fixed rates, in instances started per second
+npm run load -- --levels 10,50,100,200 --rates 5,10,15,20,25,30,40,50,60,70 --repeat 3
 ```
+
+The rates must go past every engine's ceiling: a sweep that stops at 25
+inst/s shows two engines "sustaining 25" whatever their real limits. If an
+engine still sustains the last rate, add higher ones until it does not.
 
 - **Workload**: one process, start → two service tasks → end, with a few
   business variables. The same workers (8 per job type, batches of 32)
@@ -365,7 +369,22 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
   memory of the engine's containers, and the CPU time per completed instance.
   An instance counts only if it *started and finished inside* the window:
   completions that land after it are the backlog the engine was still
-  working through, reported apart, not credited as throughput.
+  working through, reported apart, not credited as throughput, in clients
+  levels as in rate levels. Latency percentiles include those late ones.
+- **Drain after each level**: work an engine defers past the window
+  (BpmnGo's archiver, Camunda's exporters) would otherwise be paid inside the
+  next level's window — after the clients levels, BpmnGo's 5 inst/s level
+  used to show thousands of SQL statements per new instance. So after each
+  level the workers keep running, nothing is started, and the bench waits
+  until the engine's containers are back to the idle CPU measured before
+  level 1 (two 5 s checks in a row at most 50 %, and at least 10 points,
+  above it; `--drain-timeout`, 300 s, `0` to skip). The report gives each
+  level's drain time, its CPU above idle, and a **durable CPU per
+  instance**: window CPU plus that drain CPU, per instance started in the
+  window that finished; for BpmnGo, SQL statements per instance the same way.
+- **Error messages**: for every code other than back-pressure
+  (`RESOURCE_EXHAUSTED`, `CLIENT_LIMIT`), the first five messages are kept in
+  `load.json` and printed in the report, so an `INTERNAL` can be traced.
 - **Repeats** (`--repeat 3`): the whole test runs that many times, the
   engine order alternating; the report gives mean±standard deviation, and
   each run.
@@ -391,7 +410,8 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
   state is in its own process.
 - **Endurance**: one level with a long window, e.g.
   `npm run load -- --engines bpmngo --levels 100 --duration 1800`.
-- Output: `results/load-<date>/load-report.txt` and `load.json`.
+- Output: `results/load-<date>/load-report.txt` and `load.json` (written
+  after each engine, so a series cut short keeps what it measured).
 
 ```
 --levels 10,50,100   clients levels               --rates 5,10,20  fixed-rate levels (inst/s)
@@ -401,7 +421,8 @@ npm run load -- --levels 10,50,100 --rates 5,10,15,20,25 --repeat 3
 --process bpmn/large.bpmn   run a real model instead of the generated start → 2 tasks → end:
                      its job types are read from the file, and its parser/deploy cost is paid
 --repeat 1           runs, engine order alternating --p99-limit 1000 p99 (ms) for a sustained rate
---workers 8          workers per job type
+--workers 8          workers per job type         --drain-timeout 300  longest wait for the engine to
+                                                                       be idle after a level; 0 skips it
 --bpmngo-postgres c   PostgreSQL container read   --no-pg-stats    skip PostgreSQL's figures
 --engines, --*-grpc, --*-user, --*-containers, --no-resources, --out: as for npm run compare
 ```

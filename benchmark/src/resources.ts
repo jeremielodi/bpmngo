@@ -81,6 +81,17 @@ async function cpuUsec(container: string): Promise<number | null> {
   }
 }
 
+/** CPU time the containers have used since they started, in seconds (null: a counter is unreadable). */
+export async function cpuSecondsNow(containers: string[]): Promise<number | null> {
+  let total = 0;
+  for (const c of containers) {
+    const us = await cpuUsec(c);
+    if (us === null) return null;
+    total += us / 1e6;
+  }
+  return total;
+}
+
 /** The container's CPU limit: pinned cores, a CPU quota, or none. */
 async function cpuLimit(container: string): Promise<string> {
   try {
