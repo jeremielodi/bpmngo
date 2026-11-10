@@ -89,7 +89,14 @@ export class Engine {
   }
 
   async deploy(fileName: string, content: Buffer) {
-    return this.call('DeployResource', { resources: [{ name: fileName, content }], tenantId: '' });
+    return this.deployResources([{ name: fileName, content }]);
+  }
+
+  // One deployment for several resources: Camunda distributes a deployment to
+  // its other partitions as a whole, so a process never reaches a partition
+  // before the decision or form it uses.
+  async deployResources(resources: { name: string; content: Buffer }[]) {
+    return this.call('DeployResource', { resources, tenantId: '' });
   }
 
   // ── REST ──────────────────────────────────────────────────────────────────

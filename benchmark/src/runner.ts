@@ -75,16 +75,21 @@ export async function runScenario(engine: Engine, sc: Scenario, runTagOfBench: s
   const processIds = new Set<string>();
 
   // ── Deploy ────────────────────────────────────────────────────────────────
-  for (const file of sc.bpmn) {
+  // All files of a scenario in one deployment. Deployed one by one, a process
+  // could start on a Camunda partition the decision had not reached yet
+  // (CALLED_DECISION_ERROR "no decision found", seen on rb-dmn-gold-customer
+  // with 2 partitions).
+  const resources = sc.bpmn.map(file => {
     const xml = isolate(fs.readFileSync(path.join(BPMN_DIR, file), 'utf8'), suffix);
     for (const m of xml.matchAll(/<(?:\w+:)?process\b[^>]*\bid="([^"]+)"/g)) processIds.add(m[1]);
-    try {
-      await engine.deploy(file, Buffer.from(xml));
-    } catch (e) {
-      const err = e as CallError;
-      trace.compared.deploy = err.code;
-      trace.info.errors.push(`deploy ${file}: ${err.code} ${err.message}`);
-    }
+    return { name: file, content: Buffer.from(xml) };
+  });
+  try {
+    await engine.deployResources(resources);
+  } catch (e) {
+    const err = e as CallError;
+    trace.compared.deploy = err.code;
+    trace.info.errors.push(`deploy ${sc.bpmn.join(', ')}: ${err.code} ${err.message}`);
   }
   if (trace.compared.deploy !== 'ok') {
     trace.compared.outcome = 'not deployed';
