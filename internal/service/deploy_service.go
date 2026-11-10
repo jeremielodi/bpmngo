@@ -2,6 +2,7 @@
 package service
 
 import (
+	"database/sql"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -103,7 +104,7 @@ func DeployResources(db *sqlx.DB, deploymentName string, tenantID string, resour
 				ID string `json:"id"`
 			}
 			if err := json.Unmarshal(res.Content, &schema); err != nil || schema.ID == "" {
-				return nil, fmt.Errorf("failed to parse form %s: expected JSON with an \"id\" field", res.Filename)
+				return nil, fmt.Errorf("%w: failed to parse form %s: expected JSON with an \"id\" field", ErrInvalidResource, res.Filename)
 			}
 			formID, version, err := formRepo.CreateForm(models.FormCreateModel{
 				DeploymentID: deploy.ID,
@@ -120,7 +121,7 @@ func DeployResources(db *sqlx.DB, deploymentName string, tenantID string, resour
 		if strings.HasSuffix(lowerName, ".dmn") {
 			defs, err := dmn.ParseDMN(res.Content)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse DMN %s: %w", res.Filename, err)
+				return nil, fmt.Errorf("%w: failed to parse DMN %s: %v", ErrInvalidResource, res.Filename, err)
 			}
 			for _, decision := range defs.Decisions {
 				if decision.DecisionTable == nil {
@@ -154,17 +155,29 @@ func DeployResources(db *sqlx.DB, deploymentName string, tenantID string, resour
 			return nil, fmt.Errorf("%w: %s: %v", ErrInvalidResource, res.Filename, err)
 		}
 
+		// A failed permission lookup fails the deployment as an error, never
+		// as a denial nor as a grant.
 		if requestingUserID != uuid.Nil {
 			for _, procKey := range processKeys {
-				if _, findErr := deploymentRepo.FindLatestProcessDefinitionByKey(procKey); findErr != nil {
-					hasGlobal, _ := actionRepo.UserHasPermission(requestingUserID, "CAN_MANAGE_DEPLOY_PROCESS")
+				_, findErr := deploymentRepo.FindLatestProcessDefinitionByKey(procKey)
+				if findErr != nil && !errors.Is(findErr, sql.ErrNoRows) {
+					return nil, fmt.Errorf("looking up process %s: %w", procKey, findErr)
+				}
+				if findErr != nil {
+					hasGlobal, permErr := actionRepo.UserHasPermission(requestingUserID, "CAN_MANAGE_DEPLOY_PROCESS")
+					if permErr != nil {
+						return nil, fmt.Errorf("checking deploy permission for process %s: %w", procKey, permErr)
+					}
 					if !hasGlobal {
 						return nil, fmt.Errorf("%w: you do not have permission to deploy new process %s", ErrDeployPermissionDenied, procKey)
 					}
 					continue
 				}
 				allowed, permErr := CanAccessProcess(db, requestingUserID, procKey, "MANAGE")
-				if permErr == nil && !allowed {
+				if permErr != nil {
+					return nil, fmt.Errorf("checking MANAGE access to process %s: %w", procKey, permErr)
+				}
+				if !allowed {
 					return nil, fmt.Errorf("%w: you do not have MANAGE access to process %s", ErrDeployPermissionDenied, procKey)
 				}
 			}

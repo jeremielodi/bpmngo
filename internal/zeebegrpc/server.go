@@ -106,7 +106,10 @@ func (s *Server) DeployResource(ctx context.Context, req *pb.DeployResourceReque
 		if errors.Is(err, service.ErrDeployPermissionDenied) {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		if errors.Is(err, service.ErrInvalidResource) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	deployKey, err := s.zeebeKeys.GetOrAssignKey("deployment", result.DeploymentID)
