@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Play, GitBranch, RefreshCw, ChevronRight, Shield, Trash2 } from 'lucide-react';
+import { Upload, Play, GitBranch, RefreshCw, ChevronRight, Shield, Trash2, Search, X } from 'lucide-react';
 import { listDefinitions, deployBpmn, startProcess } from '../api/processes';
+import { apiErrorMessage } from '../api/client';
 import { listProcessPermissions, grantProcessPermission, revokeProcessPermission } from '../api/processPermissions';
 import { listUsers, listRoles } from '../api/admin';
 import { useAuth } from '../hooks/useAuth';
@@ -20,6 +21,7 @@ export default function ProcessDefinitions() {
   const [startVars, setStartVars]   = useState('{}');
   const [startError, setStartError] = useState('');
   const [permissionsKey, setPermissionsKey] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: defs = [], isLoading, refetch } = useQuery({
     queryKey: ['definitions'],
@@ -43,8 +45,12 @@ export default function ProcessDefinitions() {
 
   const handleDeploy = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Cleared so picking the same file again after fixing it fires onChange.
+    e.target.value = '';
     if (file) deployMut.mutate(file);
   };
+
+  const openDeploy = () => { deployMut.reset(); setDeployOpen(true); };
 
   const handleStart = () => {
     if (!startOpen) return;
@@ -65,6 +71,11 @@ export default function ProcessDefinitions() {
     }, {})
   );
 
+  const term = search.trim().toLowerCase();
+  const visible = term
+    ? latest.filter(d => d.key.toLowerCase().includes(term) || (d.name ?? '').toLowerCase().includes(term))
+    : latest;
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -76,11 +87,34 @@ export default function ProcessDefinitions() {
           <Button variant="ghost" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => setDeployOpen(true)}>
+          <Button variant="secondary" size="sm" onClick={openDeploy}>
             <Upload className="w-4 h-4" /> Deploy BPMN
           </Button>
         </div>
       </div>
+
+      <Card className="p-4">
+        <div className="relative">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or key…"
+            aria-label="Search process definitions"
+            className="w-full text-sm border border-gray-300 rounded-md pl-9 pr-9 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </Card>
 
       <Card>
         {isLoading ? (
@@ -93,6 +127,12 @@ export default function ProcessDefinitions() {
             title="No process definitions"
             description="Deploy a BPMN file to get started"
           />
+        ) : visible.length === 0 ? (
+          <EmptyState
+            icon={<Search className="w-12 h-12" />}
+            title="No matching definitions"
+            description={`Nothing matches "${search.trim()}"`}
+          />
         ) : (
           <Table>
             <Thead>
@@ -104,7 +144,7 @@ export default function ProcessDefinitions() {
               </tr>
             </Thead>
             <tbody>
-              {latest.map(def => (
+              {visible.map(def => (
                 <Tr key={def.id}>
                   <Td>
                     <p className="font-medium text-gray-900">{def.name || def.key}</p>
@@ -175,7 +215,12 @@ export default function ProcessDefinitions() {
             </div>
           )}
           {deployMut.isError && (
-            <p className="text-sm text-red-600">Deploy failed. Check your BPMN file.</p>
+            <div role="alert" className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+              <p className="font-medium">Deploy failed</p>
+              <p className="mt-0.5 break-words whitespace-pre-wrap">
+                {apiErrorMessage(deployMut.error, 'Check your BPMN file.')}
+              </p>
+            </div>
           )}
         </div>
       </Modal>

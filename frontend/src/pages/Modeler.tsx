@@ -16,6 +16,7 @@ import ZeebeModdleExtension from 'zeebe-bpmn-moddle/resources/zeebe.json';
 import { FilePlus, FolderOpen, Download, UploadCloud, ArrowLeft } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { deployBpmn } from '../api/processes';
+import { apiErrorMessage } from '../api/client';
 
 const BLANK_DIAGRAM = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -163,7 +164,7 @@ export default function ModelerPage() {
         <div className={`px-4 py-2 text-sm flex-shrink-0 ${
           importError || deployMut.isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
         }`}>
-          {importError ?? (deployMut.isError ? 'Deploy failed — check the diagram is complete and valid.' : 'Deployed successfully.')}
+          {importError ?? (deployMut.isError ? `Deploy failed: ${apiErrorMessage(deployMut.error, 'check the diagram is complete and valid.')}` : 'Deployed successfully.')}
         </div>
       )}
 
