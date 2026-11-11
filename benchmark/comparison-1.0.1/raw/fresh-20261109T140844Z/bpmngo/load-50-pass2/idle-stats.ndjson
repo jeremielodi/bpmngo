@@ -1,0 +1,2 @@
+{"BlockIO":"0B / 4.1kB","CPUPerc":"42.27%","Container":"bpmngo-benchmark-app","ID":"7c2b8a60c706","MemPerc":"9.23%","MemUsage":"141.7MiB / 1.5GiB","Name":"bpmngo-benchmark-app","NetIO":"2.99GB / 3.71GB","PIDs":"12"}
+{"BlockIO":"1.38GB / 11.7GB","CPUPerc":"55.06%","Container":"bpmngo-benchmark-postgres","ID":"1c06ad57cfc2","MemPerc":"63.28%","MemUsage":"324MiB / 512MiB","Name":"bpmngo-benchmark-postgres","NetIO":"3.59GB / 2.85GB","PIDs":"49"}

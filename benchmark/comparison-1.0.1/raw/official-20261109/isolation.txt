@@ -1,0 +1,14 @@
+Isolation checks performed before the measured campaigns
+
+BpmnGo campaign — `docker ps`:
+bpmngo-e2e-app        bpmngo-final-bpmngo
+bpmngo-e2e-postgres   postgres:16
+
+Camunda campaign — `docker ps`:
+connectors      camunda/connectors-bundle:8.10.2
+orchestration   camunda/camunda:8.10.7
+
+Before every individual measurement, `docker inspect` and `docker stats
+--no-stream` were executed again. Their HostConfig snapshots, cgroup counters
+and repeated stats samples are stored in each measurement directory. After the
+campaign, `docker ps` returned no active container.

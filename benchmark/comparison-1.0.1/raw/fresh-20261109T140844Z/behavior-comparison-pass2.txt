@@ -1,0 +1,13 @@
+DIFF 3: exclusive-two-true-reference-order vs exclusive-two-true-reference-order
+DIFF 15: boundary-message vs boundary-message
+DIFF 16: boundary-signal-non-interrupting vs boundary-signal-non-interrupting
+DIFF 21: job-fail-no-retries-incident vs job-fail-no-retries-incident
+DIFF 28: event-subprocess-message vs event-subprocess-message
+DIFF 35: message-correlation-key vs message-correlation-key
+DIFF 37: message-start-event vs message-start-event
+DIFF 38: event-based-gateway-message vs event-based-gateway-message
+DIFF 39: signal-intermediate-catch vs signal-intermediate-catch
+DIFF 44: user-task-rest-completion vs user-task-rest-completion
+DIFF 46: grpc-key-usable-in-rest vs grpc-key-usable-in-rest
+DIFF 47: finished-instance-elements-and-variables vs finished-instance-elements-and-variables
+IDENTICAL_NORMALIZED 35/47

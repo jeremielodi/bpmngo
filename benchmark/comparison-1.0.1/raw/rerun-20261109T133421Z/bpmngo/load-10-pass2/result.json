@@ -1,0 +1,20 @@
+{
+  "engine": "bpmngo",
+  "generated_at": "2026-11-09T13:58:44.285729Z",
+  "clients": 10,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 10,
+  "seconds": 60.027986583,
+  "completed": 13031,
+  "instances_per_second": 217.08207690728037,
+  "errors": {},
+  "latency": {
+    "count": 13031,
+    "errors": 0,
+    "p50_us": 43262,
+    "p95_us": 70278,
+    "p99_us": 88194,
+    "mean_us": 46057.64523060394
+  }
+}

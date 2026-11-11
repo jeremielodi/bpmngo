@@ -1,0 +1,9 @@
+services:
+  postgres:
+    container_name: bpmngo-benchmark-postgres
+    cpuset: "0-1"
+    mem_limit: 512m
+  bpmngo:
+    container_name: bpmngo-benchmark-app
+    cpuset: "0-1"
+    mem_limit: 1536m

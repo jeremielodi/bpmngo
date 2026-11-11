@@ -1,0 +1,3 @@
+lodk-evaluation-completion-audit postgres:16-alpine
+connectors camunda/connectors-bundle:8.10.2
+orchestration camunda/camunda:8.10.7

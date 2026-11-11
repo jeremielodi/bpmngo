@@ -1,0 +1,2 @@
+{"BlockIO":"3.17GB / 1.16TB","CPUPerc":"10.87%","Container":"orchestration","ID":"c1df9acd3f81","MemPerc":"68.23%","MemUsage":"1.023GiB / 1.5GiB","Name":"orchestration","NetIO":"75.1MB / 90.8MB","PIDs":"90"}
+{"BlockIO":"441MB / 16.2MB","CPUPerc":"1.88%","Container":"connectors","ID":"3504b4d01e3a","MemPerc":"78.71%","MemUsage":"403MiB / 512MiB","Name":"connectors","NetIO":"2.94MB / 568kB","PIDs":"61"}

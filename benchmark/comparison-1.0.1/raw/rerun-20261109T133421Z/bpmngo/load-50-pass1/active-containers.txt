@@ -1,0 +1,2 @@
+bpmngo-benchmark-app benchmark-rerun-20261109-bpmngo
+bpmngo-benchmark-postgres postgres:16

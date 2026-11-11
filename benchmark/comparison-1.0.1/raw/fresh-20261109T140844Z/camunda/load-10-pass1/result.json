@@ -1,0 +1,20 @@
+{
+  "engine": "camunda",
+  "generated_at": "2026-11-09T14:16:18.832497Z",
+  "clients": 10,
+  "workers": 8,
+  "batch": 32,
+  "warmup_seconds": 10,
+  "seconds": 60.033314041,
+  "completed": 10902,
+  "instances_per_second": 181.59916996343787,
+  "errors": {},
+  "latency": {
+    "count": 10902,
+    "errors": 0,
+    "p50_us": 51177,
+    "p95_us": 95990,
+    "p99_us": 115597,
+    "mean_us": 55050.49926618969
+  }
+}

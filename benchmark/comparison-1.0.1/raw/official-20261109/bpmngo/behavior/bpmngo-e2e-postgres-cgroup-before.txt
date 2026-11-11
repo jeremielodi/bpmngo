@@ -1,0 +1,11 @@
+usage_usec 154806502
+user_usec 115484536
+system_usec 39321966
+nice_usec 0
+nr_periods 0
+nr_throttled 0
+throttled_usec 0
+nr_bursts 0
+burst_usec 0
+memory.current 527282176
+memory.peak 536883200

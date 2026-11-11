@@ -1,0 +1,8 @@
+{
+  "brokers": 1,
+  "clusterSize": 1,
+  "engine": "bpmngo",
+  "gatewayVersion": "bpmngo-dev",
+  "partitions": 1,
+  "replicationFactor": 1
+}

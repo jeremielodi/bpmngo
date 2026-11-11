@@ -1,0 +1,2 @@
+{"sampledAt":"2026-11-09T13:40:29.999151000Z","BlockIO":"613MB / 299GB","CPUPerc":"6.93%","Container":"orchestration","ID":"3b414bca606c","MemPerc":"70.90%","MemUsage":"1.064GiB / 1.5GiB","Name":"orchestration","NetIO":"18.8MB / 21.2MB","PIDs":"92"}
+{"sampledAt":"2026-11-09T13:40:29.999151000Z","BlockIO":"655MB / 987kB","CPUPerc":"6.52%","Container":"connectors","ID":"8ea34e2b7a45","MemPerc":"93.25%","MemUsage":"477.5MiB / 512MiB","Name":"connectors","NetIO":"994kB / 338kB","PIDs":"55"}

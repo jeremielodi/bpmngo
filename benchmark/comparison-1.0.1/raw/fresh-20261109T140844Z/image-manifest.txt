@@ -1,0 +1,6 @@
+["camunda/camunda:8.10.7"] id=sha256:1d943ed22fab746bd5fd7e19f928f90ba06516d3cc0d28a98f1a1539db1ef585 digests=["camunda/camunda@sha256:1d943ed22fab746bd5fd7e19f928f90ba06516d3cc0d28a98f1a1539db1ef585"] platform=linux/arm64
+["camunda/connectors-bundle:8.10.2"] id=sha256:ffd8428e54f4f21995e5cea0564c4123ecd80a968208965138873d032355b4d9 digests=["camunda/connectors-bundle@sha256:ffd8428e54f4f21995e5cea0564c4123ecd80a968208965138873d032355b4d9"] platform=linux/arm64
+["postgres:16"] id=sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657 digests=["postgres@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657"] platform=linux/arm64
+["golang:1.26-alpine"] id=sha256:87c65a688975c0b1d4585d204874c45ca78354670e3a5f11368c5a492303d696 digests=["golang@sha256:87c65a688975c0b1d4585d204874c45ca78354670e3a5f11368c5a492303d696"] platform=linux/arm64
+["alpine:latest"] id=sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf digests=["alpine@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf"] platform=linux/arm64
+["bpmngo-fresh-20261109t140844-bpmngo:latest"] id=sha256:94ac3a8fed7baf88e0231b79ab4ef230ce8d9a73119087bbf42e8a338174b5d2 digests=["bpmngo-fresh-20261109t140844-bpmngo@sha256:94ac3a8fed7baf88e0231b79ab4ef230ce8d9a73119087bbf42e8a338174b5d2"] platform=linux/arm64

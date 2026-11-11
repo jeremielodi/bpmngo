@@ -1,0 +1,207 @@
+# docker-compose.yaml
+
+# Nom du projet Compose figé : les volumes (goflow_postgres_data, …) et le
+# réseau gardent leur nom quel que soit le dossier du clone. Ne pas changer
+# sans migrer les données (dump/restore). COMPOSE_PROJECT_NAME le remplace.
+name: goflow
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16
+    container_name: bpmngo-postgres
+    # max_connections doit couvrir DB_MAX_OPEN_CONNS × le nombre d'instances
+    # BpmnGo (+ quelques connexions d'admin).
+    command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"]
+    environment:
+      POSTGRES_DB: goflow
+      POSTGRES_USER: goflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
+    ports:
+      # Publié sur 127.0.0.1 seulement : l'appli passe par le réseau Docker.
+      # Pour y accéder depuis une autre machine, POSTGRES_BIND=0.0.0.0.
+      - "${POSTGRES_BIND:-127.0.0.1}:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bpmngo-network
+    restart: unless-stopped
+
+  # Redpanda (Kafka-wire-compatible event log — Phase 0 shadow-mode event
+  # sourcing scoping, see architecture/event-sourced-kafka-design.md).
+  # Un seul nœud, sur le même serveur que l'appli : données persistées et
+  # fsyncées dans le volume redpanda_data, mais pas répliquées — la sécurité
+  # vient des sauvegardes de ce volume. Mémoire/CPU : REDPANDA_MEMORY,
+  # REDPANDA_SMP.
+  #
+  # Lancé seulement avec le profil "kafka" (COMPOSE_PROFILES=kafka) : il ne
+  # sert qu'au chemin d'écriture partitionné (WRITE_PATH=partitioned) et au
+  # journal d'événements en mode shadow (EVENT_LOG=shadow). En mode direct,
+  # BpmnGo n'a pas besoin de Kafka.
+  redpanda:
+    profiles: ["kafka"]
+    image: redpandadata/redpanda:v24.2.4
+    container_name: bpmngo-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp=${REDPANDA_SMP:-1}
+      - --memory=${REDPANDA_MEMORY:-1G}
+      # Recommandé quand les CPU sont partagés avec l'appli et Postgres sur la
+      # même machine (pas d'épinglage de threads, pas de polling actif).
+      # N'affecte pas la durabilité : les écritures restent fsyncées.
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+    ports:
+      # Publié sur 127.0.0.1 seulement, sans authentification : ne jamais
+      # l'exposer sur le réseau tel quel.
+      - "127.0.0.1:9092:9092"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - bpmngo-network
+    restart: unless-stopped
+
+  # BpmnGo Application
+  bpmngo:
+    build: .
+    container_name: bpmngo-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda: # only with the "kafka" profile
+        condition: service_healthy
+        required: false
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: goflow
+      DB_PASS: ${POSTGRES_PASSWORD:-goflow123}
+      DB_NAME: goflow
+      # Taille du pool de connexions par instance BpmnGo
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-80}
+
+      # Kafka : vide (défaut) en mode direct. Pour WRITE_PATH=partitioned ou
+      # EVENT_LOG=shadow : KAFKA_BROKERS=redpanda:9092 et COMPOSE_PROFILES=kafka.
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-}
+      # Journal d'événements en mode shadow (internal/eventlog) : off (défaut)
+      # ou shadow. Il n'alimente que /engine-rest/eventlog/* et ses métriques,
+      # pour une écriture Kafka par événement du moteur.
+      EVENT_LOG: ${EVENT_LOG:-off}
+      # Copies de chaque partition à la création des topics (1 = mono-nœud)
+      KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-1}
+      # Chemin d'écriture (voir internal/cmdbus) : direct (défaut) ou
+      # partitioned (comme Camunda 8 : chaque commande d'une instance passe
+      # par la partition Kafka de cette instance)
+      WRITE_PATH: ${WRITE_PATH:-direct}
+      # Nombre de partitions : ne change plus une fois des instances créées
+      KAFKA_PARTITIONS: ${KAFKA_PARTITIONS:-12}
+      COMMAND_TIMEOUT: ${COMMAND_TIMEOUT:-30s}
+
+      # Queue Settings
+      QUEUE_MAX_RETRIES: 3
+      QUEUE_RETRY_BACKOFF_BASE: 1s
+      QUEUE_RETRY_MAX_BACKOFF: 5m
+      QUEUE_RETRY_SCHEDULER_INTERVAL: 5s
+      QUEUE_STATS_UPDATE_INTERVAL: 30s
+      QUEUE_CLEANUP_OLDER_THAN: 24h
+      
+      # Server
+      # Port d'écoute DANS le conteneur : reste 8080 (nginx proxifie vers
+      # bpmngo:8080). Le port exposé sur l'hôte vient de SERVER_PORT (.env).
+      SERVER_PORT: 8080
+      QUEUE_WORKERS: 10
+      
+      # JWT signing key, read from .env (never hardcode it here). Generate one
+      # with: openssl rand -base64 48. Set, BpmnGo runs in production mode.
+      # Unset (no .env at all), it runs in demo mode with a generated key
+      # kept in the bpmngo_data volume — fine to try BpmnGo, not for
+      # production.
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+
+      # Super User (valeurs lues depuis .env)
+      CREATE_SUPER_USER: ${CREATE_SUPER_USER:-true}
+      SUPER_USER_NAME: ${SUPER_USER_NAME:-admin}
+      SUPER_USER_EMAIL: ${SUPER_USER_EMAIL:-admin@goflow.com}
+      SUPER_USER_PASSWORD: ${SUPER_USER_PASSWORD:-admin123}
+      
+      # Mode : production (défaut dès que JWT_SECRET_KEY est fixé : refuse les
+      # secrets d'exemple, avertit sur /metrics ouvert et le mot de passe
+      # admin123) ou demo (défaut sans JWT_SECRET_KEY : secret généré).
+      GOFLOW_ENV: ${GOFLOW_ENV:-}
+
+      # Observabilité : jeton Bearer exigé sur GET /metrics (vide = ouvert)
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+
+      # Gateway gRPC (26500) : chaque appel exige des identifiants (JWT,
+      # OIDC ou Basic). true = un appel SANS identifiants s'exécute comme
+      # super_admin ; réservé à un réseau local de confiance.
+      GRPC_ALLOW_ANONYMOUS: ${GRPC_ALLOW_ANONYMOUS:-false}
+
+      # Rétention : supprime les instances terminées depuis plus de N jours
+      # (historic_*, audit_logs liés). Vide = tout garder.
+      RETENTION_DAYS: ${RETENTION_DAYS:-}
+      RETENTION_INTERVAL: ${RETENTION_INTERVAL:-1h}
+
+      # Expressions FEEL (préfixe "=") : shadow (défaut : CEL utilisé, écarts
+      # avec le moteur FEEL natif journalisés), feel (moteur natif), cel
+      FEEL_MODE: ${FEEL_MODE:-shadow}
+
+      # Clés dans les réponses /v2 : uuid (défaut) ou int (la clé int64 du
+      # gRPC, en chaîne, comme Camunda 8). /v2 accepte les deux en entrée.
+      REST_KEYS: ${REST_KEYS:-uuid}
+    volumes:
+      # Mode démo : la clé JWT générée, partagée par toutes les instances
+      - bpmngo_data:/app/data
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+      - "${GRPC_PORT:-26500}:26500" # gRPC gateway (Zeebe protocol subset — see internal/zeebegrpc)
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - bpmngo-network
+    restart: unless-stopped
+
+  # BpmnGo Frontend (React + nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bpmngo-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      bpmngo:
+        condition: service_healthy
+    networks:
+      - bpmngo-network
+    restart: unless-stopped
+
+networks:
+  bpmngo-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redpanda_data:
+  bpmngo_data:
