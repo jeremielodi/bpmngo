@@ -1,0 +1,20 @@
+{
+  "scenario": "api-grpc-key-usable-in-rest",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "ok",
+    "finalVariables": {
+      "sameKeyInRest": true
+    },
+    "instances": []
+  },
+  "info": {
+    "durationMs": 0,
+    "errors": [],
+    "restNotes": []
+  }
+}

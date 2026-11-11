@@ -23,12 +23,12 @@ import (
 
 var (
 	httpRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "goflow_http_requests_total",
+		Name: "bpmngo_http_requests_total",
 		Help: "HTTP requests handled, by method, route pattern and status code.",
 	}, []string{"method", "route", "status"})
 
 	httpDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "goflow_http_request_duration_seconds",
+		Name:    "bpmngo_http_request_duration_seconds",
 		Help:    "HTTP request latency, by method and route pattern.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"method", "route"})
@@ -39,48 +39,52 @@ var (
 	// interpreter and the CEL path disagreed, in FEEL_MODE=shadow
 	// (internal/common), by kind ("condition" or "value").
 	FeelShadowMismatches = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "goflow_feel_shadow_mismatches_total",
+		Name: "bpmngo_feel_shadow_mismatches_total",
 		Help: "FEEL expressions on which the native interpreter and the CEL path disagreed (FEEL_MODE=shadow).",
 	}, []string{"kind"})
 
 	RetentionDeletedRows = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "goflow_retention_deleted_rows_total",
+		Name: "bpmngo_retention_deleted_rows_total",
 		Help: "Rows deleted by the retention purge, by table.",
 	}, []string{"table"})
 
 	RuntimeAdmissionWait = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name:    "goflow_runtime_admission_wait_seconds",
+		Name:    "bpmngo_runtime_admission_wait_seconds",
 		Help:    "Time execution resumes wait for a runtime concurrency slot.",
 		Buckets: prometheus.DefBuckets,
 	})
 	RuntimeInFlight = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "goflow_runtime_executions_in_flight",
+		Name: "bpmngo_runtime_executions_in_flight",
 		Help: "Runtime executions currently consuming an admission slot.",
 	})
 	RuntimeAdmissionLimit = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "goflow_runtime_admission_limit",
+		Name: "bpmngo_runtime_admission_limit",
 		Help: "Current top-level runtime concurrency limit after archive-backlog throttling.",
 	})
 	RuntimeArchiveBacklog = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "goflow_runtime_archive_backlog",
+		Name: "bpmngo_runtime_archive_backlog",
 		Help: "Completed or terminated live instances waiting for archival, as observed by admission control.",
 	})
+	BackpressureRejections = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "bpmngo_backpressure_rejections_total",
+		Help: "Requests creating new work refused because the engine was overloaded, by API (grpc, rest).",
+	}, []string{"api"})
 	ArchiveBatchSize = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name:    "goflow_archive_transaction_instances",
+		Name:    "bpmngo_archive_transaction_instances",
 		Help:    "Number of process instances committed in one archive transaction.",
 		Buckets: []float64{1, 2, 5, 10, 20, 50, 100},
 	})
 	EngineTransactions = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "goflow_engine_transactions_total",
+		Name: "bpmngo_engine_transactions_total",
 		Help: "Engine transactions by operation and outcome.",
 	}, []string{"operation", "outcome"})
 	EngineTransactionDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "goflow_engine_transaction_duration_seconds",
+		Name:    "bpmngo_engine_transaction_duration_seconds",
 		Help:    "Engine transaction duration by operation and outcome.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"operation", "outcome"})
 	EngineTransactionRollbacks = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "goflow_engine_transaction_rollbacks_total",
+		Name: "bpmngo_engine_transaction_rollbacks_total",
 		Help: "Rolled-back engine transactions by operation and bounded reason.",
 	}, []string{"operation", "reason"})
 )
@@ -97,11 +101,12 @@ func Register(db *sqlx.DB) {
 		RuntimeInFlight,
 		RuntimeAdmissionLimit,
 		RuntimeArchiveBacklog,
+		BackpressureRejections,
 		ArchiveBatchSize,
 		EngineTransactions,
 		EngineTransactionDuration,
 		EngineTransactionRollbacks,
-		collectors.NewDBStatsCollector(db.DB, "goflow"),
+		collectors.NewDBStatsCollector(db.DB, "bpmngo"),
 		&engineCollector{db: db},
 	)
 }
@@ -172,23 +177,23 @@ type engineCollector struct {
 }
 
 var (
-	descInstances = prometheus.NewDesc("goflow_process_instances",
+	descInstances = prometheus.NewDesc("bpmngo_process_instances",
 		"Live process instances, by status.", []string{"status"}, nil)
-	descJobs = prometheus.NewDesc("goflow_jobs",
+	descJobs = prometheus.NewDesc("bpmngo_jobs",
 		"Jobs in the live jobs table, by status.", []string{"status"}, nil)
-	descTasks = prometheus.NewDesc("goflow_user_tasks",
+	descTasks = prometheus.NewDesc("bpmngo_user_tasks",
 		"Live user tasks, by status.", []string{"status"}, nil)
-	descIncidentsOpen = prometheus.NewDesc("goflow_incidents_open",
+	descIncidentsOpen = prometheus.NewDesc("bpmngo_incidents_open",
 		"Open incidents.", nil, nil)
-	descTimersPending = prometheus.NewDesc("goflow_timers_pending",
+	descTimersPending = prometheus.NewDesc("bpmngo_timers_pending",
 		"Timers not yet triggered.", nil, nil)
-	descTimersOverdue = prometheus.NewDesc("goflow_timers_overdue",
+	descTimersOverdue = prometheus.NewDesc("bpmngo_timers_overdue",
 		"Timers past their due time by more than one minute and still not triggered.", nil, nil)
-	descTableBytes = prometheus.NewDesc("goflow_table_size_bytes",
+	descTableBytes = prometheus.NewDesc("bpmngo_table_size_bytes",
 		"Total on-disk size (table + indexes + TOAST) of tables that grow over time.", []string{"table"}, nil)
-	descTableRows = prometheus.NewDesc("goflow_table_rows_estimate",
+	descTableRows = prometheus.NewDesc("bpmngo_table_rows_estimate",
 		"Planner row-count estimate (pg_class.reltuples) of tables that grow over time.", []string{"table"}, nil)
-	descScrapeError = prometheus.NewDesc("goflow_metrics_scrape_error",
+	descScrapeError = prometheus.NewDesc("bpmngo_metrics_scrape_error",
 		"1 if the last engine-state query failed, else 0.", nil, nil)
 )
 

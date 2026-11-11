@@ -8,7 +8,7 @@ name: goflow
 services:
   # PostgreSQL
   postgres:
-    image: postgres:16
+    image: postgres:18
     container_name: bpmngo-postgres
     # Les valeurs mémoire supposent au moins 1 Gio pour PostgreSQL. Ajuster
     # ensemble POSTGRES_MEMORY_LIMIT, shared_buffers et effective_cache_size.
@@ -37,18 +37,20 @@ services:
       - -c
       - max_wal_size=${POSTGRES_MAX_WAL_SIZE:-2GB}
     environment:
-      POSTGRES_DB: goflow
-      POSTGRES_USER: goflow
+      POSTGRES_DB: ${POSTGRES_DB:-goflow}
+      POSTGRES_USER: ${POSTGRES_USER:-goflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
     ports:
       # Publié sur 127.0.0.1 seulement : l'appli passe par le réseau Docker.
       # Pour y accéder depuis une autre machine, POSTGRES_BIND=0.0.0.0.
       - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Postgres 18+ : données dans /var/lib/postgresql/18/docker (PGDATA de
+      # l'image) ; le volume se monte sur le dossier parent.
+      - postgres_data:/var/lib/postgresql
       - ./database:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U goflow"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -107,23 +109,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redpanda: # only with the "kafka" profile
-        condition: service_healthy
-        required: false
+      # No dependency on redpanda (the "kafka" profile): an optional one
+      # needs Compose 2.20.2. With Kafka, BpmnGo waits for it at boot.
     environment:
       # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: goflow
-      DB_PASS: ${POSTGRES_PASSWORD:-goflow123}
-      DB_NAME: goflow
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-goflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
+      POSTGRES_DB: ${POSTGRES_DB:-goflow}
       # Taille du pool de connexions par instance BpmnGo
-      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-80}
+      POSTGRES_MAX_OPEN_CONNS: ${POSTGRES_MAX_OPEN_CONNS:-80}
       RUNTIME_MAX_CONCURRENCY: ${RUNTIME_MAX_CONCURRENCY:-}
       RUNTIME_MIN_CONCURRENCY: ${RUNTIME_MIN_CONCURRENCY:-}
       ARCHIVER_BACKLOG_SOFT_LIMIT: ${ARCHIVER_BACKLOG_SOFT_LIMIT:-}
       ARCHIVER_BACKLOG_HARD_LIMIT: ${ARCHIVER_BACKLOG_HARD_LIMIT:-}
-      ENGINE_NODE_ID: ${ENGINE_NODE_ID:-0}
+      ENGINE_NODE_ID: ${ENGINE_NODE_ID:-}
 
       # Kafka : vide (défaut) en mode direct. Pour WRITE_PATH=partitioned ou
       # EVENT_LOG=shadow : KAFKA_BROKERS=redpanda:9092 et COMPOSE_PROFILES=kafka.
@@ -166,13 +167,13 @@ services:
       # Super User (valeurs lues depuis .env)
       CREATE_SUPER_USER: ${CREATE_SUPER_USER:-true}
       SUPER_USER_NAME: ${SUPER_USER_NAME:-admin}
-      SUPER_USER_EMAIL: ${SUPER_USER_EMAIL:-admin@goflow.com}
+      SUPER_USER_EMAIL: ${SUPER_USER_EMAIL:-admin@bpmngo.com}
       SUPER_USER_PASSWORD: ${SUPER_USER_PASSWORD:-admin123}
       
       # Mode : production (défaut dès que JWT_SECRET_KEY est fixé : refuse les
       # secrets d'exemple, avertit sur /metrics ouvert et le mot de passe
       # admin123) ou demo (défaut sans JWT_SECRET_KEY : secret généré).
-      GOFLOW_ENV: ${GOFLOW_ENV:-}
+      BPMNGO_ENV: ${BPMNGO_ENV:-}
 
       # Observabilité : jeton Bearer exigé sur GET /metrics (vide = ouvert)
       METRICS_TOKEN: ${METRICS_TOKEN:-}
@@ -190,6 +191,7 @@ services:
       # Expressions FEEL (préfixe "=") : shadow (défaut : CEL utilisé, écarts
       # avec le moteur FEEL natif journalisés), feel (moteur natif), cel
       FEEL_MODE: ${FEEL_MODE:-shadow}
+      EXCLUSIVE_GATEWAY_ORDER: ${EXCLUSIVE_GATEWAY_ORDER:-camunda}
 
       # Clés dans les réponses /v2 : int par défaut (la clé int64 du gRPC,
       # comme Camunda 8) ; uuid conserve l'ancien format BpmnGo.

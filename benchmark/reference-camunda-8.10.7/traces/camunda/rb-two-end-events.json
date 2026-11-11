@@ -1,0 +1,49 @@
+{
+  "scenario": "rb-two-end-events",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-e-fast",
+        "elementId": "te_fast",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-e-slow",
+        "elementId": "te_slow",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "after 1500 ms: complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "fast": true,
+      "slow": true
+    },
+    "instances": [
+      {
+        "process": "rb_two_ends",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3363,
+    "errors": [],
+    "restNotes": []
+  }
+}

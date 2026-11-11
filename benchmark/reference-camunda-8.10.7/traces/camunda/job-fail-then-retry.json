@@ -1,0 +1,48 @@
+{
+  "scenario": "job-fail-then-retry",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "job-work",
+        "elementId": "r_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "fail(retries=2)",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "job-work",
+        "elementId": "r_work",
+        "retries": 2,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "attempt": 2
+    },
+    "instances": [
+      {
+        "process": "job_retry",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 1502,
+    "errors": [],
+    "restNotes": []
+  }
+}

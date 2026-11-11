@@ -1,0 +1,121 @@
+BpmnGo ⇄ Camunda 8 behaviour comparison
+Date      : 2026-11-03T08:47:32.550Z
+Reference : camunda  (gRPC 127.0.0.1:26500, REST http://127.0.0.1:8080)
+Compared  : bpmngo  (gRPC 127.0.0.1:36500, REST http://127.0.0.1:18080)
+
+Scenarios: 87   same: 87   expected differences: 0   different: 0   missing: 0
+
+── API checks ────────────────────────────────────────────────────────────
+  SAME       api-deploy-response
+  SAME       api-grpc-key-usable-in-rest
+  SAME       api-element-instances-endpoint
+  SAME       api-finished-instance-searchable
+  SAME       api-timer-waits-its-duration
+── Gateways ──────────────────────────────────────────────────────────────
+  SAME       gw-exclusive-default-taken
+  SAME       gw-exclusive-condition-beats-default
+  SAME       gw-exclusive-two-conditions-true
+  SAME       gw-exclusive-nothing-true-no-default
+  SAME       gw-exclusive-condition-on-missing-variable
+  SAME       gw-inclusive-default-alone
+  SAME       gw-inclusive-two-branches
+  SAME       gw-inclusive-nothing-true-no-default
+  SAME       gw-parallel-join-merges-variables
+── Boundary events ───────────────────────────────────────────────────────
+  SAME       boundary-timer-interrupting
+  SAME       boundary-timer-non-interrupting
+  SAME       boundary-message-interrupting
+  SAME       boundary-error-specific-code
+  SAME       boundary-error-catch-all
+  SAME       boundary-error-uncaught
+  SAME       boundary-signal-interrupting
+  SAME       boundary-escalation-non-interrupting
+── Jobs and variables ────────────────────────────────────────────────────
+  SAME       job-fail-then-retry
+  SAME       job-fail-no-retries-left
+  SAME       job-fail-with-backoff
+  SAME       job-fail-with-variables
+  SAME       job-headers-and-io-mappings
+  SAME       job-variable-types
+── Event sub-processes ───────────────────────────────────────────────────
+  SAME       esp-message-interrupting
+  SAME       esp-timer-non-interrupting
+  SAME       esp-error-catches-job-error
+── Multi-instance ────────────────────────────────────────────────────────
+  SAME       mi-parallel-output-collection
+  SAME       mi-sequential-loop-counter
+  SAME       mi-completion-condition
+  SAME       mi-empty-collection
+  SAME       mi-input-not-a-list
+  SAME       mi-subprocess-local-variables
+── Call activities ───────────────────────────────────────────────────────
+  SAME       call-propagate-all
+  SAME       call-only-mappings
+  SAME       call-child-error-caught-by-parent
+── Messages ──────────────────────────────────────────────────────────────
+  SAME       msg-correlation-key
+  SAME       msg-ttl-buffered
+  SAME       msg-ttl-zero-not-kept
+  SAME       msg-duplicate-message-id
+  SAME       msg-start-event
+  SAME       msg-event-gateway-message-wins
+  SAME       msg-event-gateway-timer-wins
+── Signals ───────────────────────────────────────────────────────────────
+  SAME       signal-start-event
+  SAME       signal-intermediate-catch
+── Timers ────────────────────────────────────────────────────────────────
+  SAME       timer-intermediate-duration
+  SAME       timer-date-in-the-past
+  SAME       timer-duration-from-feel
+  SAME       timer-cycle-boundary-fires-twice
+── FEEL expressions ──────────────────────────────────────────────────────
+  SAME       feel-numbers
+  SAME       feel-null-handling
+  SAME       feel-strings
+  SAME       feel-lists
+  SAME       feel-dates
+  SAME       feel-contexts
+── User tasks ────────────────────────────────────────────────────────────
+  SAME       user-task-completed-over-rest
+── Compensation ──────────────────────────────────────────────────────────
+  SAME       compensation-after-payment-error
+  SAME       compensation-not-run-on-happy-path
+── Robustness ────────────────────────────────────────────────────────────
+  SAME       rb-loop-retries-until-ok
+  SAME       rb-nested-subprocess
+  SAME       rb-subprocess-error-boundary
+  SAME       rb-subprocess-timer-boundary
+  SAME       rb-subprocess-terminate-end
+  SAME       rb-terminate-ends-instance
+  SAME       rb-parallel-five-branches
+  SAME       rb-parallel-nested
+  SAME       rb-inclusive-two-of-three
+  SAME       rb-link-events
+  SAME       rb-two-end-events
+  SAME       rb-script-task-feel
+  SAME       rb-dmn-gold-customer
+  SAME       rb-dmn-big-order
+  SAME       rb-big-unicode-variables
+  SAME       rb-subprocess-escalation
+  SAME       rb-subprocess-error-end-caught
+  SAME       rb-subprocess-error-end-not-reached
+  SAME       rb-event-gateway-signal-wins
+  SAME       rb-message-nested-correlation-key
+  SAME       rb-mi-subprocess-gateway
+  SAME       rb-boundary-fires-twice
+  SAME       rb-call-activity-child-timer
+  SAME       rb-modeler-export-freight
+  SAME       rb-modeler-export-backorder
+
+── Resources (Docker) ────────────────────────────────────────────────────
+  container                  run  CPU time  CPU avg  CPU peak  mem idle  mem avg  mem peak  limits (CPU, memory)
+  camunda (total)          330 s    90.6 s     27 %     129 %   514 MiB  620 MiB   739 MiB
+    bench-orchestration             90.6 s     27 %     129 %   514 MiB  620 MiB   739 MiB  cores 2,4, 2048 MiB
+  bpmngo (total)           268 s    24.4 s      9 %      30 %    85 MiB  133 MiB   164 MiB
+    bpmngotest-app                  13.8 s      5 %      18 %    11 MiB   16 MiB    26 MiB  cores 6,8, 1024 MiB
+    bpmngotest-postgres             10.6 s      4 %      13 %    74 MiB  116 MiB   144 MiB  cores 6,8, 1024 MiB
+
+  bpmngo / camunda: CPU time ×0.27, memory peak ×0.22, memory idle ×0.16, run time ×0.81
+
+  CPU in % of one core. CPU time from each container's cgroup counter over the run; peaks and
+  memory from `docker stats` samples (one every ~2 s). Each engine is measured during its own run.

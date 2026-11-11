@@ -135,7 +135,7 @@ func StartJobWakeListener(connStr string) (*pq.Listener, error) {
 	// The same connection carries InstanceFinishedChannel (see
 	// instance_notifier.go) and TimerArmedChannel (timer_notifier.go), with
 	// the same fallback-poll safety net.
-	for _, channel := range []string{JobAvailableChannel, InstanceFinishedChannel, TimerArmedChannel} {
+	for _, channel := range []string{JobAvailableChannel, InstanceFinishedChannel, TimerArmedChannel, ACLChangedChannel} {
 		if err := listener.Listen(channel); err != nil {
 			listener.Close()
 			return nil, err
@@ -156,6 +156,8 @@ func StartJobWakeListener(connStr string) (*pq.Listener, error) {
 				}
 			case TimerArmedChannel:
 				wakeTimers()
+			case ACLChangedChannel:
+				aclChangedLocal(n.Extra)
 			default:
 				wakeLocal(n.Extra)
 			}

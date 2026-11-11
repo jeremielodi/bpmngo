@@ -85,6 +85,10 @@ type Flow struct {
 	TargetRef  string
 	Condition  string
 	IsBoundary bool // true for flows generated from boundary event attachments
+	// DocOrder is the flow's position (1-based) among its process's
+	// sequenceFlow elements in the BPMN file; 0 in graphs stored before it
+	// was recorded (BackfillFlowDocOrder fills them in).
+	DocOrder int `json:"docOrder,omitempty"`
 }
 
 type Node struct {
@@ -99,6 +103,9 @@ type Node struct {
 	// when no other flow's condition is true (BPMN "default" attribute).
 	DefaultFlow   string               `json:"defaultFlow,omitempty"`
 	JobType       *string              // for service tasks
+	// JobRetries is zeebe:taskDefinition's retries: a number, a FEEL
+	// expression ("=..."), or empty for the default (3).
+	JobRetries string `json:"jobRetries,omitempty"`
 	MultiInstance *MultiInstanceConfig `json:"multiInstance,omitempty"`
 	// Timer support
 	TimerDefinition string `json:"timerDefinition,omitempty"` // Raw XML timer definition

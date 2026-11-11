@@ -38,7 +38,7 @@ type StepBackArgs struct {
 }
 
 type StepBackResult struct {
-	ExecutionID    int64   `json:"executionId"`
+	ExecutionID    int64   `json:"executionId,string"`
 	FromElementID  string  `json:"fromElementId"`
 	ToElementID    string  `json:"toElementId"`
 	ToElementName  string  `json:"toElementName,omitempty"`

@@ -32,7 +32,7 @@ node load-test.js all         # Run all tests
 Expected Output:
 text
 ============================================================
-🚀 GOFLOW LOAD TEST SUITE
+🚀 BPMNGO LOAD TEST SUITE
 ============================================================
 Server: http://localhost:8080
 CPU Cores: 8

@@ -126,11 +126,7 @@ func formatVariablesForResponse(variables map[string]interface{}) map[string]Cam
 func (ctrl *ExternalTaskController) CompleteTask(c *fiber.Ctx) error {
 	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"title":   "Validation Error",
-			"message": "invalid task id format",
-			"error":   err.Error(),
-		})
+		return c.Status(404).JSON(fiber.Map{"title": "Not Found", "message": "job not found"}) // job ids are int64: no job has this one
 	}
 
 	var req CompleteRequest
@@ -167,7 +163,7 @@ func (ctrl *ExternalTaskController) CompleteTask(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"title":   "Success",
 			"message": "process completed",
-			"jobId":   jobID,
+			"jobId":   strconv.FormatInt(jobID, 10),
 		})
 	}
 
@@ -180,11 +176,7 @@ func (ctrl *ExternalTaskController) CompleteTask(c *fiber.Ctx) error {
 func (ctrl *ExternalTaskController) HandleFailure(c *fiber.Ctx) error {
 	jobID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"title":   "Validation Error",
-			"message": "invalid task id format",
-			"error":   err.Error(),
-		})
+		return c.Status(404).JSON(fiber.Map{"title": "Not Found", "message": "job not found"}) // job ids are int64: no job has this one
 	}
 
 	var req FailureRequest
@@ -316,7 +308,12 @@ func (ctrl *ExternalTaskController) GetJob(c *fiber.Ctx) error {
 			FROM public.jobs j JOIN public.process_instances pi ON pi.engine_key = j.process_instance_key
 			WHERE j.engine_key = $1`
 
-	err := ctrl.db.Get(&job, query, id)
+	jobID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		// Job ids are int64: no job has this one.
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": true, "message": "Job not found"})
+	}
+	err = ctrl.db.Get(&job, query, jobID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{

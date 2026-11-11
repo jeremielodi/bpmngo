@@ -1,0 +1,51 @@
+{
+  "scenario": "rb-link-events",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-link-before",
+        "elementId": "lk_before",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-link-after",
+        "elementId": "lk_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "before": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "after": true,
+      "before": true
+    },
+    "instances": [
+      {
+        "process": "rb_links",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3302,
+    "errors": [],
+    "restNotes": []
+  }
+}

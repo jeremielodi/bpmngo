@@ -1247,19 +1247,19 @@ VALUES ('012', 'corrélation message-start: FK BIGINT nullable pendant la réser
 ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('020', 'laboratoire de simulation BPMN, campagnes et registre de problèmes')
+VALUES ('024', 'laboratoire de simulation BPMN, campagnes et registre de problèmes')
 ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('021', 'campagnes de capacité et exécution asynchrone des simulations')
+VALUES ('025', 'campagnes de capacité et exécution asynchrone des simulations')
 ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('022', 'expériences de simulation multi-paramètres')
+VALUES ('026', 'expériences de simulation multi-paramètres')
 ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('023', 'versionnement, restauration et export des scénarios de simulation')
+VALUES ('027', 'versionnement, restauration et export des scénarios de simulation')
 ON CONFLICT (version) DO NOTHING;
 
 -- Finalise la transition hybride construite ci-dessus. `\ir` est résolu
@@ -1273,3 +1273,7 @@ ON CONFLICT (version) DO NOTHING;
 \ir migrations/017_remove_identity_compatibility.sql
 \ir migrations/018_parent_fk_indexes.sql
 \ir migrations/019_partition_retention.sql
+\ir migrations/020_hot_path_cpu.sql
+\ir migrations/021_eventlog_projected_jobs_bigint.sql
+\ir migrations/022_audit_writer_marks.sql
+\ir migrations/023_historic_instance_engine_key.sql

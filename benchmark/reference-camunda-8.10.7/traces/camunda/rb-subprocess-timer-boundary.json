@@ -1,0 +1,50 @@
+{
+  "scenario": "rb-subprocess-timer-boundary",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-slow",
+        "elementId": "st_slow",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "after 4000 ms: complete",
+        "result": "NOT_FOUND"
+      },
+      {
+        "instance": "main",
+        "type": "rb-timeout",
+        "elementId": "st_timeout",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "timedOut": true
+    },
+    "instances": [
+      {
+        "process": "rb_sub_timer",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 6440,
+    "errors": [
+      "answer rb-slow at st_slow: NOT_FOUND Command 'COMPLETE' rejected with code 'NOT_FOUND': Expected to complete job with key '2251799813687813', but no such job was found"
+    ],
+    "restNotes": []
+  }
+}

@@ -28,7 +28,8 @@ const run = Date.now().toString(36);
 
 async function start(vars: Record<string, unknown>) {
   const inst = await client.startProcess('Partitions27', vars);
-  return (inst.processInstanceId ?? inst.id) as string;
+  // The key /v2 shows, which the activated jobs carry.
+  return client.instanceKey((inst.processInstanceId ?? inst.id) as string);
 }
 
 // activate returns the activated p27-work jobs of the given instances.
@@ -65,7 +66,7 @@ async function until(check: () => Promise<boolean>, timeoutMs: number, what: str
 
 async function publish(name: string, correlationKey: string, variables: Record<string, unknown> = {}) {
   const res = await client.api.post('/v2/messages/publication', { name, correlationKey, variables });
-  return res.data as { correlatedProcessInstanceKeys: string[] };
+  return res.data as { messageKey: string };
 }
 
 async function historicStatus(id: string) {
@@ -73,11 +74,18 @@ async function historicStatus(id: string) {
   return res.status === 200 ? res.data.state : undefined;
 }
 
+// reviewing tells whether the message reached id: its review task is open.
+// (Camunda 8 publication answers don't list the correlated instances.)
+async function reviewing(id: string) {
+  await sleep(200);
+  return (await client.getTasks(id)).some(t => t.taskDefinitionKey === 'p_review');
+}
+
 // finish sends the message, completes the review and waits for the end.
 async function finish(id: string, orderId: string) {
   await until(async () => {
-    const r = await publish('Go27', orderId);
-    return r.correlatedProcessInstanceKeys.includes(id);
+    await publish('Go27', orderId);
+    return reviewing(id);
   }, 15000, `message to ${id}`);
   const task = await client.waitForTask('p_review', id, 15000);
   await client.completeTask(task.id, { reviewed: orderId });
@@ -105,7 +113,7 @@ async function main() {
               const ids: number[] = settled.brokers.flatMap((b: any) => b.partitions.map((p: any) => p.partitionId));
               return ids.length === settled.partitionsCount && new Set(ids).size === ids.length;
             }, 30000, 'every partition owned once');
-            const replicas = Number(process.env.GOFLOW_REPLICAS || 1);
+            const replicas = Number(process.env.BPMNGO_REPLICAS || 1);
             assert(settled.clusterSize === replicas, `expected ${replicas} brokers (replicas), got ${settled.clusterSize}`);
             console.log(`      partitioned: ${settled.partitionsCount} partitions over ${settled.clusterSize} replica(s)`);
           } else {
@@ -152,8 +160,8 @@ async function main() {
           for (const j of await activate([ia, ib], 8)) await completeJob(j.jobKey, {});
 
           await until(async () => {
-            const r = await publish('Go27', b, { from: 'D' });
-            return r.correlatedProcessInstanceKeys.includes(ib);
+            await publish('Go27', b, { from: 'D' });
+            return reviewing(ib);
           }, 15000, 'message to the second instance');
           await client.waitForTask('p_review', ib, 15000);
           const tasksA = await client.getTasks(ia);

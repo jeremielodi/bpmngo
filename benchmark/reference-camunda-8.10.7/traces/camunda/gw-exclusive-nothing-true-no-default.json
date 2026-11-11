@@ -1,0 +1,32 @@
+{
+  "scenario": "gw-exclusive-nothing-true-no-default",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "not completed within 6s",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "gw_exclusive_nodefault",
+        "state": "ACTIVE",
+        "activeElements": [
+          "n_gw"
+        ],
+        "incidents": [
+          {
+            "elementId": "n_gw",
+            "errorType": "CONDITION_ERROR"
+          }
+        ]
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 7359,
+    "errors": [],
+    "restNotes": []
+  }
+}

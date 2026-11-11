@@ -37,7 +37,7 @@ describe('Tasks page - complete task modal', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(useAuth).mockReturnValue({
-      user: { id: 'u1', email: 'admin@goflow.com' },
+      user: { id: 'u1', email: 'admin@bpmngo.com' },
       roles: [],
       actions: [],
       isLoading: false,
@@ -92,7 +92,7 @@ describe('Tasks page - status badge', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(useAuth).mockReturnValue({
-      user: { id: 'u1', email: 'admin@goflow.com' },
+      user: { id: 'u1', email: 'admin@bpmngo.com' },
       roles: [],
       actions: [],
       isLoading: false,
@@ -103,7 +103,7 @@ describe('Tasks page - status badge', () => {
   });
 
   it('shows the exact task_status DB value as the badge and keeps action buttons for an open task', async () => {
-    vi.mocked(tasksApi.listTasks).mockResolvedValue([{ ...baseTask, status: 'claimed', assignee: 'admin@goflow.com' }]);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([{ ...baseTask, status: 'claimed', assignee: 'admin@bpmngo.com' }]);
     renderPage();
 
     expect(await screen.findByText('claimed')).toBeInTheDocument();
@@ -111,7 +111,7 @@ describe('Tasks page - status badge', () => {
   });
 
   it('hides Claim/Complete actions for a completed task instead of showing it as open', async () => {
-    vi.mocked(tasksApi.listTasks).mockResolvedValue([{ ...baseTask, status: 'completed', assignee: 'admin@goflow.com' }]);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([{ ...baseTask, status: 'completed', assignee: 'admin@bpmngo.com' }]);
     renderPage();
 
     expect(await screen.findByText('completed')).toBeInTheDocument();

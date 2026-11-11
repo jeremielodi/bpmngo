@@ -26,6 +26,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/cmdbus"
 	"github.com/jeremielodi/bpmngo/internal/engine"
 	"github.com/jeremielodi/bpmngo/internal/eventlog"
+	"github.com/jeremielodi/bpmngo/internal/ids"
 	"github.com/jeremielodi/bpmngo/internal/events"
 	"github.com/jeremielodi/bpmngo/internal/listeners"
 	"github.com/jeremielodi/bpmngo/internal/metrics"
@@ -70,12 +71,16 @@ func configuredJWTSecret(util common.Util) string {
 	return secret
 }
 
-// goflowEnv is GOFLOW_ENV when set. Unset, it is "production" when a JWT
-// secret is configured (a deployment that set one keeps every production
-// check), and "demo" otherwise: a first `docker compose up` with no .env
-// at all just works.
-func goflowEnv(util common.Util) string {
+// bpmngoEnv is BPMNGO_ENV (or the legacy GOFLOW_ENV) when set. Unset, it is
+// "production" when a JWT secret is configured (a deployment that set one
+// keeps every production check), and "demo" otherwise: a first
+// `docker compose up` with no .env at all just works.
+func bpmngoEnv(util common.Util) string {
+	if env := strings.TrimSpace(util.DotEnvVariable("BPMNGO_ENV")); env != "" {
+		return env
+	}
 	if env := strings.TrimSpace(util.DotEnvVariable("GOFLOW_ENV")); env != "" {
+		log.Println("⚠️ GOFLOW_ENV is deprecated — rename it to BPMNGO_ENV")
 		return env
 	}
 	if configuredJWTSecret(util) != "" {
@@ -160,8 +165,8 @@ func main() {
 
 	// Initialize utility functions using the root directory
 	var util = *common.NewUtil(&rootDirPath)
-	env := goflowEnv(util)
-	log.Printf("Environment: %s (GOFLOW_ENV)", env)
+	env := bpmngoEnv(util)
+	log.Printf("Environment: %s (BPMNGO_ENV)", env)
 	if env == "production" && util.DotEnvVariable("SUPER_USER_PASSWORD") == "admin123" {
 		log.Println("⚠️ SUPER_USER_PASSWORD is the sample admin123 — set a real password for the admin account")
 	}
@@ -193,12 +198,27 @@ func main() {
 		}()
 	}
 	// Session-level work (advisory locks held across transactions) reaches
-	// Postgres directly, bypassing PgBouncer when there is one (DB_DIRECT_HOST).
+	// Postgres directly, bypassing PgBouncer when there is one (POSTGRES_DIRECT_HOST).
 	directDB, err := database.NewDirectPostgres(util)
 	if err != nil {
 		log.Fatalln("Postgres (direct): ", err)
 	}
-	// History and analytics read a replica when DB_READ_HOST
+	// Engine keys carry a node number: instances sharing the database must
+	// each have their own. ENGINE_NODE_ID fixes it; otherwise each instance
+	// claims a free one.
+	if node, set, err := ids.ConfiguredNode(); err != nil {
+		log.Fatalln(err)
+	} else if !set {
+		node, err = database.ClaimEngineNode(directDB, ids.MaxNode())
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err := ids.SetNode(node); err != nil {
+			log.Fatalln(err)
+		}
+		log.Printf("✅ Engine node %d (claimed; set ENGINE_NODE_ID to fix it)", node)
+	}
+	// History and analytics read a replica when POSTGRES_READ_HOST
 	// is set (read-only, a few milliseconds behind), the primary otherwise.
 	readDB := db
 	if replica, err := database.NewReadPostgres(util); err != nil {
@@ -225,11 +245,11 @@ func main() {
 		if err := citus.EnsureDistributedTables(db); err != nil {
 			log.Fatalln("citus: failed to ensure distributed tables: ", err)
 		}
-		coordinatorPort, _ := strconv.Atoi(util.DotEnvVariable("DB_PORT"))
+		coordinatorPort, _ := strconv.Atoi(database.Env(util)("POSTGRES_PORT"))
 		if coordinatorPort == 0 {
 			coordinatorPort = 5432
 		}
-		if err := citus.EnsureLocalTablesInMetadata(db, util.DotEnvVariable("DB_HOST"), coordinatorPort); err != nil {
+		if err := citus.EnsureLocalTablesInMetadata(db, database.Env(util)("POSTGRES_HOST"), coordinatorPort); err != nil {
 			log.Fatalln("citus: failed to add the local tables to the metadata: ", err)
 		}
 		repository.SetDistributedClaims(true)
@@ -323,8 +343,19 @@ func main() {
 				eventlog.TopicSpec{Name: partition.CommandsTopic, Partitions: kafkaPartitions, Fixed: true},
 				eventlog.TopicSpec{Name: partition.RepliesTopic, Partitions: kafkaPartitions, Fixed: true})
 		}
-		if err := eventlog.EnsureTopics(kafkaBrokers, replicationFactor, topics...); err != nil {
-			log.Fatalln("Kafka topics: ", err)
+		// Redpanda may still be starting: the compose file can't make BpmnGo
+		// wait for it (an optional dependency needs Compose 2.20.2), so
+		// BpmnGo waits itself.
+		for deadline := time.Now().Add(2 * time.Minute); ; {
+			err := eventlog.EnsureTopics(kafkaBrokers, replicationFactor, topics...)
+			if err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				log.Fatalln("Kafka topics: ", err)
+			}
+			log.Printf("⏳ Kafka not ready yet (%v), retrying", err)
+			time.Sleep(2 * time.Second)
 		}
 	}
 
@@ -387,17 +418,27 @@ func main() {
 	// ============================================================
 
 	metrics.Register(db)
-	metrics.RegisterGaugeFunc("goflow_worker_pool_queue_length", "Requests waiting in the async worker pool queue.",
+	metrics.RegisterGaugeFunc("bpmngo_worker_pool_queue_length", "Requests waiting in the async worker pool queue.",
 		func() float64 { return float64(workerPool.GetMetrics().QueueLength) })
-	metrics.RegisterGaugeFunc("goflow_worker_pool_active_workers", "Async worker pool workers currently busy.",
+	metrics.RegisterGaugeFunc("bpmngo_worker_pool_active_workers", "Async worker pool workers currently busy.",
 		func() float64 { return float64(workerPool.GetMetrics().ActiveWorkers) })
-	metrics.RegisterGaugeFunc("goflow_worker_pool_jobs_failed", "Async worker pool requests that failed since startup.",
+	metrics.RegisterGaugeFunc("bpmngo_worker_pool_jobs_failed", "Async worker pool requests that failed since startup.",
 		func() float64 { return float64(workerPool.GetMetrics().JobsFailed) })
 
 	if n, err := service.BackfillGatewayDefaults(db); err != nil {
 		log.Println("⚠️ gateway default-flow backfill:", err)
 	} else if n > 0 {
 		log.Printf("✅ Gateway default flows added to %d stored process graphs", n)
+	}
+	if n, err := service.BackfillFlowDocOrder(db); err != nil {
+		log.Println("⚠️ sequence-flow order backfill:", err)
+	} else if n > 0 {
+		log.Printf("✅ Sequence-flow file order added to %d stored process graphs", n)
+	}
+	if n, err := service.BackfillJobRetries(db); err != nil {
+		log.Println("⚠️ job retries backfill:", err)
+	} else if n > 0 {
+		log.Printf("✅ Task retries added to %d stored process graphs", n)
 	}
 
 	retentionCfg, err := retention.ConfigFromEnv(util.DotEnvVariable)
@@ -559,6 +600,10 @@ func main() {
 
 	app.Use(middleware.CombinedAuthMiddleware(db, jwcService, oidcService, util))
 
+	// The int64 keys /v2 and gRPC answer with also work where the routes
+	// outside /v2 take a process instance or definition UUID.
+	app.Use(apiv2.LegacyKeyTranslation(db))
+
 	// ============================================================
 	// EVENT STREAMING ENDPOINTS
 	// ============================================================
@@ -639,19 +684,19 @@ func main() {
 	// (see process_authorization_service.go) — a per-resource grant can
 	// satisfy that without the global action.
 	app.Post("/engine-rest/v2/deployments", processDefinitionCtrl.DeployBPMN)
-	app.Post("/engine-rest/v2/process-definitions/:key/start", processInstanceCtrl.StartProcess)
+	app.Post("/engine-rest/v2/process-definitions/:key/start", api.Backpressure, processInstanceCtrl.StartProcess)
 	app.Get("/engine-rest/process-definition", processDefinitionCtrl.ListDefinitions)
 	// Camunda 7 process definition endpoints (by key, by id), Camunda 7
 	// request and response shapes.
 	c7ProcessCtrl := api.NewCamunda7ProcessController(db)
 	app.Get("/engine-rest/process-definition/key/:key", c7ProcessCtrl.GetDefinition)
 	app.Get("/engine-rest/process-definition/key/:key/tenant-id/:tenant", c7ProcessCtrl.GetDefinition)
-	app.Post("/engine-rest/process-definition/key/:key/start", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/key/:key/submit-form", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/start", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/submit-form", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/:id/start", c7ProcessCtrl.Start)
-	app.Post("/engine-rest/process-definition/:id/submit-form", c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/start", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/submit-form", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/start", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/key/:key/tenant-id/:tenant/submit-form", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/:id/start", api.Backpressure, c7ProcessCtrl.Start)
+	app.Post("/engine-rest/process-definition/:id/submit-form", api.Backpressure, c7ProcessCtrl.Start)
 	app.Get("/engine-rest/process-definition/:id", processDefinitionCtrl.GetDefinition)
 
 	// Per-resource process permissions (see process_authorization_service.go) —
@@ -799,8 +844,8 @@ func main() {
 	// MESSAGE & SIGNAL ROUTES
 	// ============================================================
 
-	app.Post("/engine-rest/message", messageCtrl.CorrelateMessage)
-	app.Post("/engine-rest/signal", signalCtrl.BroadcastSignal)
+	app.Post("/engine-rest/message", api.Backpressure, messageCtrl.CorrelateMessage)
+	app.Post("/engine-rest/signal", api.Backpressure, signalCtrl.BroadcastSignal)
 
 	// ============================================================
 	// CAMUNDA 8 REST API ("/v2/...")
@@ -813,7 +858,7 @@ func main() {
 	app.Post("/v2/resources/deployments", processDefinitionCtrl.DeployBPMN)
 
 	app.Get("/v2/topology", apiv2.GetTopology)
-	app.Post("/v2/process-instances", v2ProcessInstanceCtrl.CreateProcessInstance)
+	app.Post("/v2/process-instances", api.Backpressure, v2ProcessInstanceCtrl.CreateProcessInstance)
 	app.Get("/v2/process-instances/:id", v2ProcessInstanceCtrl.GetProcessInstance)
 	app.Post("/v2/process-instances/search", v2ProcessInstanceCtrl.SearchProcessInstances)
 
@@ -827,8 +872,8 @@ func main() {
 	app.Delete("/v2/user-tasks/:id/assignee", taskCtrl.UnClaim)
 	app.Post("/v2/user-tasks/search", permissions(db, "CAN_READ_TASKS"), v2UserTaskCtrl.SearchUserTasks)
 
-	app.Post("/v2/messages/publication", v2MessageCtrl.PublishMessage)
-	app.Post("/v2/signals/broadcast", v2SignalCtrl.BroadcastSignal)
+	app.Post("/v2/messages/publication", api.Backpressure, v2MessageCtrl.PublishMessage)
+	app.Post("/v2/signals/broadcast", api.Backpressure, v2SignalCtrl.BroadcastSignal)
 	app.Post("/v2/decisions/:key/evaluation", v2DecisionCtrl.EvaluateDecision)
 	app.Get("/v2/forms/:formKey", v2FormCtrl.GetForm)
 
@@ -861,7 +906,7 @@ func main() {
 	// ASYNC PROCESS START
 	// ============================================================
 
-	app.Post("/async/process-definitions/:key/start", processInstanceCtrl.StartProcessAsync)
+	app.Post("/async/process-definitions/:key/start", api.Backpressure, processInstanceCtrl.StartProcessAsync)
 
 	// ============================================================
 	// PROCESS INSTANCE VARIABLE ROUTES
@@ -934,7 +979,7 @@ func main() {
 	grpcAuth := zeebegrpc.NewAuthenticator(db, jwcService, oidcService, anonymousUserID)
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcAuth.UnaryInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcAuth.UnaryInterceptor(), zeebegrpc.BackpressureInterceptor()),
 		grpc.StreamInterceptor(grpcAuth.StreamInterceptor()),
 	)
 	pb.RegisterGatewayServer(grpcServer, zeebegrpc.NewServer(db, taskEventDispatcher))

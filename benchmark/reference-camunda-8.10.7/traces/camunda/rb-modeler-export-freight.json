@@ -1,0 +1,130 @@
+{
+  "scenario": "rb-modeler-export-freight",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-md-stock",
+        "elementId": "Activity_stock",
+        "retries": 5,
+        "headers": {
+          "warehouse": "north"
+        },
+        "variables": {
+          "lines": [
+            {
+              "sku": "A",
+              "kg": 20
+            },
+            {
+              "sku": "B",
+              "kg": 15
+            }
+          ],
+          "order": {
+            "id": "M-1",
+            "lines": [
+              {
+                "sku": "A",
+                "kg": 20
+              },
+              {
+                "sku": "B",
+                "kg": 15
+              }
+            ]
+          }
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-md-reserve",
+        "elementId": "Activity_reserve",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "order": {
+            "id": "M-1",
+            "lines": [
+              {
+                "sku": "A",
+                "kg": 20
+              },
+              {
+                "sku": "B",
+                "kg": 15
+              }
+            ]
+          },
+          "inStock": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-md-freight",
+        "elementId": "Activity_freight",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "order": {
+            "id": "M-1",
+            "lines": [
+              {
+                "sku": "A",
+                "kg": 20
+              },
+              {
+                "sku": "B",
+                "kg": 15
+              }
+            ]
+          },
+          "inStock": true,
+          "reserved": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "order": {
+        "id": "M-1",
+        "lines": [
+          {
+            "sku": "A",
+            "kg": 20
+          },
+          {
+            "sku": "B",
+            "kg": 15
+          }
+        ]
+      },
+      "carrier": "freight",
+      "inStock": true,
+      "reserved": true
+    },
+    "instances": [
+      {
+        "process": "rb_modeler_order",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3502,
+    "errors": [],
+    "restNotes": []
+  }
+}

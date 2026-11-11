@@ -52,6 +52,16 @@ func directEngineKey(db sqlx.Queryer, resourceType string, resourceID uuid.UUID)
 	}
 	var key int64
 	err := sqlx.Get(db, &key, fmt.Sprintf(`SELECT engine_key FROM public.%s WHERE id = $1`, table), resourceID)
+	if errors.Is(err, sql.ErrNoRows) && resourceType == "process_instance" {
+		// Archived: the history keeps the instance's key (migration 023).
+		var archived *int64
+		err = sqlx.Get(db, &archived, `SELECT engine_key FROM public.historic_process_instances WHERE id = $1`, resourceID)
+		if err == nil && archived == nil {
+			err = sql.ErrNoRows // archived before 023: its key, if any, is in zeebe_keys
+		} else if err == nil {
+			key = *archived
+		}
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, false, nil
 	}
@@ -65,6 +75,10 @@ func directResourceID(db sqlx.Queryer, resourceType string, key int64) (uuid.UUI
 	}
 	var id uuid.UUID
 	err := sqlx.Get(db, &id, fmt.Sprintf(`SELECT id FROM public.%s WHERE engine_key = $1`, table), key)
+	if errors.Is(err, sql.ErrNoRows) && resourceType == "process_instance" {
+		// Archived: the history keeps the instance's key (migration 023).
+		err = sqlx.Get(db, &id, `SELECT id FROM public.historic_process_instances WHERE engine_key = $1`, key)
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return uuid.Nil, false, nil
 	}

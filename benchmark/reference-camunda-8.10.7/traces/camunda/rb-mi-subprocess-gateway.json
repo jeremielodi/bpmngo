@@ -1,0 +1,109 @@
+{
+  "scenario": "rb-mi-subprocess-gateway",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-mi-big",
+        "elementId": "mg_big",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 20,
+          "size": null,
+          "loopCounter": 2,
+          "sizes": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            5,
+            20,
+            7
+          ]
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-mi-small",
+        "elementId": "mg_small",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 5,
+          "size": null,
+          "loopCounter": 1,
+          "sizes": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            5,
+            20,
+            7
+          ]
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-mi-small",
+        "elementId": "mg_small",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 7,
+          "size": null,
+          "loopCounter": 3,
+          "sizes": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            5,
+            20,
+            7
+          ]
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "items": [
+        5,
+        20,
+        7
+      ],
+      "sizes": [
+        "small",
+        "big",
+        "small"
+      ]
+    },
+    "instances": [
+      {
+        "process": "rb_mi_sub_gateway",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 1640,
+    "errors": [],
+    "restNotes": []
+  }
+}

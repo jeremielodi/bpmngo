@@ -1,0 +1,43 @@
+{
+  "scenario": "job-fail-no-retries-left",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "job-work",
+        "elementId": "r_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "fail(retries=0)",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "not completed within 6s",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "job_retry",
+        "state": "ACTIVE",
+        "activeElements": [
+          "r_work"
+        ],
+        "incidents": [
+          {
+            "elementId": "r_work",
+            "errorType": "JOB_NO_RETRIES"
+          }
+        ]
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 7418,
+    "errors": [],
+    "restNotes": []
+  }
+}

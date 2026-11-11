@@ -1,0 +1,46 @@
+{
+  "scenario": "job-fail-with-backoff",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "job-work",
+        "elementId": "r_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "fail(retries=1)",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "job-work",
+        "elementId": "r_work",
+        "retries": 1,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {},
+    "instances": [
+      {
+        "process": "job_retry",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 4433,
+    "errors": [],
+    "restNotes": []
+  }
+}

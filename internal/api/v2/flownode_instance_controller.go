@@ -55,7 +55,7 @@ func (fc *FlownodeInstanceController) executionItem(e repository.Execution) fibe
 		endDate = e.UpdatedAt
 	}
 	item := fiber.Map{
-		"elementInstanceKey":     e.ID,
+		"elementInstanceKey":     strconv.FormatInt(e.ID, 10),
 		"processInstanceKey":     e.ProcessInstanceID,
 		"rootProcessInstanceKey": e.ProcessInstanceID,
 		"elementId":              e.CurrentElementID,

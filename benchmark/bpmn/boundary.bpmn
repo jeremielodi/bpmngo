@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Boundary events on service tasks and sub-processes. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="boundary" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:message id="Msg_cancel" name="be-cancel">
+    <bpmn:extensionElements><zeebe:subscription correlationKey="=orderId"/></bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:signal id="Sig_stop" name="be-stop"/>
+  <bpmn:error id="Err_card" name="Card declined" errorCode="CARD"/>
+  <bpmn:escalation id="Esc_late" name="Late" escalationCode="LATE"/>
+
+  <bpmn:collaboration id="Collaboration_boundary">
+    <bpmn:participant id="Participant_be_timer_int" name="be_timer_int" processRef="be_timer_int" />
+    <bpmn:participant id="Participant_be_timer_nonint" name="be_timer_nonint" processRef="be_timer_nonint" />
+    <bpmn:participant id="Participant_be_message_int" name="be_message_int" processRef="be_message_int" />
+    <bpmn:participant id="Participant_be_error" name="be_error" processRef="be_error" />
+    <bpmn:participant id="Participant_be_error_uncaught" name="be_error_uncaught" processRef="be_error_uncaught" />
+    <bpmn:participant id="Participant_be_signal_int" name="be_signal_int" processRef="be_signal_int" />
+    <bpmn:participant id="Participant_be_escalation" name="be_escalation" processRef="be_escalation" />
+  </bpmn:collaboration>
+
+  <!-- Interrupting timer on a service task. -->
+  <bpmn:process id="be_timer_int" isExecutable="true">
+    <bpmn:startEvent id="ti_start"/>
+    <bpmn:sequenceFlow id="ti_f0" sourceRef="ti_start" targetRef="ti_slow"/>
+    <bpmn:serviceTask id="ti_slow"><bpmn:extensionElements><zeebe:taskDefinition type="be-slow"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="ti_timer" attachedToRef="ti_slow">
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT2S</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="ti_f1" sourceRef="ti_slow" targetRef="ti_end"/>
+    <bpmn:sequenceFlow id="ti_f2" sourceRef="ti_timer" targetRef="ti_late"/>
+    <bpmn:serviceTask id="ti_late"><bpmn:extensionElements><zeebe:taskDefinition type="be-late"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="ti_f3" sourceRef="ti_late" targetRef="ti_end2"/>
+    <bpmn:endEvent id="ti_end"/>
+    <bpmn:endEvent id="ti_end2"/>
+  </bpmn:process>
+
+  <!-- Non-interrupting timer: a reminder while the task goes on. -->
+  <bpmn:process id="be_timer_nonint" isExecutable="true">
+    <bpmn:startEvent id="tn_start"/>
+    <bpmn:sequenceFlow id="tn_f0" sourceRef="tn_start" targetRef="tn_long"/>
+    <bpmn:serviceTask id="tn_long"><bpmn:extensionElements><zeebe:taskDefinition type="be-long"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="tn_timer" attachedToRef="tn_long" cancelActivity="false">
+      <bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT1S</bpmn:timeDuration></bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="tn_f1" sourceRef="tn_long" targetRef="tn_end"/>
+    <bpmn:sequenceFlow id="tn_f2" sourceRef="tn_timer" targetRef="tn_reminder"/>
+    <bpmn:serviceTask id="tn_reminder"><bpmn:extensionElements><zeebe:taskDefinition type="be-reminder"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="tn_f3" sourceRef="tn_reminder" targetRef="tn_end2"/>
+    <bpmn:endEvent id="tn_end"/>
+    <bpmn:endEvent id="tn_end2"/>
+  </bpmn:process>
+
+  <!-- Interrupting message boundary with a correlation key. -->
+  <bpmn:process id="be_message_int" isExecutable="true">
+    <bpmn:startEvent id="mi_start"/>
+    <bpmn:sequenceFlow id="mi_f0" sourceRef="mi_start" targetRef="mi_work"/>
+    <bpmn:serviceTask id="mi_work"><bpmn:extensionElements><zeebe:taskDefinition type="be-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="mi_msg" attachedToRef="mi_work">
+      <bpmn:messageEventDefinition messageRef="Msg_cancel"/>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="mi_f1" sourceRef="mi_work" targetRef="mi_end"/>
+    <bpmn:sequenceFlow id="mi_f2" sourceRef="mi_msg" targetRef="mi_cancelled"/>
+    <bpmn:serviceTask id="mi_cancelled"><bpmn:extensionElements><zeebe:taskDefinition type="be-cancelled"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="mi_f3" sourceRef="mi_cancelled" targetRef="mi_end2"/>
+    <bpmn:endEvent id="mi_end"/>
+    <bpmn:endEvent id="mi_end2"/>
+  </bpmn:process>
+
+  <!-- A specific error boundary and a catch-all one on the same task. -->
+  <bpmn:process id="be_error" isExecutable="true">
+    <bpmn:startEvent id="er_start"/>
+    <bpmn:sequenceFlow id="er_f0" sourceRef="er_start" targetRef="er_pay"/>
+    <bpmn:serviceTask id="er_pay"><bpmn:extensionElements><zeebe:taskDefinition type="be-pay"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="er_card" attachedToRef="er_pay"><bpmn:errorEventDefinition errorRef="Err_card"/></bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="er_any" attachedToRef="er_pay"><bpmn:errorEventDefinition/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="er_f1" sourceRef="er_pay" targetRef="er_end"/>
+    <bpmn:sequenceFlow id="er_f2" sourceRef="er_card" targetRef="er_on_card"/>
+    <bpmn:sequenceFlow id="er_f3" sourceRef="er_any" targetRef="er_on_any"/>
+    <bpmn:serviceTask id="er_on_card"><bpmn:extensionElements><zeebe:taskDefinition type="be-on-card"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="er_on_any"><bpmn:extensionElements><zeebe:taskDefinition type="be-on-any"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="er_f4" sourceRef="er_on_card" targetRef="er_end2"/>
+    <bpmn:sequenceFlow id="er_f5" sourceRef="er_on_any" targetRef="er_end3"/>
+    <bpmn:endEvent id="er_end"/>
+    <bpmn:endEvent id="er_end2"/>
+    <bpmn:endEvent id="er_end3"/>
+  </bpmn:process>
+
+  <!-- An error nothing catches. -->
+  <bpmn:process id="be_error_uncaught" isExecutable="true">
+    <bpmn:startEvent id="eu_start"/>
+    <bpmn:sequenceFlow id="eu_f0" sourceRef="eu_start" targetRef="eu_pay"/>
+    <bpmn:serviceTask id="eu_pay"><bpmn:extensionElements><zeebe:taskDefinition type="be-pay"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="eu_f1" sourceRef="eu_pay" targetRef="eu_end"/>
+    <bpmn:endEvent id="eu_end"/>
+  </bpmn:process>
+
+  <!-- Interrupting signal boundary. -->
+  <bpmn:process id="be_signal_int" isExecutable="true">
+    <bpmn:startEvent id="si_start"/>
+    <bpmn:sequenceFlow id="si_f0" sourceRef="si_start" targetRef="si_work"/>
+    <bpmn:serviceTask id="si_work"><bpmn:extensionElements><zeebe:taskDefinition type="be-work"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:boundaryEvent id="si_sig" attachedToRef="si_work"><bpmn:signalEventDefinition signalRef="Sig_stop"/></bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="si_f1" sourceRef="si_work" targetRef="si_end"/>
+    <bpmn:sequenceFlow id="si_f2" sourceRef="si_sig" targetRef="si_stopped"/>
+    <bpmn:serviceTask id="si_stopped"><bpmn:extensionElements><zeebe:taskDefinition type="be-stopped"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="si_f3" sourceRef="si_stopped" targetRef="si_end2"/>
+    <bpmn:endEvent id="si_end"/>
+    <bpmn:endEvent id="si_end2"/>
+  </bpmn:process>
+
+  <!-- Escalation end event inside a sub-process, caught by a
+       non-interrupting boundary: both paths run. -->
+  <bpmn:process id="be_escalation" isExecutable="true">
+    <bpmn:startEvent id="es_start"/>
+    <bpmn:sequenceFlow id="es_f0" sourceRef="es_start" targetRef="es_sub"/>
+    <bpmn:subProcess id="es_sub">
+      <bpmn:startEvent id="es_sub_start"/>
+      <bpmn:sequenceFlow id="es_s1" sourceRef="es_sub_start" targetRef="es_note"/>
+      <bpmn:serviceTask id="es_note"><bpmn:extensionElements><zeebe:taskDefinition type="be-note"/></bpmn:extensionElements></bpmn:serviceTask>
+      <bpmn:sequenceFlow id="es_s2" sourceRef="es_note" targetRef="es_throw"/>
+      <bpmn:endEvent id="es_throw"><bpmn:escalationEventDefinition escalationRef="Esc_late"/></bpmn:endEvent>
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="es_catch" attachedToRef="es_sub" cancelActivity="false">
+      <bpmn:escalationEventDefinition escalationRef="Esc_late"/>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="es_f1" sourceRef="es_sub" targetRef="es_after"/>
+    <bpmn:sequenceFlow id="es_f2" sourceRef="es_catch" targetRef="es_on_late"/>
+    <bpmn:serviceTask id="es_after"><bpmn:extensionElements><zeebe:taskDefinition type="be-after"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:serviceTask id="es_on_late"><bpmn:extensionElements><zeebe:taskDefinition type="be-on-late"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="es_f3" sourceRef="es_after" targetRef="es_end"/>
+    <bpmn:sequenceFlow id="es_f4" sourceRef="es_on_late" targetRef="es_end2"/>
+    <bpmn:endEvent id="es_end"/>
+    <bpmn:endEvent id="es_end2"/>
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_boundary">
+    <bpmndi:BPMNPlane id="BPMNPlane_boundary" bpmnElement="Collaboration_boundary">
+      <bpmndi:BPMNShape id="Participant_be_timer_int_di" bpmnElement="Participant_be_timer_int" isHorizontal="true">
+        <dc:Bounds x="0" y="0" width="1046" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ti_start_di" bpmnElement="ti_start">
+        <dc:Bounds x="70" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ti_slow_di" bpmnElement="ti_slow">
+        <dc:Bounds x="188" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ti_timer_di" bpmnElement="ti_timer">
+        <dc:Bounds x="220" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ti_end_di" bpmnElement="ti_end">
+        <dc:Bounds x="370" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ti_late_di" bpmnElement="ti_late">
+        <dc:Bounds x="338" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ti_end2_di" bpmnElement="ti_end2">
+        <dc:Bounds x="520" y="202" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="ti_f0_di" bpmnElement="ti_f0">
+        <di:waypoint x="106" y="80" />
+        <di:waypoint x="188" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ti_f1_di" bpmnElement="ti_f1">
+        <di:waypoint x="288" y="80" />
+        <di:waypoint x="370" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ti_f2_di" bpmnElement="ti_f2">
+        <di:waypoint x="238" y="138" />
+        <di:waypoint x="238" y="220" />
+        <di:waypoint x="338" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ti_f3_di" bpmnElement="ti_f3">
+        <di:waypoint x="438" y="220" />
+        <di:waypoint x="520" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_be_timer_nonint_di" bpmnElement="Participant_be_timer_nonint" isHorizontal="true">
+        <dc:Bounds x="0" y="330" width="1046" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="tn_start_di" bpmnElement="tn_start">
+        <dc:Bounds x="70" y="392" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="tn_long_di" bpmnElement="tn_long">
+        <dc:Bounds x="188" y="370" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="tn_timer_di" bpmnElement="tn_timer">
+        <dc:Bounds x="220" y="432" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="tn_end_di" bpmnElement="tn_end">
+        <dc:Bounds x="370" y="392" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="tn_reminder_di" bpmnElement="tn_reminder">
+        <dc:Bounds x="338" y="510" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="tn_end2_di" bpmnElement="tn_end2">
+        <dc:Bounds x="520" y="532" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="tn_f0_di" bpmnElement="tn_f0">
+        <di:waypoint x="106" y="410" />
+        <di:waypoint x="188" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="tn_f1_di" bpmnElement="tn_f1">
+        <di:waypoint x="288" y="410" />
+        <di:waypoint x="370" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="tn_f2_di" bpmnElement="tn_f2">
+        <di:waypoint x="238" y="468" />
+        <di:waypoint x="238" y="550" />
+        <di:waypoint x="338" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="tn_f3_di" bpmnElement="tn_f3">
+        <di:waypoint x="438" y="550" />
+        <di:waypoint x="520" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_be_message_int_di" bpmnElement="Participant_be_message_int" isHorizontal="true">
+        <dc:Bounds x="0" y="660" width="1046" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="mi_start_di" bpmnElement="mi_start">
+        <dc:Bounds x="70" y="722" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="mi_work_di" bpmnElement="mi_work">
+        <dc:Bounds x="188" y="700" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="mi_msg_di" bpmnElement="mi_msg">
+        <dc:Bounds x="220" y="762" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="mi_end_di" bpmnElement="mi_end">
+        <dc:Bounds x="370" y="722" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="mi_cancelled_di" bpmnElement="mi_cancelled">
+        <dc:Bounds x="338" y="840" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="mi_end2_di" bpmnElement="mi_end2">
+        <dc:Bounds x="520" y="862" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="mi_f0_di" bpmnElement="mi_f0">
+        <di:waypoint x="106" y="740" />
+        <di:waypoint x="188" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="mi_f1_di" bpmnElement="mi_f1">
+        <di:waypoint x="288" y="740" />
+        <di:waypoint x="370" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="mi_f2_di" bpmnElement="mi_f2">
+        <di:waypoint x="238" y="798" />
+        <di:waypoint x="238" y="880" />
+        <di:waypoint x="338" y="880" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="mi_f3_di" bpmnElement="mi_f3">
+        <di:waypoint x="438" y="880" />
+        <di:waypoint x="520" y="880" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_be_error_di" bpmnElement="Participant_be_error" isHorizontal="true">
+        <dc:Bounds x="0" y="990" width="1046" height="440" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_start_di" bpmnElement="er_start">
+        <dc:Bounds x="70" y="1052" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_pay_di" bpmnElement="er_pay">
+        <dc:Bounds x="188" y="1030" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_card_di" bpmnElement="er_card">
+        <dc:Bounds x="203" y="1092" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_any_di" bpmnElement="er_any">
+        <dc:Bounds x="237" y="1092" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_end_di" bpmnElement="er_end">
+        <dc:Bounds x="370" y="1052" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_on_any_di" bpmnElement="er_on_any">
+        <dc:Bounds x="338" y="1170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_end3_di" bpmnElement="er_end3">
+        <dc:Bounds x="520" y="1192" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_on_card_di" bpmnElement="er_on_card">
+        <dc:Bounds x="338" y="1310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="er_end2_di" bpmnElement="er_end2">
+        <dc:Bounds x="520" y="1332" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="er_f0_di" bpmnElement="er_f0">
+        <di:waypoint x="106" y="1070" />
+        <di:waypoint x="188" y="1070" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="er_f1_di" bpmnElement="er_f1">
+        <di:waypoint x="288" y="1070" />
+        <di:waypoint x="370" y="1070" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="er_f2_di" bpmnElement="er_f2">
+        <di:waypoint x="221" y="1128" />
+        <di:waypoint x="221" y="1350" />
+        <di:waypoint x="338" y="1350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="er_f3_di" bpmnElement="er_f3">
+        <di:waypoint x="255" y="1128" />
+        <di:waypoint x="255" y="1210" />
+        <di:waypoint x="338" y="1210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="er_f5_di" bpmnElement="er_f5">
+        <di:waypoint x="438" y="1210" />
+        <di:waypoint x="520" y="1210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="er_f4_di" bpmnElement="er_f4">
+        <di:waypoint x="438" y="1350" />
+        <di:waypoint x="520" y="1350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_be_error_uncaught_di" bpmnElement="Participant_be_error_uncaught" isHorizontal="true">
+        <dc:Bounds x="0" y="1460" width="1046" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="eu_start_di" bpmnElement="eu_start">
+        <dc:Bounds x="70" y="1522" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="eu_pay_di" bpmnElement="eu_pay">
+        <dc:Bounds x="188" y="1500" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="eu_end_di" bpmnElement="eu_end">
+        <dc:Bounds x="370" y="1522" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="eu_f0_di" bpmnElement="eu_f0">
+        <di:waypoint x="106" y="1540" />
+        <di:waypoint x="188" y="1540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="eu_f1_di" bpmnElement="eu_f1">
+        <di:waypoint x="288" y="1540" />
+        <di:waypoint x="370" y="1540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_be_signal_int_di" bpmnElement="Participant_be_signal_int" isHorizontal="true">
+        <dc:Bounds x="0" y="1650" width="1046" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="si_start_di" bpmnElement="si_start">
+        <dc:Bounds x="70" y="1712" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="si_work_di" bpmnElement="si_work">
+        <dc:Bounds x="188" y="1690" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="si_sig_di" bpmnElement="si_sig">
+        <dc:Bounds x="220" y="1752" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="si_end_di" bpmnElement="si_end">
+        <dc:Bounds x="370" y="1712" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="si_stopped_di" bpmnElement="si_stopped">
+        <dc:Bounds x="338" y="1830" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="si_end2_di" bpmnElement="si_end2">
+        <dc:Bounds x="520" y="1852" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="si_f0_di" bpmnElement="si_f0">
+        <di:waypoint x="106" y="1730" />
+        <di:waypoint x="188" y="1730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="si_f1_di" bpmnElement="si_f1">
+        <di:waypoint x="288" y="1730" />
+        <di:waypoint x="370" y="1730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="si_f2_di" bpmnElement="si_f2">
+        <di:waypoint x="238" y="1788" />
+        <di:waypoint x="238" y="1870" />
+        <di:waypoint x="338" y="1870" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="si_f3_di" bpmnElement="si_f3">
+        <di:waypoint x="438" y="1870" />
+        <di:waypoint x="520" y="1870" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_be_escalation_di" bpmnElement="Participant_be_escalation" isHorizontal="true">
+        <dc:Bounds x="0" y="1980" width="1046" height="440" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_start_di" bpmnElement="es_start">
+        <dc:Bounds x="70" y="2042" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_sub_di" bpmnElement="es_sub" isExpanded="true">
+        <dc:Bounds x="188" y="2020" width="550" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_catch_di" bpmnElement="es_catch">
+        <dc:Bounds x="445" y="2222" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_after_di" bpmnElement="es_after">
+        <dc:Bounds x="788" y="2020" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_end_di" bpmnElement="es_end">
+        <dc:Bounds x="970" y="2042" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_on_late_di" bpmnElement="es_on_late">
+        <dc:Bounds x="788" y="2300" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_end2_di" bpmnElement="es_end2">
+        <dc:Bounds x="970" y="2322" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="es_f0_di" bpmnElement="es_f0">
+        <di:waypoint x="106" y="2060" />
+        <di:waypoint x="188" y="2060" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="es_f1_di" bpmnElement="es_f1">
+        <di:waypoint x="738" y="2060" />
+        <di:waypoint x="788" y="2060" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="es_f2_di" bpmnElement="es_f2">
+        <di:waypoint x="463" y="2258" />
+        <di:waypoint x="463" y="2340" />
+        <di:waypoint x="788" y="2340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="es_f3_di" bpmnElement="es_f3">
+        <di:waypoint x="888" y="2060" />
+        <di:waypoint x="970" y="2060" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="es_f4_di" bpmnElement="es_f4">
+        <di:waypoint x="888" y="2340" />
+        <di:waypoint x="970" y="2340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="es_sub_start_di" bpmnElement="es_sub_start">
+        <dc:Bounds x="295" y="2112" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_note_di" bpmnElement="es_note">
+        <dc:Bounds x="413" y="2090" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="es_throw_di" bpmnElement="es_throw">
+        <dc:Bounds x="595" y="2112" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="es_s1_di" bpmnElement="es_s1">
+        <di:waypoint x="331" y="2130" />
+        <di:waypoint x="413" y="2130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="es_s2_di" bpmnElement="es_s2">
+        <di:waypoint x="513" y="2130" />
+        <di:waypoint x="595" y="2130" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

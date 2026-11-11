@@ -1,0 +1,36 @@
+{
+  "scenario": "feel-numbers",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "div": 2.5,
+      "mod": 1,
+      "pow": 1024,
+      "sum": 0.3,
+      "exact": true,
+      "amount": 10,
+      "scaled": 11,
+      "floored": -2,
+      "rounded": 1.26,
+      "divByZero": null
+    },
+    "instances": [
+      {
+        "process": "feel_numbers",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2426,
+    "errors": [],
+    "restNotes": []
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "scenario": "boundary-timer-non-interrupting",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "be-long",
+        "elementId": "tn_long",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "after 3000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "be-reminder",
+        "elementId": "tn_reminder",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "longDone": true,
+      "reminded": true
+    },
+    "instances": [
+      {
+        "process": "be_timer_nonint",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 5967,
+    "errors": [],
+    "restNotes": []
+  }
+}

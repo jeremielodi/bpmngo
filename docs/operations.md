@@ -21,18 +21,18 @@ scrape_configs:
 
 | Metric | What it tells you |
 |---|---|
-| `goflow_process_instances{status}` | live instances by status |
-| `goflow_jobs{status}`, `goflow_user_tasks{status}` | work waiting / in progress |
-| `goflow_incidents_open` | failures needing an operator |
-| `goflow_timers_pending`, `goflow_timers_overdue` | timer backlog; overdue > 0 means the scheduler is behind |
-| `goflow_table_size_bytes{table}`, `goflow_table_rows_estimate{table}` | growth of `audit_logs`, `historic_*`, event-log projections |
-| `goflow_retention_deleted_rows_total{table}` | rows removed by the retention purge |
-| `goflow_http_requests_total`, `goflow_http_request_duration_seconds` | traffic, errors and latency per route pattern |
+| `bpmngo_process_instances{status}` | live instances by status |
+| `bpmngo_jobs{status}`, `bpmngo_user_tasks{status}` | work waiting / in progress |
+| `bpmngo_incidents_open` | failures needing an operator |
+| `bpmngo_timers_pending`, `bpmngo_timers_overdue` | timer backlog; overdue > 0 means the scheduler is behind |
+| `bpmngo_table_size_bytes{table}`, `bpmngo_table_rows_estimate{table}` | growth of `audit_logs`, `historic_*`, event-log projections |
+| `bpmngo_retention_deleted_rows_total{table}` | rows removed by the retention purge |
+| `bpmngo_http_requests_total`, `bpmngo_http_request_duration_seconds` | traffic, errors and latency per route pattern |
 | `go_sql_*` | database connection pool (open, in use, wait time) |
-| `goflow_worker_pool_*` | async worker pool queue and failures |
-| `goflow_metrics_scrape_error` | 1 if the engine-state queries failed during the last scrape |
+| `bpmngo_worker_pool_*` | async worker pool queue and failures |
+| `bpmngo_metrics_scrape_error` | 1 if the engine-state queries failed during the last scrape |
 
-Engine-state metrics are read from Postgres at scrape time. On a Citus deployment, `goflow_table_size_bytes` only covers the coordinator's local tables.
+Engine-state metrics are read from Postgres at scrape time. On a Citus deployment, `bpmngo_table_size_bytes` only covers the coordinator's local tables.
 
 `GET /health` now also pings the database and returns `503` when it is unreachable.
 
@@ -49,13 +49,13 @@ Postgres is the source of truth (Redpanda only holds the event log and in-flight
 ./scripts/test-restore.sh         # restores the latest dump into a throwaway Postgres container and counts rows
 ```
 
-Run the backup daily from cron (`0 3 * * * cd /path/to/goflow && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1`), copy `backups/` off the server, and run `test-restore.sh` regularly: a backup that was never restored is not a backup. Variables: `BACKUP_DIR`, `BACKUP_KEEP_DAYS`, `POSTGRES_CONTAINER`.
+Run the backup daily from cron (`0 3 * * * cd /path/to/bpmngo && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1`), copy `backups/` off the server, and run `test-restore.sh` regularly: a backup that was never restored is not a backup. Variables: `BACKUP_DIR`, `BACKUP_KEEP_DAYS`, `POSTGRES_CONTAINER`.
 
-With the high-availability cluster (`deploy/ha`), back up through HAProxy, which leads to whichever node is the primary: `PGHOST=haproxy PGPORT=5000 PGPASSWORD=… ./scripts/backup-postgres.sh` — `pg_dump` then runs in a throwaway `postgres:16` container on BpmnGo's Docker network (`DOCKER_NETWORK`). The cluster creates the BpmnGo database from `template0`, so its dumps restore into any plain Postgres, the standalone one included. `test-restore.sh` never touches the production database, standalone or cluster. For point-in-time recovery on top of daily dumps, Spilo can archive the write-ahead log continuously to object storage (WAL-G; its `WAL_S3_BUCKET` / `AWS_*` variables on `node.compose.yaml`).
+With the high-availability cluster (`deploy/ha`), back up through HAProxy, which leads to whichever node is the primary: `PGHOST=haproxy PGPORT=5000 PGPASSWORD=… ./scripts/backup-postgres.sh` — `pg_dump` then runs in a throwaway `postgres:18` container on BpmnGo's Docker network (`DOCKER_NETWORK`). The cluster creates the BpmnGo database from `template0`, so its dumps restore into any plain Postgres, the standalone one included. `test-restore.sh` never touches the production database, standalone or cluster. For point-in-time recovery on top of daily dumps, Spilo can archive the write-ahead log continuously to object storage (WAL-G; its `WAL_S3_BUCKET` / `AWS_*` variables on `node.compose.yaml`).
 
 ## Database connections
 
-Each BpmnGo instance opens up to `DB_MAX_OPEN_CONNS` connections (default 80). Postgres's `max_connections` (`POSTGRES_MAX_CONNECTIONS`, default 200) must cover that times the number of BpmnGo instances, plus a few for administration — otherwise, under load, Postgres refuses connections (`too many clients already`) and requests fail.
+Each BpmnGo instance opens up to `POSTGRES_MAX_OPEN_CONNS` connections (default 80). Postgres's `max_connections` (`POSTGRES_MAX_CONNECTIONS`, default 200) must cover that times the number of BpmnGo instances, plus a few for administration — otherwise, under load, Postgres refuses connections (`too many clients already`) and requests fail.
 
 ## Load testing
 
@@ -78,8 +78,8 @@ docker compose -f docker-compose.yaml -f docker-compose.scale.yaml up -d --scale
 `docker-compose.scale.yaml` leaves `docker-compose.yaml` untouched for a single instance and adds:
 
 - an nginx load balancer (`deploy/nginx-lb.conf`: HTTP, server-sent events, WebSocket and the gRPC gateway) in front of the replicas;
-- PgBouncer in transaction mode: the replicas may open many client connections, Postgres only sees the pool (`PGBOUNCER_POOL_SIZE`). What needs a Postgres session — `LISTEN`, the advisory locks of the archiver and the retention job — reaches Postgres directly (`DB_DIRECT_HOST`). BpmnGo uses the pgx driver, which sends each query in one round trip, as a transaction-mode pooler requires;
-- a streaming read replica (`deploy/replica-entrypoint.sh`): history and analytics read it (`DB_READ_HOST`), a few milliseconds behind the primary; everything else reads and writes the primary.
+- PgBouncer in transaction mode: the replicas may open many client connections, Postgres only sees the pool (`PGBOUNCER_POOL_SIZE`). What needs a Postgres session — `LISTEN`, the advisory locks of the archiver and the retention job — reaches Postgres directly (`POSTGRES_DIRECT_HOST`). BpmnGo uses the pgx driver, which sends each query in one round trip, as a transaction-mode pooler requires; queries are named prepared statements, which PgBouncer 1.21+ keeps working in transaction mode with `max_prepared_statements` (set to 1000 in `docker-compose.scale.yaml`; behind an older pooler set `POSTGRES_QUERY_EXEC_MODE=cache_describe`, at the cost of Postgres planning every query again);
+- a streaming read replica (`deploy/replica-entrypoint.sh`): history and analytics read it (`POSTGRES_READ_HOST`), a few milliseconds behind the primary; everything else reads and writes the primary.
 
 The scale manifest defaults each BpmnGo replica to 40 open and 10 idle client
 connections, while PgBouncer opens at most 80 server connections. For three
@@ -87,7 +87,7 @@ replicas that gives 120 possible clients multiplexed onto 80 PostgreSQL
 sessions. Size the pools from measurements rather than multiplying the
 standalone default: keep `PGBOUNCER_POOL_SIZE` below PostgreSQL's
 `max_connections` minus direct/background/admin connections, then raise
-`DB_MAX_OPEN_CONNS` only if application pool waits are visible. `SHOW POOLS`
+`POSTGRES_MAX_OPEN_CONNS` only if application pool waits are visible. `SHOW POOLS`
 on PgBouncer exposes `cl_waiting`; sustained waiting with idle PostgreSQL CPU
 is evidence to raise the server pool, while saturated database CPU is not.
 
@@ -102,11 +102,11 @@ The benchmark override pins BpmnGo to CPU 0 while PostgreSQL may use CPUs
 two-CPU test envelope.
 
 Runtime admission protects archive progress automatically. It publishes
-`goflow_runtime_archive_backlog` and `goflow_runtime_admission_limit`, halves
+`bpmngo_runtime_archive_backlog` and `bpmngo_runtime_admission_limit`, halves
 foreground concurrency at `ARCHIVER_BACKLOG_SOFT_LIMIT`, and uses
 `RUNTIME_MIN_CONCURRENCY` at `ARCHIVER_BACKLOG_HARD_LIMIT`. Archive grouping
-is visible in `goflow_archive_transaction_instances` and in
-`goflow_engine_transactions_total{operation="archive_batch",...}`.
+is visible in `bpmngo_archive_transaction_instances` and in
+`bpmngo_engine_transactions_total{operation="archive_batch",...}`.
 
 ## Postgres high availability
 
@@ -139,7 +139,7 @@ Moving an existing standalone database to the cluster leaves the old one untouch
 1. Run the migrations of `database/migrations` on the old database, as usual.
 2. Start the three nodes, check the cluster: `curl http://10.0.0.1:8008/cluster`.
 3. Stop BpmnGo (`docker compose stop bpmngo`) and dump the old database — a read: `docker exec bpmngo-postgres pg_dump -U goflow -Fc goflow > goflow.dump`.
-4. Create the role and the empty database on the cluster: `docker compose -f docker-compose.yaml -f deploy/ha/app.compose.yaml run --rm -e GOFLOW_SKIP_SCHEMA=true ha-init`.
+4. Create the role and the empty database on the cluster: `docker compose -f docker-compose.yaml -f deploy/ha/app.compose.yaml run --rm -e BPMNGO_SKIP_SCHEMA=true ha-init`.
 5. Restore into the primary: `pg_restore -h 10.0.0.x -U postgres -d goflow --no-owner --role=goflow goflow.dump` (any node: if it isn't the primary, the restore is refused — use the one `/cluster` lists as leader).
 6. Start BpmnGo on the cluster (`app.compose.yaml`). Keep the old database stopped but intact until you're satisfied: going back is restarting BpmnGo without `app.compose.yaml`.
 
@@ -153,7 +153,7 @@ Expressions starting with `=` (Camunda 8 style) and DMN input entries can be eva
 
 `FEEL_MODE` controls the switch:
 
-- `shadow` (default): the legacy path still decides; the native interpreter runs alongside and every disagreement is logged once per expression (`FEEL shadow mismatch …`) and counted in `goflow_feel_shadow_mismatches_total{kind}`. Where the legacy path fails and the native interpreter succeeds (a string literal, decimal arithmetic, `if … then … else`), the native result is used, so nothing that worked changes and what failed now works.
+- `shadow` (default): the legacy path still decides; the native interpreter runs alongside and every disagreement is logged once per expression (`FEEL shadow mismatch …`) and counted in `bpmngo_feel_shadow_mismatches_total{kind}`. Where the legacy path fails and the native interpreter succeeds (a string literal, decimal arithmetic, `if … then … else`), the native result is used, so nothing that worked changes and what failed now works.
 - `feel`: the native interpreter decides. Switch once shadow mode shows no unexpected mismatches on real traffic.
 - `cel`: legacy path only.
 

@@ -1,0 +1,40 @@
+{
+  "scenario": "msg-event-gateway-timer-wins",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "msg-timeout",
+        "elementId": "g_timeout",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "orderId": "G2"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "orderId": "G2"
+    },
+    "instances": [
+      {
+        "process": "msg_ebg",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 5137,
+    "errors": [],
+    "restNotes": []
+  }
+}

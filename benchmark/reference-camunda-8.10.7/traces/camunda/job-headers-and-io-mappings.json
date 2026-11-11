@@ -1,0 +1,59 @@
+{
+  "scenario": "job-headers-and-io-mappings",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "job-calc",
+        "elementId": "io_calc",
+        "retries": 3,
+        "headers": {
+          "region": "eu",
+          "priority": "1"
+        },
+        "variables": {
+          "label": "fixed",
+          "doubled": 42,
+          "amount": 21
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "job-check",
+        "elementId": "io_check",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "total": 42,
+          "amount": 21
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "total": 42,
+      "amount": 21
+    },
+    "instances": [
+      {
+        "process": "job_io",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2174,
+    "errors": [],
+    "restNotes": []
+  }
+}

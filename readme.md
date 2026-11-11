@@ -1,7 +1,7 @@
 # BpmnGo — Cloud-Native BPMN Workflow Engine
 
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![BPMN 2.0](https://img.shields.io/badge/BPMN-2.0-orange)
 ![React](https://img.shields.io/badge/Frontend-React%2019-61DAFB?logo=react&logoColor=black)
@@ -11,22 +11,23 @@ BpmnGo is a BPMN 2.0 workflow engine written in Go that runs models with Camunda
 
 ## Contents
 
-- [Current State](#current-state-v101)
+- [Current State](#current-state-v104)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Documentation](#documentation)
 
 ---
 
-## Current State (v1.0.1)
+## Current State (v1.0.4)
 
-**BpmnGo 1.0.1 is production ready.** What backs this:
+**BpmnGo 1.0.4 is production ready.** What backs this:
 
 - **Tested end to end:** 53 integration suites run against a real Postgres + BpmnGo stack, in every deployment mode (single server, several instances, Patroni HA cluster, Citus, partitioned write path). See [Integration Tests](docs/testing.md).
+- **Same behaviour as Camunda 8:** the [benchmark](benchmark/README.md) drives BpmnGo and Camunda 8.10.7 with the same Zeebe gRPC and `/v2` client code, and all 88 scenarios (gateways, joins, loops, nested and interrupted sub-processes, multi-instance, events, timers, compensation, FEEL, DMN, user tasks with forms, models exported by Camunda Modeler, and a 72-element model with a four-way parallel fork…) behave the same. Where Camunda 8 departs from BPMN 2.0 — an exclusive gateway with several true conditions takes the last one, in file order — BpmnGo follows Camunda by default (`EXCLUSIVE_GATEWAY_ORDER=bpmn` keeps the BPMN 2.0 rule).
 - **No single point of failure:** several BpmnGo instances behind a load balancer, and a Patroni cluster with automatic failover. In the failover drill, a replica took over within 28 s with no instance lost. See [Operations](docs/operations.md#postgres-high-availability).
 - **Backups:** `pg_dump` backups, with a script that checks each backup restores. See [Operations](docs/operations.md#backups).
-- **Secure defaults:** with `GOFLOW_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
-- **Operable:** Prometheus metrics, history retention, manual SQL migrations from a baseline, load-testing script. See [Operations](docs/operations.md).
+- **Secure defaults:** with `BPMNGO_ENV=production`, the server refuses to start with a sample JWT secret, and warns when `/metrics` is left without `METRICS_TOKEN`.
+- **Operable:** Prometheus metrics, history retention, manual SQL migrations from a baseline, load and endurance tests that report PostgreSQL's own figures (statements, commits and WAL per instance). See [Operations](docs/operations.md).
 
 What BpmnGo does not cover yet compared with Camunda is listed in [Comparison to Camunda 7 / Camunda 8](docs/comparison.md).
 
@@ -42,7 +43,7 @@ Versioning, FEEL, job workers, incidents, DMN, multi-tenancy, authentication, au
 
 ## Quick Start
 
-Requires Docker with Compose v2.
+Requires Docker with Compose v2 (the default stack works from Compose 2.19; the multi-replica and high-availability files, `docker-compose.scale.yaml` and `deploy/ha/`, need 2.24.4 or later for their `!reset` / `!override` tags).
 
 ### Try it — no configuration
 
@@ -53,9 +54,9 @@ docker compose up -d --build --wait     # PostgreSQL, BpmnGo and the web app
 ./scripts/demo.sh                       # your first workflow, end to end
 ```
 
-With no `.env`, BpmnGo starts in **demo mode**: it generates its token-signing key (kept in the `bpmngo_data` volume) and the admin account is `admin@goflow.com` / `admin123`. Fine to try BpmnGo, not for production (see below).
+With no `.env`, BpmnGo starts in **demo mode**: it generates its token-signing key (kept in the `bpmngo_data` volume) and the admin account is `admin@bpmngo.com` / `admin123`. Fine to try BpmnGo, not for production (see below).
 
-Then open the web app at `http://localhost:3000` and log in as `admin@goflow.com` / `admin123`. On Windows, run the script from Git Bash.
+Then open the web app at `http://localhost:3000` and log in as `admin@bpmngo.com` / `admin123`. On Windows, run the script from Git Bash.
 
 ### Your first workflow
 
@@ -78,8 +79,8 @@ cp .env.example .env
 
 In `.env`, set at least:
 
-- `JWT_SECRET_KEY` — a real random secret, e.g. the output of `openssl rand -base64 48`. With it set, BpmnGo runs in production mode (`GOFLOW_ENV=production`): it refuses to start with a sample value such as `change_me`, and warns about an unprotected `/metrics` or the sample admin password.
-- `SUPER_USER_PASSWORD` — the password of the admin account created at first start (`SUPER_USER_EMAIL`, `admin@goflow.com` by default).
+- `JWT_SECRET_KEY` — a real random secret, e.g. the output of `openssl rand -base64 48`. With it set, BpmnGo runs in production mode (`BPMNGO_ENV=production`): it refuses to start with a sample value such as `change_me`, and warns about an unprotected `/metrics` or the sample admin password.
+- `SUPER_USER_PASSWORD` — the password of the admin account created at first start (`SUPER_USER_EMAIL`, `admin@bpmngo.com` by default).
 
 Then `docker compose up -d --build --wait`, and check with `curl http://localhost:8080/health`. A database created this way already has the full schema; when upgrading an existing one, apply the new files of [`database/migrations/`](database/migrations/README.md) first.
 
@@ -97,7 +98,7 @@ The ports come from `SERVER_PORT` and `FRONTEND_PORT` in `.env`. Kafka (Redpanda
 
 Every request goes through the same parser/engine/runtime and lands in the same PostgreSQL database. What the deployment chooses (`WRITE_PATH`) is *where* each command runs: right where it arrives (`direct`, the default), or — like Camunda 8 — on the one BpmnGo instance owning the Kafka partition of its process instance (`partitioned`).
 
-![BpmnGo process command flow: commands go straight to the command handlers (WRITE_PATH=direct) or through the Kafka partition owner (WRITE_PATH=partitioned), then to PostgreSQL](docs/bpmn_process_command_flow.png)
+![BpmnGo process command flow: commands go straight to the command handlers (WRITE_PATH=direct) or through the Kafka partition owner (WRITE_PATH=partitioned), then to PostgreSQL](docs/bpmn_process_cmd_flow.png)
 
 Design decisions and the partitioned write path: [docs/architecture.md](docs/architecture.md).
 
@@ -118,6 +119,7 @@ Design decisions and the partitioned write path: [docs/architecture.md](docs/arc
 - [Operations](docs/operations.md) — migrations, metrics, backups, scaling, high availability
 - [Ajouter des serveurs](docs/adding-servers.md) — de 1 à 4 serveurs et plus : quels fichiers, et ce qu'il faut faire côté base de données à chaque étape
 - [Integration Tests](docs/testing.md) — the suites and how to run them
+- [Benchmark](benchmark/README.md) — BpmnGo against Camunda 8: behaviour (88 scenarios), load, endurance, per-call latency
 - [Roadmap](docs/roadmap.md) — what's done and what's next
 - [`architecture/`](architecture/) — design documents (partitioned write path, Citus storage, history of the event-sourced phases)
 - [`database/migrations/`](database/migrations/README.md) — the SQL migrations, applied by hand

@@ -14,7 +14,7 @@
 # peut ouvrir beaucoup de connexions clientes, Postgres n'en voit que
 # DEFAULT_POOL_SIZE. Ce qui a besoin d'une session Postgres (LISTEN, verrous
 # consultatifs de l'archiveur et de la rétention) passe directement par
-# Postgres (DB_DIRECT_HOST). Les délais (statement_timeout…) sont réglés
+# Postgres (POSTGRES_DIRECT_HOST). Les délais (statement_timeout…) sont réglés
 # côté Postgres : PgBouncer ne transmet pas les paramètres de démarrage.
 
 services:
@@ -61,17 +61,17 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: goflow
+      DB_USER: ${POSTGRES_USER:-goflow}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
-      DB_NAME: goflow
+      DB_NAME: ${POSTGRES_DB:-goflow}
       AUTH_TYPE: scram-sha-256
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 2000
       DEFAULT_POOL_SIZE: ${PGBOUNCER_POOL_SIZE:-80}
-      MAX_PREPARED_STATEMENTS: 200
+      MAX_PREPARED_STATEMENTS: 1000
       IGNORE_STARTUP_PARAMETERS: extra_float_digits,statement_timeout,idle_in_transaction_session_timeout
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U goflow -d goflow"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U $${DB_USER} -d $${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -90,16 +90,16 @@ services:
       postgres-replica:
         condition: service_healthy
     environment:
-      DB_HOST: pgbouncer
-      DB_DIRECT_HOST: postgres
-      DB_DIRECT_PORT: 5432
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_DIRECT_HOST: postgres
+      POSTGRES_DIRECT_PORT: 5432
       TASK_EVENTS_FANOUT: "true"
-      DB_READ_HOST: postgres-replica
+      POSTGRES_READ_HOST: postgres-replica
       # With three replicas this exposes at most 120 client connections to
       # PgBouncer, which multiplexes them onto its 80 server connections.
       # Increase only after measuring wait_count in SHOW POOLS.
-      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-40}
-      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-10}
+      POSTGRES_MAX_OPEN_CONNS: ${POSTGRES_MAX_OPEN_CONNS:-40}
+      POSTGRES_MAX_IDLE_CONNS: ${POSTGRES_MAX_IDLE_CONNS:-10}
 
   lb:
     image: nginx:1.29.2-alpine
@@ -118,15 +118,15 @@ services:
 
   # Rôle de réplication sur le primaire (idempotent), puis la réplique en
   # lecture : l'historique et l'analytics la lisent
-  # (DB_READ_HOST), quelques millisecondes derrière le primaire.
+  # (POSTGRES_READ_HOST), quelques millisecondes derrière le primaire.
   replication-setup:
-    image: postgres:16
+    image: postgres:18
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      POSTGRES_USER: goflow
-      POSTGRES_DB: goflow
+      POSTGRES_USER: ${POSTGRES_USER:-goflow}
+      POSTGRES_DB: ${POSTGRES_DB:-goflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
       REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-replicator}
     entrypoint: ["/bin/bash", "/replication-setup.sh"]
@@ -137,18 +137,19 @@ services:
     restart: "no"
 
   postgres-replica:
-    image: postgres:16
+    image: postgres:18
     container_name: bpmngo-postgres-replica
     depends_on:
       replication-setup:
         condition: service_completed_successfully
     environment:
-      PGDATA: /var/lib/postgresql/data
+      # Postgres 18+ : même disposition que le primaire.
+      PGDATA: /var/lib/postgresql/18/docker
       REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-replicator}
       POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-200}
     entrypoint: ["/bin/bash", "/replica-entrypoint.sh"]
     volumes:
-      - replica_data:/var/lib/postgresql/data
+      - replica_data:/var/lib/postgresql
       - ./deploy/replica-entrypoint.sh:/replica-entrypoint.sh:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "goflow", "-d", "goflow"]

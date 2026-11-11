@@ -44,8 +44,8 @@ async function createTenantUser(email: string, tenantId: string): Promise<BpmnGo
 async function run() {
   await superuser.loginAsSuperUser();
 
-  const userA = await createTenantUser('tenant-a-user@goflow.com', 'tenant-a');
-  const userB = await createTenantUser('tenant-b-user@goflow.com', 'tenant-b');
+  const userA = await createTenantUser('tenant-a-user@bpmngo.com', 'tenant-a');
+  const userB = await createTenantUser('tenant-b-user@bpmngo.com', 'tenant-b');
 
   await runSuite({
     name: '20 — Multi-tenancy',
@@ -107,8 +107,9 @@ async function run() {
           // --- B: search endpoint (v2) ---
           const searchA = await userA.api.post('/v2/process-instances/search', {});
           const searchIdsA = (searchA.data.items as any[]).map(i => i.processInstanceKey);
-          assert(searchIdsA.includes(instanceIdA), 'tenant A v2 search should include its own instance');
-          assert(!searchIdsA.includes(instanceIdB), 'tenant A v2 search should NOT include tenant B\'s instance');
+          const keyA = await userA.instanceKey(instanceIdA), keyB = await superuser.instanceKey(instanceIdB);
+          assert(searchIdsA.includes(keyA), 'tenant A v2 search should include its own instance');
+          assert(!searchIdsA.includes(keyB), 'tenant A v2 search should NOT include tenant B\'s instance');
 
           // --- C: direct fetch by ID across tenants ---
           const crossFetch = await userA.getProcessInstance(instanceIdB);

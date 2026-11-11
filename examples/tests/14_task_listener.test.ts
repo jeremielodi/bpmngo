@@ -212,9 +212,9 @@ async function run() {
           form.append('deployment-name', key);
           await client.api.post('/engine-rest/deployment/create', form, { headers: form.getHeaders() });
 
-          const outsiderEmail = `sse14-out-${run}@goflow.com`;
+          const outsiderEmail = `sse14-out-${run}@bpmngo.com`;
           await client.api.post('/users', { email: outsiderEmail, full_name: 'o', password: 'password123' });
-          const insider = await client.api.post('/users', { email: `sse14-in-${run}@goflow.com`, full_name: 'i', password: 'password123' });
+          const insider = await client.api.post('/users', { email: `sse14-in-${run}@bpmngo.com`, full_name: 'i', password: 'password123' });
           await client.api.post(`/engine-rest/process-definition/key/${key}/permissions`, { granteeType: 'user', granteeId: insider.data.user.id, permission: 'VIEW' });
           const outsider = new BpmnGoClient();
           await outsider.login(outsiderEmail, 'password123');

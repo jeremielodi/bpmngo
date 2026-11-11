@@ -61,8 +61,8 @@ func (c *TimerController) GetTimers(ctx *fiber.Ctx) error {
 func (c *TimerController) GetTimerByID(ctx *fiber.Ctx) error {
 	timerID, err := strconv.ParseInt(ctx.Params("id"), 10, 64)
 	if err != nil {
-		return ctx.Status(400).JSON(fiber.Map{
-			"error": "Invalid timer ID",
+		return ctx.Status(404).JSON(fiber.Map{
+			"error": "timer not found",
 		})
 	}
 

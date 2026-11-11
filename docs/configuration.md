@@ -2,14 +2,16 @@
 
 Every variable can come either from the process environment or from a `.env` file (optional — real environment variables always win, and the Docker image no longer contains a `.env`). `docker-compose.yaml` reads secrets from `.env` next to it: without `JWT_SECRET_KEY` BpmnGo starts in demo mode (see below), `POSTGRES_PASSWORD` defaults to `goflow123`.
 
+The database settings use the names of the official `postgres` image (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`): with `docker compose` the same values create the Postgres container and configure BpmnGo's connection to it, and `POSTGRES_PORT` is also the port published on the host. The former `DB_*` names (`DB_HOST`, `DB_PASS`, `DB_NAME`, …) are still read, with a deprecation warning at startup.
+
 ```bash
 # Database
-DB_HOST=postgres
-DB_PORT=5432
-DB_USER=goflow
-DB_PASS=goflow123
-DB_SSLMODE=disable   # or require / verify-ca / verify-full
-DB_NAME=goflow
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=goflow
+POSTGRES_PASSWORD=goflow123
+POSTGRES_SSLMODE=disable   # or require / verify-ca / verify-full
+POSTGRES_DB=goflow
 
 # JWT signing key. Generate with:
 #   openssl rand -base64 48
@@ -18,7 +20,7 @@ DB_NAME=goflow
 # DEMO_SECRET_FILE (default data/jwt_secret, the bpmngo_data volume in
 # Docker) — to try BpmnGo, never for production.
 JWT_SECRET_KEY=<random value>
-# GOFLOW_ENV=production        # or demo; unset: production when JWT_SECRET_KEY
+# BPMNGO_ENV=production        # or demo; unset: production when JWT_SECRET_KEY
 #                              # is set, demo otherwise. Production refuses a
 #                              # sample JWT key, warns about an open /metrics
 #                              # and the sample admin password
@@ -28,14 +30,14 @@ JWT_SECRET_KEY=<random value>
 # CREATE_SUPER_USER=false skips the seeding (unset = true)
 CREATE_SUPER_USER=true
 SUPER_USER_NAME=admin
-SUPER_USER_EMAIL=admin@goflow.com
+SUPER_USER_EMAIL=admin@bpmngo.com
 SUPER_USER_PASSWORD=admin123
 
 # OIDC (optional) — set all three to accept bearer tokens from an external
 # identity provider alongside the built-in JWT login; leave unset to disable
-# OIDC_ISSUER=https://your-idp.example.com/realms/goflow
-# OIDC_AUDIENCE=goflow-api
-# OIDC_JWKS_URL=https://your-idp.example.com/realms/goflow/protocol/openid-connect/certs
+# OIDC_ISSUER=https://your-idp.example.com/realms/bpmngo
+# OIDC_AUDIENCE=bpmngo-api
+# OIDC_JWKS_URL=https://your-idp.example.com/realms/bpmngo/protocol/openid-connect/certs
 
 # Kafka (Redpanda): only for the partitioned write path and the shadow event
 # log. Direct mode (the default) needs no Kafka: leave KAFKA_BROKERS unset and
@@ -69,6 +71,11 @@ SUPER_USER_PASSWORD=admin123
 # FEEL-to-CEL path decides, native FEEL runs alongside and mismatches are
 # logged), feel (native interpreter decides), cel (legacy only)
 # FEEL_MODE=shadow
+# Exclusive gateway with several conditions true: camunda (default) takes the
+# last true flow in the order of the sequenceFlow elements of the file, as
+# Camunda 8 does; bpmn takes the first, in the gateway's <outgoing> order
+# (else file order), as the BPMN 2.0 standard says.
+# EXCLUSIVE_GATEWAY_ORDER=camunda
 
 # Keys in /v2 (Camunda 8 API) answers: int by default (the gRPC gateway's
 # int64 key, as a string as Camunda 8 does) or uuid for the legacy BpmnGo
@@ -78,10 +85,15 @@ SUPER_USER_PASSWORD=admin123
 
 # Connection pool per BpmnGo instance (keep instances × this under
 # Postgres's max_connections, or put PgBouncer in front)
-# DB_MAX_OPEN_CONNS=80
+# POSTGRES_MAX_OPEN_CONNS=80
+# How queries reach Postgres. Default cache_statement: each query is prepared
+# once per connection and its plan reused (no re-planning, ~3x less Postgres
+# CPU on the engine lookups). cache_describe re-plans every call; only for a
+# pooler without prepared-statement support (PgBouncer < 1.21).
+# POSTGRES_QUERY_EXEC_MODE=cache_statement
 # Top-level runtime admission limit; default 4 × GOMAXPROCS (minimum 4).
 # On a two-CPU container, start with 8 and tune from
-# goflow_runtime_admission_wait_seconds.
+# bpmngo_runtime_admission_wait_seconds.
 # RUNTIME_MAX_CONCURRENCY=8
 # Minimum foreground concurrency retained above the hard archive backlog.
 # Defaults to one quarter of RUNTIME_MAX_CONCURRENCY (minimum 1).
@@ -108,11 +120,11 @@ SUPER_USER_PASSWORD=admin123
 # TASK_EVENTS_FANOUT=true
 # with PgBouncer in front of Postgres: where session-level work (LISTEN,
 # advisory locks) reaches Postgres directly
-# DB_DIRECT_HOST=postgres
-# DB_DIRECT_PORT=5432
+# POSTGRES_DIRECT_HOST=postgres
+# POSTGRES_DIRECT_PORT=5432
 # read replica for history and analytics (unset = the primary)
-# DB_READ_HOST=postgres-replica
-# DB_READ_PORT=5432
+# POSTGRES_READ_HOST=postgres-replica
+# POSTGRES_READ_PORT=5432
 
 # High-availability cluster (deploy/ha, see Operations): passwords of the
 # Patroni nodes, the same on every node

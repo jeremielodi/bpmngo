@@ -1,0 +1,79 @@
+{
+  "scenario": "rb-boundary-fires-twice",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-bt-work",
+        "elementId": "bt_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "ref": "R-1"
+        },
+        "answer": "after 4000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-bt-log",
+        "elementId": "bt_log",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "ref": "R-1",
+          "note": 1
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-bt-log",
+        "elementId": "bt_log",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "ref": "R-1",
+          "note": 2,
+          "logged": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after 1000 ms: publish rb-note key=R-1",
+        "result": "ok"
+      },
+      {
+        "action": "after 2000 ms: publish rb-note key=R-1",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "ref": "R-1",
+      "note": 2,
+      "logged": true,
+      "worked": true
+    },
+    "instances": [
+      {
+        "process": "rb_boundary_twice",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 6013,
+    "errors": [],
+    "restNotes": []
+  }
+}

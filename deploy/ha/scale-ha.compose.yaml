@@ -36,9 +36,9 @@ services:
         condition: service_healthy
         required: false
     environment:
-      DB_HOST: pgbouncer
-      DB_PORT: 5432
-      DB_DIRECT_HOST: haproxy
-      DB_DIRECT_PORT: 5000
-      DB_READ_HOST: haproxy
-      DB_READ_PORT: 5001
+      POSTGRES_HOST: pgbouncer
+      POSTGRES_PORT: 5432
+      POSTGRES_DIRECT_HOST: haproxy
+      POSTGRES_DIRECT_PORT: 5000
+      POSTGRES_READ_HOST: haproxy
+      POSTGRES_READ_PORT: 5001

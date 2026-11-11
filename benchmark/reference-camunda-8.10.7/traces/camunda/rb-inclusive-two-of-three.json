@@ -1,0 +1,81 @@
+{
+  "scenario": "rb-inclusive-two-of-three",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-i-a",
+        "elementId": "ij_a",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "wantA": true,
+          "wantB": false,
+          "wantC": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-i-c",
+        "elementId": "ij_c",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "wantA": true,
+          "wantB": false,
+          "wantC": true
+        },
+        "answer": "after 1000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-i-after",
+        "elementId": "ij_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "a": "done",
+          "c": "done",
+          "wantA": true,
+          "wantB": false,
+          "wantC": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "a": "done",
+      "c": "done",
+      "wantA": true,
+      "wantB": false,
+      "wantC": true,
+      "joined": [
+        "done",
+        null,
+        "done"
+      ]
+    },
+    "instances": [
+      {
+        "process": "rb_inclusive_join",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3585,
+    "errors": [],
+    "restNotes": []
+  }
+}

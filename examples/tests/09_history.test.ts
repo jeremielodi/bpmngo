@@ -13,7 +13,7 @@ import { BpmnGoClient, runSuite, assert, sleep } from './client';
 
 const BPMN = path.join(__dirname, 'bpmn', '09_order_fulfillment.bpmn');
 const client = new BpmnGoClient();
-const BASE = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
+const BASE = process.env.BPMNGO_URL ?? 'http://127.0.0.1:8080';
 
 async function apiGet(token: string, path: string): Promise<any> {
   const r = await fetch(`${BASE}${path}`, {

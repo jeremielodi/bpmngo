@@ -9,9 +9,9 @@ import (
 )
 
 type Incident struct {
-	ID                int64          `db:"engine_key" json:"id"`
+	ID                int64          `db:"engine_key" json:"id,string"`
 	ProcessInstanceID uuid.UUID      `db:"process_instance_id" json:"processInstanceId"`
-	JobID             *int64         `db:"job_key" json:"jobId,omitempty"`
+	JobID             *int64         `db:"job_key" json:"jobId,string,omitempty"`
 	IncidentType      string         `db:"incident_type" json:"incidentType"`
 	ActivityID        string         `db:"activity_id" json:"activityId"`
 	ErrorMessage      sql.NullString `db:"error_message" json:"errorMessage,omitempty"`

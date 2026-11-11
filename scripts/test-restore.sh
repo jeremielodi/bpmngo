@@ -1,17 +1,17 @@
 #!/usr/bin/env sh
 # Vérifie qu'une sauvegarde se restaure, sans toucher à la base de prod :
-# restaure dans un Postgres jetable (conteneur postgres:16 supprimé à la
+# restaure dans un Postgres jetable (conteneur postgres:18 supprimé à la
 # fin), compte les lignes de quelques tables. Marche pareil pour une base
 # autonome et pour le cluster haute disponibilité.
 #
 #   ./scripts/test-restore.sh                       # dernière sauvegarde de ./backups
-#   ./scripts/test-restore.sh backups/goflow_20261017_030000.dump
+#   ./scripts/test-restore.sh backups/bpmngo_20261017_030000.dump
 set -eu
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
-CHECK="goflow-restore-check-$$"
+CHECK="bpmngo-restore-check-$$"
 
-file="${1:-$(ls -t "$BACKUP_DIR"/goflow_*.dump 2>/dev/null | head -1)}"
+file="${1:-$(ls -t "$BACKUP_DIR"/bpmngo_*.dump "$BACKUP_DIR"/goflow_*.dump 2>/dev/null | head -1)}"
 if [ -z "$file" ] || [ ! -f "$file" ]; then
   echo "aucune sauvegarde trouvée (dossier $BACKUP_DIR)" >&2
   exit 1
@@ -19,7 +19,7 @@ fi
 
 echo "restauration de $file dans un Postgres jetable…"
 docker run -d --rm --name "$CHECK" -e POSTGRES_USER=goflow -e POSTGRES_PASSWORD=check \
-  -e POSTGRES_DB=goflow postgres:16 > /dev/null
+  -e POSTGRES_DB=goflow postgres:18 > /dev/null
 trap 'docker rm -f "$CHECK" > /dev/null 2>&1' EXIT
 
 # Ready once the image's init (which restarts Postgres) is over.

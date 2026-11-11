@@ -230,7 +230,7 @@ func (tc *TaskController) GetTask(c *fiber.Ctx) error {
 
 	taskId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(404).JSON(fiber.Map{"error": "task not found"}) // task ids are int64: nothing has this one
 	}
 
 	repo := repository.NewTaskRepository(tc.db, tc.dispatcher)

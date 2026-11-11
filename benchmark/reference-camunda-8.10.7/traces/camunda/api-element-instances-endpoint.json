@@ -1,0 +1,18 @@
+{
+  "scenario": "api-element-instances-endpoint",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "ok",
+    "finalVariables": {},
+    "instances": []
+  },
+  "info": {
+    "durationMs": 0,
+    "errors": [],
+    "restNotes": []
+  }
+}

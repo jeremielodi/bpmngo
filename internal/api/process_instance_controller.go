@@ -442,7 +442,7 @@ func (pc *ProcessInstanceController) StartProcess(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"processInstanceId": instanceID,
-		"executionId":       execID,
+		"executionId":       strconv.FormatInt(execID, 10),
 		"processKey":        def.ProcessKey,
 		"version":           def.Version,
 		"message":           "process started successfully",
@@ -457,11 +457,8 @@ func (pc *ProcessInstanceController) StartProcess(c *fiber.Ctx) error {
 func (pc *ProcessInstanceController) CompleteTask(c *fiber.Ctx) error {
 	taskID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"title":   "Validation Error",
-			"message": "invalid task ID",
-			"error":   err.Error(),
-		})
+		// Task ids are int64: no task has this one.
+		return c.Status(404).JSON(fiber.Map{"title": "Not Found", "message": "task not found"})
 	}
 
 	var req struct {

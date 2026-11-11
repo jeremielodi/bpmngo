@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A model of realistic size and shape, for the scenarios and the load test
+     that the other, deliberately small, fixtures cannot cover: a four-way
+     parallel fork inside a sub-process, a join that merges the branch
+     variables, a script task, an exclusive gateway with a default branch, a
+     sequential multi-instance over a collection, and a second sub-process
+     nested below the first.
+     Nothing here is engine-specific: the same variables take the same path
+     everywhere, and every service task is a job the bench answers. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="large_order_defs" targetNamespace="http://bpmn.io/schema/bpmn"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI">
+
+  <bpmn:process id="large_order" name="Large order" isExecutable="true">
+    <bpmn:startEvent id="lg_start" name="Order received"/>
+    <bpmn:sequenceFlow id="lg_f0" sourceRef="lg_start" targetRef="lg_intake"/>
+
+    <!-- Four checks in parallel, in a sub-process of their own. -->
+    <bpmn:subProcess id="lg_intake" name="Intake">
+      <bpmn:startEvent id="lg_i_start"/>
+      <bpmn:sequenceFlow id="lg_i_f0" sourceRef="lg_i_start" targetRef="lg_fork"/>
+      <bpmn:parallelGateway id="lg_fork"/>
+      <bpmn:sequenceFlow id="lg_i_f1" sourceRef="lg_fork" targetRef="lg_check"/>
+      <bpmn:sequenceFlow id="lg_i_f2" sourceRef="lg_fork" targetRef="lg_price"/>
+      <bpmn:sequenceFlow id="lg_i_f3" sourceRef="lg_fork" targetRef="lg_stock"/>
+      <bpmn:sequenceFlow id="lg_i_f4" sourceRef="lg_fork" targetRef="lg_risk"/>
+      <bpmn:serviceTask id="lg_check" name="Check customer">
+        <bpmn:extensionElements><zeebe:taskDefinition type="large-check"/></bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="lg_price" name="Price">
+        <bpmn:extensionElements><zeebe:taskDefinition type="large-price"/></bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="lg_stock" name="Reserve stock">
+        <bpmn:extensionElements><zeebe:taskDefinition type="large-stock"/></bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="lg_risk" name="Score risk">
+        <bpmn:extensionElements><zeebe:taskDefinition type="large-risk"/></bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:sequenceFlow id="lg_i_f5" sourceRef="lg_check" targetRef="lg_join"/>
+      <bpmn:sequenceFlow id="lg_i_f6" sourceRef="lg_price" targetRef="lg_join"/>
+      <bpmn:sequenceFlow id="lg_i_f7" sourceRef="lg_stock" targetRef="lg_join"/>
+      <bpmn:sequenceFlow id="lg_i_f8" sourceRef="lg_risk" targetRef="lg_join"/>
+      <bpmn:parallelGateway id="lg_join"/>
+      <bpmn:sequenceFlow id="lg_i_f9" sourceRef="lg_join" targetRef="lg_sum"/>
+      <bpmn:scriptTask id="lg_sum" name="Total">
+        <bpmn:extensionElements><zeebe:script expression="=amount" resultVariable="total"/></bpmn:extensionElements>
+      </bpmn:scriptTask>
+      <bpmn:sequenceFlow id="lg_i_f10" sourceRef="lg_sum" targetRef="lg_i_end"/>
+      <bpmn:endEvent id="lg_i_end"/>
+    </bpmn:subProcess>
+
+    <bpmn:sequenceFlow id="lg_f1" sourceRef="lg_intake" targetRef="lg_gw"/>
+    <bpmn:exclusiveGateway id="lg_gw" default="lg_to_auto"/>
+    <bpmn:sequenceFlow id="lg_to_manual" sourceRef="lg_gw" targetRef="lg_manual">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=total &gt; 1000</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="lg_to_auto" sourceRef="lg_gw" targetRef="lg_auto"/>
+    <bpmn:serviceTask id="lg_manual" name="Manual approval">
+      <bpmn:extensionElements><zeebe:taskDefinition type="large-manual"/></bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="lg_auto" name="Auto approval">
+      <bpmn:extensionElements><zeebe:taskDefinition type="large-auto"/></bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="lg_f2" sourceRef="lg_manual" targetRef="lg_merge"/>
+    <bpmn:sequenceFlow id="lg_f3" sourceRef="lg_auto" targetRef="lg_merge"/>
+    <bpmn:exclusiveGateway id="lg_merge"/>
+    <bpmn:sequenceFlow id="lg_f4" sourceRef="lg_merge" targetRef="lg_charge"/>
+    <bpmn:serviceTask id="lg_charge" name="Charge">
+      <bpmn:extensionElements><zeebe:taskDefinition type="large-auto"/></bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="lg_f5" sourceRef="lg_charge" targetRef="lg_items"/>
+
+    <!-- One job per item, in order: the collection comes from the start variables. -->
+    <bpmn:serviceTask id="lg_items" name="Pick items">
+      <bpmn:extensionElements><zeebe:taskDefinition type="large-item"/></bpmn:extensionElements>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=items" inputElement="item" outputCollection="itemResults" outputElement="=item"/>
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="lg_f6" sourceRef="lg_items" targetRef="lg_audit"/>
+
+    <!-- A second sub-process, nested one level below the first: the model has
+         both a fork/join and a branch that only some instances take. -->
+    <bpmn:subProcess id="lg_audit" name="Audit">
+      <bpmn:startEvent id="lg_a_start"/>
+      <bpmn:sequenceFlow id="lg_a_f0" sourceRef="lg_a_start" targetRef="lg_a1"/>
+      <bpmn:serviceTask id="lg_a1" name="Audit file">
+        <bpmn:extensionElements><zeebe:taskDefinition type="large-audit"/></bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:sequenceFlow id="lg_a_f1" sourceRef="lg_a1" targetRef="lg_a_gw"/>
+      <bpmn:exclusiveGateway id="lg_a_gw" default="lg_a_skip"/>
+      <bpmn:sequenceFlow id="lg_a_to_second" sourceRef="lg_a_gw" targetRef="lg_a2">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=total &gt; 2000</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="lg_a_skip" sourceRef="lg_a_gw" targetRef="lg_a_merge"/>
+      <bpmn:serviceTask id="lg_a2" name="Second approver">
+        <bpmn:extensionElements><zeebe:taskDefinition type="large-audit"/></bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:sequenceFlow id="lg_a_f2" sourceRef="lg_a2" targetRef="lg_a_merge"/>
+      <bpmn:exclusiveGateway id="lg_a_merge"/>
+      <bpmn:sequenceFlow id="lg_a_f3" sourceRef="lg_a_merge" targetRef="lg_a3"/>
+      <bpmn:serviceTask id="lg_a3" name="Close audit">
+        <bpmn:extensionElements><zeebe:taskDefinition type="large-audit"/></bpmn:extensionElements>
+      </bpmn:serviceTask>
+      <bpmn:sequenceFlow id="lg_a_f4" sourceRef="lg_a3" targetRef="lg_a_end"/>
+      <bpmn:endEvent id="lg_a_end"/>
+    </bpmn:subProcess>
+
+    <bpmn:sequenceFlow id="lg_f7" sourceRef="lg_audit" targetRef="lg_end"/>
+    <bpmn:endEvent id="lg_end" name="Done"/>
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_large_order">
+    <bpmndi:BPMNPlane id="BPMNPlane_large_order" bpmnElement="large_order">
+      <bpmndi:BPMNShape id="lg_start_di" bpmnElement="lg_start">
+        <dc:Bounds x="57" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_intake_di" bpmnElement="lg_intake">
+        <dc:Bounds x="175" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_gw_di" bpmnElement="lg_gw" isMarkerVisible="true">
+        <dc:Bounds x="350" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_manual_di" bpmnElement="lg_manual">
+        <dc:Bounds x="475" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_merge_di" bpmnElement="lg_merge" isMarkerVisible="true">
+        <dc:Bounds x="650" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_charge_di" bpmnElement="lg_charge">
+        <dc:Bounds x="775" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_items_di" bpmnElement="lg_items">
+        <dc:Bounds x="925" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_audit_di" bpmnElement="lg_audit">
+        <dc:Bounds x="1075" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_end_di" bpmnElement="lg_end">
+        <dc:Bounds x="1257" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_auto_di" bpmnElement="lg_auto">
+        <dc:Bounds x="475" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="lg_f0_di" bpmnElement="lg_f0">
+        <di:waypoint x="93" y="70" />
+        <di:waypoint x="175" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_f1_di" bpmnElement="lg_f1">
+        <di:waypoint x="275" y="70" />
+        <di:waypoint x="350" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_to_manual_di" bpmnElement="lg_to_manual">
+        <di:waypoint x="400" y="70" />
+        <di:waypoint x="475" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_to_auto_di" bpmnElement="lg_to_auto">
+        <di:waypoint x="375" y="95" />
+        <di:waypoint x="375" y="210" />
+        <di:waypoint x="475" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_f2_di" bpmnElement="lg_f2">
+        <di:waypoint x="575" y="70" />
+        <di:waypoint x="650" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_f4_di" bpmnElement="lg_f4">
+        <di:waypoint x="700" y="70" />
+        <di:waypoint x="775" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_f5_di" bpmnElement="lg_f5">
+        <di:waypoint x="875" y="70" />
+        <di:waypoint x="925" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_f6_di" bpmnElement="lg_f6">
+        <di:waypoint x="1025" y="70" />
+        <di:waypoint x="1075" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_f7_di" bpmnElement="lg_f7">
+        <di:waypoint x="1175" y="70" />
+        <di:waypoint x="1257" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_f3_di" bpmnElement="lg_f3">
+        <di:waypoint x="575" y="210" />
+        <di:waypoint x="675" y="210" />
+        <di:waypoint x="675" y="95" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_lg_audit">
+    <bpmndi:BPMNPlane id="BPMNPlane_lg_audit" bpmnElement="lg_audit">
+      <bpmndi:BPMNShape id="lg_a_start_di" bpmnElement="lg_a_start">
+        <dc:Bounds x="57" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_a1_di" bpmnElement="lg_a1">
+        <dc:Bounds x="175" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_a_gw_di" bpmnElement="lg_a_gw" isMarkerVisible="true">
+        <dc:Bounds x="350" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_a2_di" bpmnElement="lg_a2">
+        <dc:Bounds x="475" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_a_merge_di" bpmnElement="lg_a_merge" isMarkerVisible="true">
+        <dc:Bounds x="650" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_a3_di" bpmnElement="lg_a3">
+        <dc:Bounds x="775" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_a_end_di" bpmnElement="lg_a_end">
+        <dc:Bounds x="957" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="lg_a_f0_di" bpmnElement="lg_a_f0">
+        <di:waypoint x="93" y="70" />
+        <di:waypoint x="175" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_a_f1_di" bpmnElement="lg_a_f1">
+        <di:waypoint x="275" y="70" />
+        <di:waypoint x="350" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_a_to_second_di" bpmnElement="lg_a_to_second">
+        <di:waypoint x="400" y="70" />
+        <di:waypoint x="475" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_a_skip_di" bpmnElement="lg_a_skip">
+        <di:waypoint x="375" y="95" />
+        <di:waypoint x="375" y="140" />
+        <di:waypoint x="675" y="140" />
+        <di:waypoint x="675" y="95" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_a_f2_di" bpmnElement="lg_a_f2">
+        <di:waypoint x="575" y="70" />
+        <di:waypoint x="650" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_a_f3_di" bpmnElement="lg_a_f3">
+        <di:waypoint x="700" y="70" />
+        <di:waypoint x="775" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_a_f4_di" bpmnElement="lg_a_f4">
+        <di:waypoint x="875" y="70" />
+        <di:waypoint x="957" y="70" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_lg_intake">
+    <bpmndi:BPMNPlane id="BPMNPlane_lg_intake" bpmnElement="lg_intake">
+      <bpmndi:BPMNShape id="lg_i_start_di" bpmnElement="lg_i_start">
+        <dc:Bounds x="57" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_fork_di" bpmnElement="lg_fork">
+        <dc:Bounds x="200" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_check_di" bpmnElement="lg_check">
+        <dc:Bounds x="325" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_join_di" bpmnElement="lg_join">
+        <dc:Bounds x="500" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_sum_di" bpmnElement="lg_sum">
+        <dc:Bounds x="625" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_i_end_di" bpmnElement="lg_i_end">
+        <dc:Bounds x="807" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_price_di" bpmnElement="lg_price">
+        <dc:Bounds x="325" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_stock_di" bpmnElement="lg_stock">
+        <dc:Bounds x="325" y="310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lg_risk_di" bpmnElement="lg_risk">
+        <dc:Bounds x="325" y="450" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="lg_i_f0_di" bpmnElement="lg_i_f0">
+        <di:waypoint x="93" y="70" />
+        <di:waypoint x="200" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f1_di" bpmnElement="lg_i_f1">
+        <di:waypoint x="250" y="70" />
+        <di:waypoint x="325" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f2_di" bpmnElement="lg_i_f2">
+        <di:waypoint x="225" y="95" />
+        <di:waypoint x="225" y="210" />
+        <di:waypoint x="325" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f3_di" bpmnElement="lg_i_f3">
+        <di:waypoint x="225" y="95" />
+        <di:waypoint x="225" y="350" />
+        <di:waypoint x="325" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f4_di" bpmnElement="lg_i_f4">
+        <di:waypoint x="225" y="95" />
+        <di:waypoint x="225" y="490" />
+        <di:waypoint x="325" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f5_di" bpmnElement="lg_i_f5">
+        <di:waypoint x="425" y="70" />
+        <di:waypoint x="500" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f9_di" bpmnElement="lg_i_f9">
+        <di:waypoint x="550" y="70" />
+        <di:waypoint x="625" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f10_di" bpmnElement="lg_i_f10">
+        <di:waypoint x="725" y="70" />
+        <di:waypoint x="807" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f6_di" bpmnElement="lg_i_f6">
+        <di:waypoint x="425" y="210" />
+        <di:waypoint x="525" y="210" />
+        <di:waypoint x="525" y="95" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f7_di" bpmnElement="lg_i_f7">
+        <di:waypoint x="425" y="350" />
+        <di:waypoint x="525" y="350" />
+        <di:waypoint x="525" y="95" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="lg_i_f8_di" bpmnElement="lg_i_f8">
+        <di:waypoint x="425" y="490" />
+        <di:waypoint x="525" y="490" />
+        <di:waypoint x="525" y="95" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

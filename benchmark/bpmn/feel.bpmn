@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FEEL expressions, evaluated by script tasks (zeebe:script). Each
+     process is a chain of script tasks; the result variables are compared.
+     If an expression fails, the instance stops there with an incident. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="feel" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:collaboration id="Collaboration_feel">
+    <bpmn:participant id="Participant_feel_numbers" name="feel_numbers" processRef="feel_numbers" />
+    <bpmn:participant id="Participant_feel_null" name="feel_null" processRef="feel_null" />
+    <bpmn:participant id="Participant_feel_strings" name="feel_strings" processRef="feel_strings" />
+    <bpmn:participant id="Participant_feel_lists" name="feel_lists" processRef="feel_lists" />
+    <bpmn:participant id="Participant_feel_dates" name="feel_dates" processRef="feel_dates" />
+    <bpmn:participant id="Participant_feel_context" name="feel_context" processRef="feel_context" />
+  </bpmn:collaboration>
+
+  <bpmn:process id="feel_numbers" isExecutable="true">
+    <bpmn:startEvent id="n_start"/>
+    <bpmn:sequenceFlow id="n_f0" sourceRef="n_start" targetRef="n1"/>
+    <bpmn:scriptTask id="n1"><bpmn:extensionElements><zeebe:script expression="=0.1 + 0.2" resultVariable="sum"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f1" sourceRef="n1" targetRef="n2"/>
+    <bpmn:scriptTask id="n2"><bpmn:extensionElements><zeebe:script expression="=0.1 + 0.2 = 0.3" resultVariable="exact"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f2" sourceRef="n2" targetRef="n3"/>
+    <bpmn:scriptTask id="n3"><bpmn:extensionElements><zeebe:script expression="=10 / 4" resultVariable="div"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f3" sourceRef="n3" targetRef="n4"/>
+    <bpmn:scriptTask id="n4"><bpmn:extensionElements><zeebe:script expression="=2 ** 10" resultVariable="pow"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f4" sourceRef="n4" targetRef="n5"/>
+    <bpmn:scriptTask id="n5"><bpmn:extensionElements><zeebe:script expression="=decimal(1.255, 2)" resultVariable="rounded"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f5" sourceRef="n5" targetRef="n6"/>
+    <bpmn:scriptTask id="n6"><bpmn:extensionElements><zeebe:script expression="=floor(-1.5)" resultVariable="floored"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f6" sourceRef="n6" targetRef="n7"/>
+    <bpmn:scriptTask id="n7"><bpmn:extensionElements><zeebe:script expression="=modulo(-5, 3)" resultVariable="mod"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f7" sourceRef="n7" targetRef="n8"/>
+    <bpmn:scriptTask id="n8"><bpmn:extensionElements><zeebe:script expression="=amount * 1.1" resultVariable="scaled"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f8" sourceRef="n8" targetRef="n9"/>
+    <bpmn:scriptTask id="n9"><bpmn:extensionElements><zeebe:script expression="=1 / 0" resultVariable="divByZero"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="n_f9" sourceRef="n9" targetRef="n_end"/>
+    <bpmn:endEvent id="n_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_null" isExecutable="true">
+    <bpmn:startEvent id="z_start"/>
+    <bpmn:sequenceFlow id="z_f0" sourceRef="z_start" targetRef="z1"/>
+    <bpmn:scriptTask id="z1"><bpmn:extensionElements><zeebe:script expression="=missing = null" resultVariable="isNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f1" sourceRef="z1" targetRef="z2"/>
+    <bpmn:scriptTask id="z2"><bpmn:extensionElements><zeebe:script expression="=if missing &gt; 5 then &quot;a&quot; else &quot;b&quot;" resultVariable="ifNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f2" sourceRef="z2" targetRef="z3"/>
+    <bpmn:scriptTask id="z3"><bpmn:extensionElements><zeebe:script expression="=missing + 1" resultVariable="plusNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f3" sourceRef="z3" targetRef="z4"/>
+    <bpmn:scriptTask id="z4"><bpmn:extensionElements><zeebe:script expression="=is defined(missing)" resultVariable="defined"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f4" sourceRef="z4" targetRef="z5"/>
+    <bpmn:scriptTask id="z5"><bpmn:extensionElements><zeebe:script expression="=false and missing" resultVariable="andNull"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="z_f5" sourceRef="z5" targetRef="z_end"/>
+    <bpmn:endEvent id="z_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_strings" isExecutable="true">
+    <bpmn:startEvent id="s_start"/>
+    <bpmn:sequenceFlow id="s_f0" sourceRef="s_start" targetRef="s1"/>
+    <bpmn:scriptTask id="s1"><bpmn:extensionElements><zeebe:script expression="=upper case(name)" resultVariable="upper"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f1" sourceRef="s1" targetRef="s2"/>
+    <bpmn:scriptTask id="s2"><bpmn:extensionElements><zeebe:script expression="=substring(name, 2, 3)" resultVariable="sub"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f2" sourceRef="s2" targetRef="s3"/>
+    <bpmn:scriptTask id="s3"><bpmn:extensionElements><zeebe:script expression="=string length(name)" resultVariable="len"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f3" sourceRef="s3" targetRef="s4"/>
+    <bpmn:scriptTask id="s4"><bpmn:extensionElements><zeebe:script expression="=name + &quot; #&quot; + string(42)" resultVariable="joined"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f4" sourceRef="s4" targetRef="s5"/>
+    <bpmn:scriptTask id="s5"><bpmn:extensionElements><zeebe:script expression="=split(&quot;a,b,c&quot;, &quot;,&quot;)" resultVariable="parts"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f5" sourceRef="s5" targetRef="s6"/>
+    <bpmn:scriptTask id="s6"><bpmn:extensionElements><zeebe:script expression="=matches(code, &quot;^[A-Z]{2}-[0-9]+$&quot;)" resultVariable="codeOk"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f6" sourceRef="s6" targetRef="s7"/>
+    <bpmn:scriptTask id="s7"><bpmn:extensionElements><zeebe:script expression="=string(12.50)" resultVariable="numText"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="s_f7" sourceRef="s7" targetRef="s_end"/>
+    <bpmn:endEvent id="s_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_lists" isExecutable="true">
+    <bpmn:startEvent id="l_start"/>
+    <bpmn:sequenceFlow id="l_f0" sourceRef="l_start" targetRef="l1"/>
+    <bpmn:scriptTask id="l1"><bpmn:extensionElements><zeebe:script expression="=sum(for i in items return i * 2)" resultVariable="doubledSum"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f1" sourceRef="l1" targetRef="l2"/>
+    <bpmn:scriptTask id="l2"><bpmn:extensionElements><zeebe:script expression="=items[item &gt; 1]" resultVariable="filtered"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f2" sourceRef="l2" targetRef="l3"/>
+    <bpmn:scriptTask id="l3"><bpmn:extensionElements><zeebe:script expression="=items[-1]" resultVariable="last"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f3" sourceRef="l3" targetRef="l4"/>
+    <bpmn:scriptTask id="l4"><bpmn:extensionElements><zeebe:script expression="=count(items) + min(items) + max(items)" resultVariable="stats"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f4" sourceRef="l4" targetRef="l5"/>
+    <bpmn:scriptTask id="l5"><bpmn:extensionElements><zeebe:script expression="=distinct values(append(items, 1, 9))" resultVariable="distinct"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f5" sourceRef="l5" targetRef="l6"/>
+    <bpmn:scriptTask id="l6"><bpmn:extensionElements><zeebe:script expression="=some i in items satisfies i &gt; 2" resultVariable="anyBig"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f6" sourceRef="l6" targetRef="l7"/>
+    <bpmn:scriptTask id="l7"><bpmn:extensionElements><zeebe:script expression="=items[5]" resultVariable="outOfRange"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f7" sourceRef="l7" targetRef="l8"/>
+    <bpmn:scriptTask id="l8"><bpmn:extensionElements><zeebe:script expression="=order.items[qty &gt; 1].sku" resultVariable="skus"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="l_f8" sourceRef="l8" targetRef="l_end"/>
+    <bpmn:endEvent id="l_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_dates" isExecutable="true">
+    <bpmn:startEvent id="d_start"/>
+    <bpmn:sequenceFlow id="d_f0" sourceRef="d_start" targetRef="d1"/>
+    <bpmn:scriptTask id="d1"><bpmn:extensionElements><zeebe:script expression="=string(date(&quot;2024-01-31&quot;) + duration(&quot;P1M&quot;))" resultVariable="endOfFeb"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f1" sourceRef="d1" targetRef="d2"/>
+    <bpmn:scriptTask id="d2"><bpmn:extensionElements><zeebe:script expression="=string(date(&quot;2024-03-01&quot;) - duration(&quot;P1D&quot;))" resultVariable="leapDay"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f2" sourceRef="d2" targetRef="d3"/>
+    <bpmn:scriptTask id="d3"><bpmn:extensionElements><zeebe:script expression="=string(duration(&quot;PT90M&quot;))" resultVariable="ninety"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f3" sourceRef="d3" targetRef="d4"/>
+    <bpmn:scriptTask id="d4"><bpmn:extensionElements><zeebe:script expression="=date(&quot;2024-02-28&quot;) &lt; date(&quot;2024-03-01&quot;)" resultVariable="before"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f4" sourceRef="d4" targetRef="d5"/>
+    <bpmn:scriptTask id="d5"><bpmn:extensionElements><zeebe:script expression="=date(&quot;2024-01-15&quot;).month" resultVariable="month"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f5" sourceRef="d5" targetRef="d6"/>
+    <bpmn:scriptTask id="d6"><bpmn:extensionElements><zeebe:script expression="=date(&quot;2024-01-31&quot;) + duration(&quot;P1D&quot;)" resultVariable="rawDate"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f6" sourceRef="d6" targetRef="d7"/>
+    <bpmn:scriptTask id="d7"><bpmn:extensionElements><zeebe:script expression="=string(date and time(&quot;2024-05-01T10:00:00Z&quot;) + duration(&quot;PT36H&quot;))" resultVariable="dateTime"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="d_f7" sourceRef="d7" targetRef="d_end"/>
+    <bpmn:endEvent id="d_end"/>
+  </bpmn:process>
+
+  <bpmn:process id="feel_context" isExecutable="true">
+    <bpmn:startEvent id="c_start"/>
+    <bpmn:sequenceFlow id="c_f0" sourceRef="c_start" targetRef="c1"/>
+    <bpmn:scriptTask id="c1"><bpmn:extensionElements><zeebe:script expression="={a: {b: 1}}.a.b" resultVariable="nested"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f1" sourceRef="c1" targetRef="c2"/>
+    <bpmn:scriptTask id="c2"><bpmn:extensionElements><zeebe:script expression="={x: 1, y: x + 1}" resultVariable="ctx"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f2" sourceRef="c2" targetRef="c3"/>
+    <bpmn:scriptTask id="c3"><bpmn:extensionElements><zeebe:script expression="=order.customer.name" resultVariable="customer"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f3" sourceRef="c3" targetRef="c4"/>
+    <bpmn:scriptTask id="c4"><bpmn:extensionElements><zeebe:script expression="=order.missing.deeper" resultVariable="missingPath"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f4" sourceRef="c4" targetRef="c5"/>
+    <bpmn:scriptTask id="c5"><bpmn:extensionElements><zeebe:script expression="=get value(order, &quot;id&quot;)" resultVariable="byName"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f5" sourceRef="c5" targetRef="c6"/>
+    <bpmn:scriptTask id="c6"><bpmn:extensionElements><zeebe:script expression="=context put(order.customer, &quot;vip&quot;, true)" resultVariable="customer2"/></bpmn:extensionElements></bpmn:scriptTask>
+    <bpmn:sequenceFlow id="c_f6" sourceRef="c6" targetRef="c_end"/>
+    <bpmn:endEvent id="c_end"/>
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_feel">
+    <bpmndi:BPMNPlane id="BPMNPlane_feel" bpmnElement="Collaboration_feel">
+      <bpmndi:BPMNShape id="Participant_feel_numbers_di" bpmnElement="Participant_feel_numbers" isHorizontal="true">
+        <dc:Bounds x="0" y="0" width="1646" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_start_di" bpmnElement="n_start">
+        <dc:Bounds x="70" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n1_di" bpmnElement="n1">
+        <dc:Bounds x="188" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n2_di" bpmnElement="n2">
+        <dc:Bounds x="338" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n3_di" bpmnElement="n3">
+        <dc:Bounds x="488" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n4_di" bpmnElement="n4">
+        <dc:Bounds x="638" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n5_di" bpmnElement="n5">
+        <dc:Bounds x="788" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n6_di" bpmnElement="n6">
+        <dc:Bounds x="938" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n7_di" bpmnElement="n7">
+        <dc:Bounds x="1088" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n8_di" bpmnElement="n8">
+        <dc:Bounds x="1238" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n9_di" bpmnElement="n9">
+        <dc:Bounds x="1388" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_end_di" bpmnElement="n_end">
+        <dc:Bounds x="1570" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="n_f0_di" bpmnElement="n_f0">
+        <di:waypoint x="106" y="80" />
+        <di:waypoint x="188" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f1_di" bpmnElement="n_f1">
+        <di:waypoint x="288" y="80" />
+        <di:waypoint x="338" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f2_di" bpmnElement="n_f2">
+        <di:waypoint x="438" y="80" />
+        <di:waypoint x="488" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f3_di" bpmnElement="n_f3">
+        <di:waypoint x="588" y="80" />
+        <di:waypoint x="638" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f4_di" bpmnElement="n_f4">
+        <di:waypoint x="738" y="80" />
+        <di:waypoint x="788" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f5_di" bpmnElement="n_f5">
+        <di:waypoint x="888" y="80" />
+        <di:waypoint x="938" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f6_di" bpmnElement="n_f6">
+        <di:waypoint x="1038" y="80" />
+        <di:waypoint x="1088" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f7_di" bpmnElement="n_f7">
+        <di:waypoint x="1188" y="80" />
+        <di:waypoint x="1238" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f8_di" bpmnElement="n_f8">
+        <di:waypoint x="1338" y="80" />
+        <di:waypoint x="1388" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="n_f9_di" bpmnElement="n_f9">
+        <di:waypoint x="1488" y="80" />
+        <di:waypoint x="1570" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_feel_null_di" bpmnElement="Participant_feel_null" isHorizontal="true">
+        <dc:Bounds x="0" y="190" width="1646" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="z_start_di" bpmnElement="z_start">
+        <dc:Bounds x="70" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="z1_di" bpmnElement="z1">
+        <dc:Bounds x="188" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="z2_di" bpmnElement="z2">
+        <dc:Bounds x="338" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="z3_di" bpmnElement="z3">
+        <dc:Bounds x="488" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="z4_di" bpmnElement="z4">
+        <dc:Bounds x="638" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="z5_di" bpmnElement="z5">
+        <dc:Bounds x="788" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="z_end_di" bpmnElement="z_end">
+        <dc:Bounds x="970" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="z_f0_di" bpmnElement="z_f0">
+        <di:waypoint x="106" y="270" />
+        <di:waypoint x="188" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="z_f1_di" bpmnElement="z_f1">
+        <di:waypoint x="288" y="270" />
+        <di:waypoint x="338" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="z_f2_di" bpmnElement="z_f2">
+        <di:waypoint x="438" y="270" />
+        <di:waypoint x="488" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="z_f3_di" bpmnElement="z_f3">
+        <di:waypoint x="588" y="270" />
+        <di:waypoint x="638" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="z_f4_di" bpmnElement="z_f4">
+        <di:waypoint x="738" y="270" />
+        <di:waypoint x="788" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="z_f5_di" bpmnElement="z_f5">
+        <di:waypoint x="888" y="270" />
+        <di:waypoint x="970" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_feel_strings_di" bpmnElement="Participant_feel_strings" isHorizontal="true">
+        <dc:Bounds x="0" y="380" width="1646" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_start_di" bpmnElement="s_start">
+        <dc:Bounds x="70" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s1_di" bpmnElement="s1">
+        <dc:Bounds x="188" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s2_di" bpmnElement="s2">
+        <dc:Bounds x="338" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s3_di" bpmnElement="s3">
+        <dc:Bounds x="488" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s4_di" bpmnElement="s4">
+        <dc:Bounds x="638" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s5_di" bpmnElement="s5">
+        <dc:Bounds x="788" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s6_di" bpmnElement="s6">
+        <dc:Bounds x="938" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s7_di" bpmnElement="s7">
+        <dc:Bounds x="1088" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_end_di" bpmnElement="s_end">
+        <dc:Bounds x="1270" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="s_f0_di" bpmnElement="s_f0">
+        <di:waypoint x="106" y="460" />
+        <di:waypoint x="188" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f1_di" bpmnElement="s_f1">
+        <di:waypoint x="288" y="460" />
+        <di:waypoint x="338" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f2_di" bpmnElement="s_f2">
+        <di:waypoint x="438" y="460" />
+        <di:waypoint x="488" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f3_di" bpmnElement="s_f3">
+        <di:waypoint x="588" y="460" />
+        <di:waypoint x="638" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f4_di" bpmnElement="s_f4">
+        <di:waypoint x="738" y="460" />
+        <di:waypoint x="788" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f5_di" bpmnElement="s_f5">
+        <di:waypoint x="888" y="460" />
+        <di:waypoint x="938" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f6_di" bpmnElement="s_f6">
+        <di:waypoint x="1038" y="460" />
+        <di:waypoint x="1088" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="s_f7_di" bpmnElement="s_f7">
+        <di:waypoint x="1188" y="460" />
+        <di:waypoint x="1270" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_feel_lists_di" bpmnElement="Participant_feel_lists" isHorizontal="true">
+        <dc:Bounds x="0" y="570" width="1646" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l_start_di" bpmnElement="l_start">
+        <dc:Bounds x="70" y="632" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l1_di" bpmnElement="l1">
+        <dc:Bounds x="188" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l2_di" bpmnElement="l2">
+        <dc:Bounds x="338" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l3_di" bpmnElement="l3">
+        <dc:Bounds x="488" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l4_di" bpmnElement="l4">
+        <dc:Bounds x="638" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l5_di" bpmnElement="l5">
+        <dc:Bounds x="788" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l6_di" bpmnElement="l6">
+        <dc:Bounds x="938" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l7_di" bpmnElement="l7">
+        <dc:Bounds x="1088" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l8_di" bpmnElement="l8">
+        <dc:Bounds x="1238" y="610" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="l_end_di" bpmnElement="l_end">
+        <dc:Bounds x="1420" y="632" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="l_f0_di" bpmnElement="l_f0">
+        <di:waypoint x="106" y="650" />
+        <di:waypoint x="188" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f1_di" bpmnElement="l_f1">
+        <di:waypoint x="288" y="650" />
+        <di:waypoint x="338" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f2_di" bpmnElement="l_f2">
+        <di:waypoint x="438" y="650" />
+        <di:waypoint x="488" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f3_di" bpmnElement="l_f3">
+        <di:waypoint x="588" y="650" />
+        <di:waypoint x="638" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f4_di" bpmnElement="l_f4">
+        <di:waypoint x="738" y="650" />
+        <di:waypoint x="788" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f5_di" bpmnElement="l_f5">
+        <di:waypoint x="888" y="650" />
+        <di:waypoint x="938" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f6_di" bpmnElement="l_f6">
+        <di:waypoint x="1038" y="650" />
+        <di:waypoint x="1088" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f7_di" bpmnElement="l_f7">
+        <di:waypoint x="1188" y="650" />
+        <di:waypoint x="1238" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="l_f8_di" bpmnElement="l_f8">
+        <di:waypoint x="1338" y="650" />
+        <di:waypoint x="1420" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_feel_dates_di" bpmnElement="Participant_feel_dates" isHorizontal="true">
+        <dc:Bounds x="0" y="760" width="1646" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d_start_di" bpmnElement="d_start">
+        <dc:Bounds x="70" y="822" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d1_di" bpmnElement="d1">
+        <dc:Bounds x="188" y="800" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d2_di" bpmnElement="d2">
+        <dc:Bounds x="338" y="800" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d3_di" bpmnElement="d3">
+        <dc:Bounds x="488" y="800" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d4_di" bpmnElement="d4">
+        <dc:Bounds x="638" y="800" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d5_di" bpmnElement="d5">
+        <dc:Bounds x="788" y="800" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d6_di" bpmnElement="d6">
+        <dc:Bounds x="938" y="800" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d7_di" bpmnElement="d7">
+        <dc:Bounds x="1088" y="800" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="d_end_di" bpmnElement="d_end">
+        <dc:Bounds x="1270" y="822" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="d_f0_di" bpmnElement="d_f0">
+        <di:waypoint x="106" y="840" />
+        <di:waypoint x="188" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="d_f1_di" bpmnElement="d_f1">
+        <di:waypoint x="288" y="840" />
+        <di:waypoint x="338" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="d_f2_di" bpmnElement="d_f2">
+        <di:waypoint x="438" y="840" />
+        <di:waypoint x="488" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="d_f3_di" bpmnElement="d_f3">
+        <di:waypoint x="588" y="840" />
+        <di:waypoint x="638" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="d_f4_di" bpmnElement="d_f4">
+        <di:waypoint x="738" y="840" />
+        <di:waypoint x="788" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="d_f5_di" bpmnElement="d_f5">
+        <di:waypoint x="888" y="840" />
+        <di:waypoint x="938" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="d_f6_di" bpmnElement="d_f6">
+        <di:waypoint x="1038" y="840" />
+        <di:waypoint x="1088" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="d_f7_di" bpmnElement="d_f7">
+        <di:waypoint x="1188" y="840" />
+        <di:waypoint x="1270" y="840" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_feel_context_di" bpmnElement="Participant_feel_context" isHorizontal="true">
+        <dc:Bounds x="0" y="950" width="1646" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_start_di" bpmnElement="c_start">
+        <dc:Bounds x="70" y="1012" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c1_di" bpmnElement="c1">
+        <dc:Bounds x="188" y="990" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c2_di" bpmnElement="c2">
+        <dc:Bounds x="338" y="990" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c3_di" bpmnElement="c3">
+        <dc:Bounds x="488" y="990" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c4_di" bpmnElement="c4">
+        <dc:Bounds x="638" y="990" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c5_di" bpmnElement="c5">
+        <dc:Bounds x="788" y="990" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c6_di" bpmnElement="c6">
+        <dc:Bounds x="938" y="990" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_end_di" bpmnElement="c_end">
+        <dc:Bounds x="1120" y="1012" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="c_f0_di" bpmnElement="c_f0">
+        <di:waypoint x="106" y="1030" />
+        <di:waypoint x="188" y="1030" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f1_di" bpmnElement="c_f1">
+        <di:waypoint x="288" y="1030" />
+        <di:waypoint x="338" y="1030" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f2_di" bpmnElement="c_f2">
+        <di:waypoint x="438" y="1030" />
+        <di:waypoint x="488" y="1030" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f3_di" bpmnElement="c_f3">
+        <di:waypoint x="588" y="1030" />
+        <di:waypoint x="638" y="1030" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f4_di" bpmnElement="c_f4">
+        <di:waypoint x="738" y="1030" />
+        <di:waypoint x="788" y="1030" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f5_di" bpmnElement="c_f5">
+        <di:waypoint x="888" y="1030" />
+        <di:waypoint x="938" y="1030" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="c_f6_di" bpmnElement="c_f6">
+        <di:waypoint x="1038" y="1030" />
+        <di:waypoint x="1120" y="1030" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

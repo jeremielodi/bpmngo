@@ -93,3 +93,18 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Extracts the server's error message from a failed request: BpmnGo answers
+// {"error": ...}, Camunda-style endpoints {"message": ...} or {"detail": ...}.
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const e = err as { response?: { data?: unknown }; message?: string };
+  const data = e?.response?.data;
+  if (typeof data === 'string' && data.trim()) return data;
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, unknown>;
+    for (const k of ['error', 'message', 'detail']) {
+      if (typeof d[k] === 'string' && d[k]) return d[k] as string;
+    }
+  }
+  return e?.message || fallback;
+}

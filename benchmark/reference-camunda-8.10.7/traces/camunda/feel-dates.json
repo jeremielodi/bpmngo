@@ -1,0 +1,33 @@
+{
+  "scenario": "feel-dates",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "month": 1,
+      "before": true,
+      "ninety": "PT1H30M",
+      "leapDay": "2024-02-29",
+      "rawDate": "2024-02-01",
+      "dateTime": "2024-05-02T22:00:00Z",
+      "endOfFeb": "2024-02-29"
+    },
+    "instances": [
+      {
+        "process": "feel_dates",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2375,
+    "errors": [],
+    "restNotes": []
+  }
+}

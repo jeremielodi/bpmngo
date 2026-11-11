@@ -11,7 +11,7 @@ const fs = require('fs');
 
 const CONFIG = {
     // BpmnGo Configuration
-    goflow: {
+    bpmngo: {
         name: 'BpmnGo',
         baseUrl: 'http://localhost:8080',
         processKey: 'SequentialMultiInstanceProcess',
@@ -99,8 +99,8 @@ const CAMUNDA_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
 // AXIOS INSTANCES
 // ============================================================
 
-const goflowApi = axios.create({
-    baseURL: CONFIG.goflow.baseUrl,
+const bpmngoApi = axios.create({
+    baseURL: CONFIG.bpmngo.baseUrl,
     timeout: CONFIG.requestTimeout,
     headers: { 'Content-Type': 'application/json' }
 });
@@ -219,17 +219,17 @@ async function stopSimpleCamundaWorker() {
 async function deployToBpmnGo() {
     log.info('Deploying to BpmnGo...');
     
-    if (!fs.existsSync(CONFIG.goflow.bpmnFile)) {
-        throw new Error(`BPMN file not found: ${CONFIG.goflow.bpmnFile}`);
+    if (!fs.existsSync(CONFIG.bpmngo.bpmnFile)) {
+        throw new Error(`BPMN file not found: ${CONFIG.bpmngo.bpmnFile}`);
     }
 
     const form = new FormData();
-    form.append('resources', fs.createReadStream(CONFIG.goflow.bpmnFile));
+    form.append('resources', fs.createReadStream(CONFIG.bpmngo.bpmnFile));
     form.append('deployment-name', 'Benchmark Test');
     form.append('deployment-source', 'benchmark');
 
     try {
-        const response = await goflowApi.post(CONFIG.goflow.deploymentEndpoint, form, {
+        const response = await bpmngoApi.post(CONFIG.bpmngo.deploymentEndpoint, form, {
             headers: { ...form.getHeaders() }
         });
         log.success(`BpmnGo: ${response.data.name} (ID: ${response.data.id})`);
@@ -452,7 +452,7 @@ async function runSustainedLoadTest(api, endpoint, duration, concurrency, name, 
 
 async function checkBpmnGo() {
     try {
-        await goflowApi.get('/');
+        await bpmngoApi.get('/');
         log.success('BpmnGo detected on port 8080');
         return true;
     } catch {
@@ -477,20 +477,20 @@ async function checkCamunda() {
 // ============================================================
 
 async function runBenchmark() {
-    log.section('🚀 GOFLOW vs CAMUNDA 7 BENCHMARK');
+    log.section('🚀 BPMNGO vs CAMUNDA 7 BENCHMARK');
     log.info(`Test Runs: ${CONFIG.testRuns} per test`);
     log.info(`Concurrency Levels: ${CONFIG.concurrentLevels.join(', ')}`);
     log.info(`Sustained Load: ${CONFIG.sustainedDuration/1000}s at ${CONFIG.sustainedConcurrency} concurrent`);
     
-    const goflowAvailable = await checkBpmnGo();
+    const bpmngoAvailable = await checkBpmnGo();
     const camundaAvailable = await checkCamunda();
     
-    if (!goflowAvailable && !camundaAvailable) {
+    if (!bpmngoAvailable && !camundaAvailable) {
         log.error('No engines available!');
         return;
     }
     
-    if (goflowAvailable) await deployToBpmnGo();
+    if (bpmngoAvailable) await deployToBpmnGo();
     if (camundaAvailable) {
         await deployToCamunda();
         await startSimpleCamundaWorker();
@@ -498,23 +498,23 @@ async function runBenchmark() {
     }
     
     const results = {
-        goflow: { sync: {}, async: {}, sustained: {} },
+        bpmngo: { sync: {}, async: {}, sustained: {} },
         camunda: { sync: {} }
     };
     
     // Latency Tests
     log.section('📊 SINGLE REQUEST LATENCY (lower is better)');
     
-    if (goflowAvailable) {
-        const syncResult = await runLatencyTest(goflowApi, CONFIG.goflow.syncEndpoint, 'BpmnGo Sync', false);
+    if (bpmngoAvailable) {
+        const syncResult = await runLatencyTest(bpmngoApi, CONFIG.bpmngo.syncEndpoint, 'BpmnGo Sync', false);
         if (syncResult) {
-            results.goflow.sync = syncResult;
+            results.bpmngo.sync = syncResult;
             log.result('BpmnGo Sync', `${syncResult.avg.toFixed(2)}ms avg (p95: ${syncResult.p95}ms)`);
         }
         
-        const asyncResult = await runLatencyTest(goflowApi, CONFIG.goflow.asyncEndpoint, 'BpmnGo Async', false);
+        const asyncResult = await runLatencyTest(bpmngoApi, CONFIG.bpmngo.asyncEndpoint, 'BpmnGo Async', false);
         if (asyncResult) {
-            results.goflow.async = asyncResult;
+            results.bpmngo.async = asyncResult;
             log.result('BpmnGo Async', `${asyncResult.avg.toFixed(2)}ms avg (p95: ${asyncResult.p95}ms)`);
         }
     }
@@ -535,13 +535,13 @@ async function runBenchmark() {
     for (const concurrency of CONFIG.concurrentLevels) {
         const row = [concurrency.toString().padEnd(11)];
         
-        if (goflowAvailable) {
-            const syncResult = await runConcurrentTest(goflowApi, CONFIG.goflow.syncEndpoint, concurrency, 'BpmnGo Sync', false);
-            results.goflow.sync[`c${concurrency}`] = syncResult;
+        if (bpmngoAvailable) {
+            const syncResult = await runConcurrentTest(bpmngoApi, CONFIG.bpmngo.syncEndpoint, concurrency, 'BpmnGo Sync', false);
+            results.bpmngo.sync[`c${concurrency}`] = syncResult;
             row.push(`${syncResult.requestsPerSecond} req/s`.padEnd(12));
             
-            const asyncResult = await runConcurrentTest(goflowApi, CONFIG.goflow.asyncEndpoint, concurrency, 'BpmnGo Async', false);
-            results.goflow.async[`c${concurrency}`] = asyncResult;
+            const asyncResult = await runConcurrentTest(bpmngoApi, CONFIG.bpmngo.asyncEndpoint, concurrency, 'BpmnGo Async', false);
+            results.bpmngo.async[`c${concurrency}`] = asyncResult;
             row.push(`${asyncResult.requestsPerSecond} req/s`.padEnd(12));
         } else {
             row.push('N/A'.padEnd(12));
@@ -563,17 +563,17 @@ async function runBenchmark() {
     // Sustained Load Tests
     log.section(`📊 SUSTAINED LOAD (${CONFIG.sustainedDuration/1000}s at ${CONFIG.sustainedConcurrency} concurrent)`);
     
-    if (goflowAvailable) {
+    if (bpmngoAvailable) {
         log.info('BpmnGo Sync:');
-        const syncSustained = await runSustainedLoadTest(goflowApi, CONFIG.goflow.syncEndpoint, CONFIG.sustainedDuration, CONFIG.sustainedConcurrency, 'BpmnGo Sync', false);
-        results.goflow.sustained.sync = syncSustained;
+        const syncSustained = await runSustainedLoadTest(bpmngoApi, CONFIG.bpmngo.syncEndpoint, CONFIG.sustainedDuration, CONFIG.sustainedConcurrency, 'BpmnGo Sync', false);
+        results.bpmngo.sustained.sync = syncSustained;
         log.result('  Throughput', `${syncSustained.requestsPerSecond} req/s`);
         log.result('  Success Rate', `${syncSustained.successRate}%`);
         log.result('  Avg Response', `${syncSustained.avgResponse}ms`);
         
         log.info('BpmnGo Async:');
-        const asyncSustained = await runSustainedLoadTest(goflowApi, CONFIG.goflow.asyncEndpoint, CONFIG.sustainedDuration, CONFIG.sustainedConcurrency, 'BpmnGo Async', false);
-        results.goflow.sustained.async = asyncSustained;
+        const asyncSustained = await runSustainedLoadTest(bpmngoApi, CONFIG.bpmngo.asyncEndpoint, CONFIG.sustainedDuration, CONFIG.sustainedConcurrency, 'BpmnGo Async', false);
+        results.bpmngo.sustained.async = asyncSustained;
         log.result('  Throughput', `${asyncSustained.requestsPerSecond} req/s`);
         log.result('  Success Rate', `${asyncSustained.successRate}%`);
         log.result('  Avg Response', `${asyncSustained.avgResponse}ms`);
@@ -595,29 +595,29 @@ async function runBenchmark() {
     // Winner Analysis
     log.section('🏆 WINNER ANALYSIS');
     
-    if (goflowAvailable && results.camunda.sync && results.camunda.sync.avg) {
-        const goflowLatency = results.goflow.async.avg || Infinity;
+    if (bpmngoAvailable && results.camunda.sync && results.camunda.sync.avg) {
+        const bpmngoLatency = results.bpmngo.async.avg || Infinity;
         const camundaLatency = results.camunda.sync.avg;
         
-        if (goflowLatency < camundaLatency) {
-            const improvement = ((camundaLatency - goflowLatency) / camundaLatency * 100).toFixed(1);
+        if (bpmngoLatency < camundaLatency) {
+            const improvement = ((camundaLatency - bpmngoLatency) / camundaLatency * 100).toFixed(1);
             log.success(`BpmnGo Async is ${improvement}% FASTER for single requests!`);
-        } else if (camundaLatency < goflowLatency) {
-            const improvement = ((goflowLatency - camundaLatency) / goflowLatency * 100).toFixed(1);
+        } else if (camundaLatency < bpmngoLatency) {
+            const improvement = ((bpmngoLatency - camundaLatency) / bpmngoLatency * 100).toFixed(1);
             log.success(`Camunda 7 is ${improvement}% FASTER for single requests!`);
         }
         
-        const goflowThroughput = parseFloat(results.goflow.async.c50?.requestsPerSecond) || 0;
+        const bpmngoThroughput = parseFloat(results.bpmngo.async.c50?.requestsPerSecond) || 0;
         const camundaThroughput = parseFloat(results.camunda.sync.c50?.requestsPerSecond) || 0;
         
-        if (goflowThroughput > camundaThroughput && goflowThroughput > 0) {
-            const improvement = ((goflowThroughput - camundaThroughput) / camundaThroughput * 100).toFixed(1);
+        if (bpmngoThroughput > camundaThroughput && bpmngoThroughput > 0) {
+            const improvement = ((bpmngoThroughput - camundaThroughput) / camundaThroughput * 100).toFixed(1);
             log.success(`BpmnGo Async handles ${improvement}% MORE REQUESTS per second at 50 concurrency!`);
-        } else if (camundaThroughput > goflowThroughput && camundaThroughput > 0) {
-            const improvement = ((camundaThroughput - goflowThroughput) / goflowThroughput * 100).toFixed(1);
+        } else if (camundaThroughput > bpmngoThroughput && camundaThroughput > 0) {
+            const improvement = ((camundaThroughput - bpmngoThroughput) / bpmngoThroughput * 100).toFixed(1);
             log.success(`Camunda 7 handles ${improvement}% MORE REQUESTS per second at 50 concurrency!`);
         }
-    } else if (goflowAvailable) {
+    } else if (bpmngoAvailable) {
         log.success('BpmnGo benchmark completed successfully!');
     }
     
@@ -627,18 +627,18 @@ async function runBenchmark() {
     console.log('│    Metric    │ BpmnGo Sync │ BpmnGo Async │ Camunda 7  │');
     console.log('├──────────────┼─────────────┼─────────────┼─────────────┤');
     
-    const syncLatency = results.goflow.sync.avg ? `${results.goflow.sync.avg.toFixed(1)}ms` : 'N/A';
-    const asyncLatency = results.goflow.async.avg ? `${results.goflow.async.avg.toFixed(1)}ms` : 'N/A';
+    const syncLatency = results.bpmngo.sync.avg ? `${results.bpmngo.sync.avg.toFixed(1)}ms` : 'N/A';
+    const asyncLatency = results.bpmngo.async.avg ? `${results.bpmngo.async.avg.toFixed(1)}ms` : 'N/A';
     const camundaLatency = results.camunda.sync.avg ? `${results.camunda.sync.avg.toFixed(1)}ms` : 'N/A';
     console.log(`│ Latency (avg) │ ${syncLatency.padEnd(11)} │ ${asyncLatency.padEnd(11)} │ ${camundaLatency.padEnd(11)} │`);
     
-    const syncThroughput = results.goflow.sync.c50?.requestsPerSecond || 'N/A';
-    const asyncThroughput = results.goflow.async.c50?.requestsPerSecond || 'N/A';
+    const syncThroughput = results.bpmngo.sync.c50?.requestsPerSecond || 'N/A';
+    const asyncThroughput = results.bpmngo.async.c50?.requestsPerSecond || 'N/A';
     const camundaThroughput = results.camunda.sync.c50?.requestsPerSecond || 'N/A';
     console.log(`│ Throughput    │ ${syncThroughput.toString().padEnd(11)} │ ${asyncThroughput.toString().padEnd(11)} │ ${camundaThroughput.toString().padEnd(11)} │`);
     
-    const syncSuccess = results.goflow.sustained.sync?.successRate || 'N/A';
-    const asyncSuccess = results.goflow.sustained.async?.successRate || 'N/A';
+    const syncSuccess = results.bpmngo.sustained.sync?.successRate || 'N/A';
+    const asyncSuccess = results.bpmngo.sustained.async?.successRate || 'N/A';
     const camundaSuccess = results.camunda.sustained?.successRate || 'N/A';
     console.log(`│ Success Rate  │ ${syncSuccess.toString().padEnd(11)} │ ${asyncSuccess.toString().padEnd(11)} │ ${camundaSuccess.toString().padEnd(11)} │`);
     

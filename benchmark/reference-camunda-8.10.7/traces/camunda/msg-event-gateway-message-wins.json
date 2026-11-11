@@ -1,0 +1,45 @@
+{
+  "scenario": "msg-event-gateway-message-wins",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "msg-approved",
+        "elementId": "g_approved",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "orderId": "G1"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after 1000 ms: publish msg-approve key=G1",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "orderId": "G1"
+    },
+    "instances": [
+      {
+        "process": "msg_ebg",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2773,
+    "errors": [],
+    "restNotes": []
+  }
+}

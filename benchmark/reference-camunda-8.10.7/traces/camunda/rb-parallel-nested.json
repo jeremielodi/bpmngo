@@ -1,0 +1,75 @@
+{
+  "scenario": "rb-parallel-nested",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-n-a",
+        "elementId": "pn_a",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-n-b1",
+        "elementId": "pn_b1",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-n-b2",
+        "elementId": "pn_b2",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-n-last",
+        "elementId": "pn_last",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "a": true,
+          "b1": true,
+          "b2": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "a": true,
+      "b1": true,
+      "b2": true,
+      "allThree": true
+    },
+    "instances": [
+      {
+        "process": "rb_parallel_nested",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3331,
+    "errors": [],
+    "restNotes": []
+  }
+}

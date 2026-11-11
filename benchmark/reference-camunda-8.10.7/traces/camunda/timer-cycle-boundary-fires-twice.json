@@ -1,0 +1,61 @@
+{
+  "scenario": "timer-cycle-boundary-fires-twice",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "tm-work",
+        "elementId": "tc_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "after 4500 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "tm-reminder",
+        "elementId": "tc_reminder",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "tm-reminder",
+        "elementId": "tc_reminder",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "reminder1": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "reminder1": true,
+      "reminder2": true
+    },
+    "instances": [
+      {
+        "process": "tm_cycle",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 7582,
+    "errors": [],
+    "restNotes": []
+  }
+}

@@ -216,7 +216,7 @@ async function main() {
         async fn() {
           const key = `Vars56_${runId}`;
           await deployRenamed(key);
-          const { id: viewerId, client: viewer } = await createUser(`vars56-viewer-${runId}@goflow.com`);
+          const { id: viewerId, client: viewer } = await createUser(`vars56-viewer-${runId}@bpmngo.com`);
           await client.api.post(`/engine-rest/process-definition/key/${key}/permissions`, { granteeType: 'user', granteeId: viewerId, permission: 'VIEW' });
 
           const id = await start(key, { approved: true });
@@ -268,8 +268,8 @@ async function main() {
           assert(posted.length === 1 && posted[0].value === 2, `POST query: ${JSON.stringify(posted)}`);
 
           // Restricted process, user without a grant: sees none of them.
-          const { client: outsider } = await createUser(`varq56-out-${runId}@goflow.com`);
-          const { id: insiderId } = await createUser(`varq56-in-${runId}@goflow.com`);
+          const { client: outsider } = await createUser(`varq56-out-${runId}@bpmngo.com`);
+          const { id: insiderId } = await createUser(`varq56-in-${runId}@bpmngo.com`);
           await client.api.post(`/engine-rest/process-definition/key/${key}/permissions`, { granteeType: 'user', granteeId: insiderId, permission: 'VIEW' });
           assert((await list({ variableNameLike: `q56_%_${runId}` }, outsider)).length === 0, 'no grant: no variables');
           assert(await count({ variableNameLike: `q56_%_${runId}` }, outsider) === 0, 'no grant: count 0');

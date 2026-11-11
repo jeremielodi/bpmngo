@@ -47,8 +47,8 @@ Sauvegarder chaque nuit et **copier hors du serveur** — c'est la seule
 protection contre la perte de la machine :
 
 ```bash
-# cron : 0 3 * * * cd /chemin/goflow && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1
-rsync -a backups/ sauvegarde@autre-machine:/sauvegardes/goflow/   # ou rclone, stockage objet…
+# cron : 0 3 * * * cd /chemin/bpmngo && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1
+rsync -a backups/ sauvegarde@autre-machine:/sauvegardes/bpmngo/   # ou rclone, stockage objet…
 ./scripts/test-restore.sh                                          # de temps en temps : la sauvegarde se restaure ?
 ```
 

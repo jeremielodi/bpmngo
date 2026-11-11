@@ -271,8 +271,8 @@ func (p *ParallelGatewayExecutor) mergeBranchVariables(
 
 	// Get all child executions
 	var childExecs []struct {
-		ID        int64
-		Variables json.RawMessage
+		ID        int64           `db:"engine_key"`
+		Variables json.RawMessage `db:"variables"`
 	}
 
 	err := tx.Select(&childExecs, `

@@ -1,0 +1,55 @@
+{
+  "scenario": "signal-intermediate-catch",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "sig-prep",
+        "elementId": "sc_prep",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "sig-after",
+        "elementId": "sc_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "resumedBy": "signal"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after job sig-prep: signal sig-continue",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "resumedBy": "signal"
+    },
+    "instances": [
+      {
+        "process": "sig_catch",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 4565,
+    "errors": [],
+    "restNotes": []
+  }
+}

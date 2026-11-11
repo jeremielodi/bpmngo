@@ -1,0 +1,65 @@
+{
+  "scenario": "call-propagate-all",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "child:ca_child",
+        "type": "ca-child-work",
+        "elementId": "c_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "label": "P",
+          "amount": 21
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "ca-after",
+        "elementId": "a_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "label": "P",
+          "amount": 21,
+          "childOnly": true,
+          "childResult": 42
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "label": "P",
+      "amount": 21,
+      "childOnly": true,
+      "childResult": 42
+    },
+    "instances": [
+      {
+        "process": "ca_child",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      },
+      {
+        "process": "ca_parent_all",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2952,
+    "errors": [],
+    "restNotes": []
+  }
+}

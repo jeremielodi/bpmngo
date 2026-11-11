@@ -1,0 +1,45 @@
+{
+  "scenario": "msg-ttl-zero-not-kept",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "msg-prep",
+        "elementId": "c_prep",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "orderId": "A3"
+        },
+        "answer": "after 2000 ms: complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after 0 ms: publish msg-paid key=A3",
+        "result": "ok"
+      }
+    ],
+    "outcome": "not completed within 8s",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "msg_catch",
+        "state": "ACTIVE",
+        "activeElements": [
+          "c_wait"
+        ],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 9145,
+    "errors": [],
+    "restNotes": []
+  }
+}

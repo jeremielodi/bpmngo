@@ -5,7 +5,7 @@
 // down), reporting per step the start latency, errors, job throughput and
 // end-to-end time. It stops at the first step the server can't sustain.
 //
-//	go run ./cmd/loadtest -url http://127.0.0.1:8080 -email admin@goflow.com -password ... \
+//	go run ./cmd/loadtest -url http://127.0.0.1:8080 -email admin@bpmngo.com -password ... \
 //	    -rates 10,25,50,100,200 -step 30s
 //
 // Run it against a non-production server: it creates real instances.

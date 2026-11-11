@@ -13,7 +13,7 @@
 # Note: the base file's plain `postgres` service also starts under this
 # override (Compose merges services additively; there's no clean way to
 # exclude it without version-dependent profile/depends_on interactions) —
-# it's simply unused once `bpmngo`'s DB_HOST points at citus-coordinator
+# it's simply unused once `bpmngo`'s POSTGRES_HOST points at citus-coordinator
 # instead. Harmless, just a small amount of idle resource use; stop it
 # manually with `docker compose stop postgres` if desired.
 #
@@ -31,8 +31,8 @@ services:
     command: ["postgres", "-c", "max_connections=300", "-c", "shared_preload_libraries=citus,pg_stat_statements", "-c", "pg_stat_statements.track=all", "-c", "track_io_timing=on", "-c", "track_wal_io_timing=on", "-c", "shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}", "-c", "effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-768MB}", "-c", "work_mem=${POSTGRES_WORK_MEM:-8MB}", "-c", "maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB}", "-c", "citus.max_shared_pool_size=200", "-c", "citus.max_adaptive_executor_pool_size=4"]
     container_name: bpmngo-citus-coordinator
     environment:
-      POSTGRES_DB: goflow
-      POSTGRES_USER: goflow
+      POSTGRES_DB: ${POSTGRES_DB:-goflow}
+      POSTGRES_USER: ${POSTGRES_USER:-goflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
     ports:
       - "${CITUS_COORDINATOR_PORT:-5433}:5432"
@@ -40,7 +40,7 @@ services:
       - citus_coordinator_data:/var/lib/postgresql/data
       - ./database:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U goflow"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -53,14 +53,14 @@ services:
     command: ["postgres", "-c", "max_connections=300", "-c", "shared_preload_libraries=citus,pg_stat_statements", "-c", "pg_stat_statements.track=all", "-c", "track_io_timing=on", "-c", "track_wal_io_timing=on", "-c", "shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}"]
     container_name: bpmngo-citus-worker-1
     environment:
-      POSTGRES_DB: goflow
-      POSTGRES_USER: goflow
+      POSTGRES_DB: ${POSTGRES_DB:-goflow}
+      POSTGRES_USER: ${POSTGRES_USER:-goflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
     volumes:
       - citus_worker1_data:/var/lib/postgresql/data
       - ./database/citus-worker-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U goflow"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,14 +73,14 @@ services:
     command: ["postgres", "-c", "max_connections=300", "-c", "shared_preload_libraries=citus,pg_stat_statements", "-c", "pg_stat_statements.track=all", "-c", "track_io_timing=on", "-c", "track_wal_io_timing=on", "-c", "shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}"]
     container_name: bpmngo-citus-worker-2
     environment:
-      POSTGRES_DB: goflow
-      POSTGRES_USER: goflow
+      POSTGRES_DB: ${POSTGRES_DB:-goflow}
+      POSTGRES_USER: ${POSTGRES_USER:-goflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
     volumes:
       - citus_worker2_data:/var/lib/postgresql/data
       - ./database/citus-worker-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U goflow"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -97,8 +97,8 @@ services:
       citus-worker-2:
         condition: service_healthy
     environment:
-      DB_HOST: citus-coordinator
-      DB_PORT: 5432
+      POSTGRES_HOST: citus-coordinator
+      POSTGRES_PORT: 5432
       CITUS_ENABLED: "true"
       CITUS_WORKERS: citus-worker-1:5432,citus-worker-2:5432
 

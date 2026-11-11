@@ -60,10 +60,14 @@ des incidents déjà enregistrés.
 | 017 | `017_remove_identity_compatibility.sql` | retire les `uid` dupliqués, les triggers d'identité de rolling upgrade et `executions.gateway_join_id` inutilisé | les racines gardent `BIGINT PK + id UUIDv7 UNIQUE`; les entités chaudes restent BIGINT uniquement |
 | 018 | `018_parent_fk_indexes.sql` | indexe les FK parentes utilisées par `ON DELETE SET NULL/CASCADE` | évite trois scans complets par instance pendant l'archivage |
 | 019 | `019_partition_retention.sql` | détache et supprime les partitions historiques expirées devenues vides | la purge ligne par ligne reste l'autorité pour ne pas perdre les audits non liés |
-| 020 | `020_simulation_lab.sql` | scénarios BPMN, campagnes de simulation et registre de problèmes | laboratoire d'analyse, dimensionnement et redesign |
-| 021 | `021_simulation_async_sweeps.sql` | file asynchrone des simulations, progression, annulation et campagnes de capacité | nécessite 020 |
-| 022 | `022_simulation_multi_parameter_experiments.sql` | expériences de simulation multi-paramètres | nécessite 021 |
-| 023 | `023_simulation_scenario_versions.sql` | versionnement, restauration et export des scénarios | nécessite 022 |
+| 020 | `020_hot_path_cpu.sql` | retire les index qui bloquaient les HOT updates (`executions.is_active`, `executions.current_element_id`, GIN `variables.data`), ajoute l'index partiel de l'archiver, retire la FK `process_definition_id` redondante, limite le NOTIFY des variables aux instances qui attendent une condition | CPU PostgreSQL du chemin chaud ; redémarrer BpmnGo après application (plans préparés) |
+| 021 | `021_eventlog_projected_jobs_bigint.sql` | passe `eventlog_projected_jobs.id` et `execution_id` en BIGINT (table vidée) | le projecteur du journal d'événements (mode shadow) ignorait tous les événements de job depuis les identifiants BIGINT |
+| 022 | `022_audit_writer_marks.sql` | table non journalisée `audit_writer_marks` | avec plusieurs instances BpmnGo, une lecture de l'audit (step back, historique des jetons, archivage) voit les lignes encore en file sur les autres instances |
+| 023 | `023_historic_instance_engine_key.sql` | colonne `historic_process_instances.engine_key` | une instance archivée se retrouve par sa clé entière (/v2, gRPC), et garde la même clé |
+| 024 | `024_simulation_lab.sql` | scénarios BPMN, campagnes de simulation et registre de problèmes | laboratoire d'analyse, dimensionnement et redesign |
+| 025 | `025_simulation_async_sweeps.sql` | file asynchrone des simulations, progression, annulation et campagnes de capacité | nécessite 024 |
+| 026 | `026_simulation_multi_parameter_experiments.sql` | expériences de simulation multi-paramètres | nécessite 025 |
+| 027 | `027_simulation_scenario_versions.sql` | versionnement, restauration et export des scénarios | nécessite 026 |
 
 Pour voir où en est une base :
 

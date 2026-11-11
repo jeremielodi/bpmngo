@@ -115,8 +115,10 @@ async function main() {
 
   for (let i = 0; i < ids.length; i++) {
     await retry(async () => {
-      const r = await client.api.post('/v2/messages/publication', { name: 'Go27', correlationKey: orders[i] });
-      if (!r.data.correlatedProcessInstanceKeys.includes(ids[i])) throw new Error('not waiting yet');
+      await client.api.post('/v2/messages/publication', { name: 'Go27', correlationKey: orders[i] });
+      await sleep(200);
+      // Camunda 8 answers don't list the correlated instances: the review task shows it.
+      if (!(await client.getTasks(ids[i])).some(t => t.taskDefinitionKey === 'p_review')) throw new Error('not waiting yet');
     }, `message to ${ids[i]}`);
     const task = await retry(() => client.waitForTask('p_review', ids[i], 5000), 'review task');
     await retry(() => client.completeTask(task.id), 'complete review');

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 const BPMN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'examples', 'tests', 'bpmn', '53_step_back.bpmn');
 
 async function api(request: APIRequestContext) {
-  const login = await request.post('/auth/login', { data: { email: 'admin@goflow.com', password: 'admin123' } });
+  const login = await request.post('/auth/login', { data: { email: 'admin@bpmngo.com', password: 'admin123' } });
   const token = (await login.json()).access_token;
   return { Authorization: `Bearer ${token}` };
 }
@@ -56,7 +56,7 @@ test('Previous step sends the token from approve back to check', async ({ page, 
   await openTask('approve');
 
   await page.goto('/login');
-  await page.getByPlaceholder('admin@example.com').fill('admin@goflow.com');
+  await page.getByPlaceholder('admin@example.com').fill('admin@bpmngo.com');
   await page.getByPlaceholder('••••••••').fill('admin123');
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page).toHaveURL('/');

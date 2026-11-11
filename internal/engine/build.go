@@ -133,6 +133,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 		if t.Ext != nil {
 			if td := t.Ext.ZeebeTaskDefinition; td != nil && td.Type != "" {
 				node.JobType = &td.Type
+				node.JobRetries = td.Retries
 			}
 			if th := t.Ext.ZeebeTaskHeaders; th != nil && len(th.Headers) > 0 {
 				node.TaskHeaders = make(map[string]string, len(th.Headers))
@@ -172,6 +173,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 				jobType := td.Type
 				node.Type = ServiceTaskType
 				node.JobType = &jobType
+				node.JobRetries = td.Retries
 				node.Script, node.ScriptFormat = nil, nil
 				if th := t.Ext.ZeebeTaskHeaders; th != nil && len(th.Headers) > 0 {
 					node.TaskHeaders = make(map[string]string, len(th.Headers))
@@ -203,6 +205,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 				jobType := td.Type
 				node.Type = ServiceTaskType
 				node.JobType = &jobType
+				node.JobRetries = td.Retries
 			}
 			applyIoMapping(node, t.Ext.ZeebeIoMapping)
 		}
@@ -243,6 +246,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 				if td := e.Ext.ZeebeTaskDefinition; td != nil && td.Type != "" {
 					node.Type = ServiceTaskType
 					node.JobType = &td.Type
+					node.JobRetries = td.Retries
 				}
 				if th := e.Ext.ZeebeTaskHeaders; th != nil && len(th.Headers) > 0 {
 					node.TaskHeaders = make(map[string]string, len(th.Headers))
@@ -350,6 +354,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 				if td := ev.Ext.ZeebeTaskDefinition; td != nil && td.Type != "" {
 					node.Type = ServiceTaskType
 					node.JobType = &td.Type
+					node.JobRetries = td.Retries
 				}
 				applyIoMapping(node, ev.Ext.ZeebeIoMapping)
 			}
@@ -537,7 +542,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 	}
 
 	// ---- Add incoming/outgoing edges from Sequence Flows ----
-	for _, f := range process.SequenceFlows {
+	for i, f := range process.SequenceFlows {
 		source, ok := nodeMap[f.SourceRef]
 		if !ok {
 			return nil, fmt.Errorf("source node %s not found for flow %s", f.SourceRef, f.ID)
@@ -551,6 +556,7 @@ func BuildGraphFromProcess(process *parser.Process) (*ProcessGraph, error) {
 			SourceRef: f.SourceRef,
 			TargetRef: f.TargetRef,
 			Condition: f.Condition,
+			DocOrder:  i + 1,
 		}
 		source.Outgoing = append(source.Outgoing, flow)
 		target.Incoming = append(target.Incoming, f.SourceRef)

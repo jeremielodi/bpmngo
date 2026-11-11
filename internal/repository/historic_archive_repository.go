@@ -30,6 +30,7 @@ func NewHistoricArchiveRepository(db *sqlx.DB) *HistoricArchiveRepository {
 // import cycle: internal/service already imports internal/repository.
 type HistoricProcessInstance struct {
 	ID                       uuid.UUID `db:"id" json:"id"`
+	EngineKey                *int64    `db:"engine_key" json:"-"` // NULL when archived before migration 023
 	ProcessDefinitionID      uuid.UUID `db:"process_definition_id" json:"processDefinitionId"`
 	ProcessDefinitionKey     string    `db:"process_definition_key" json:"processDefinitionKey"`
 	ProcessDefinitionVersion *int      `db:"process_definition_version" json:"processDefinitionVersion,omitempty"`
@@ -92,10 +93,10 @@ func (r *HistoricArchiveRepository) InsertProcessInstanceTx(tx *sqlx.Tx, h Histo
 	_, err := tx.Exec(`
 		INSERT INTO public.historic_process_instances
 			(id, process_definition_id, process_definition_key, process_definition_version,
-			 tenant_id, started_by, started_at, ended_at, duration_millis, state, delete_reason, business_key)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			 tenant_id, started_by, started_at, ended_at, duration_millis, state, delete_reason, business_key, engine_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`, h.ID, h.ProcessDefinitionID, h.ProcessDefinitionKey, h.ProcessDefinitionVersion,
-		h.TenantID, h.StartedBy, h.StartedAt, h.EndedAt, h.DurationMillis, h.State, h.DeleteReason, h.BusinessKey)
+		h.TenantID, h.StartedBy, h.StartedAt, h.EndedAt, h.DurationMillis, h.State, h.DeleteReason, h.BusinessKey, h.EngineKey)
 	return err
 }
 

@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const CONTEXT_FILE = './context.json';
 
-// Configuration for your goflow engine
+// Configuration for your BpmnGo engine
 const config = {
   baseUrl: 'http://localhost:8080/engine-rest',
   use: logger,
@@ -415,4 +415,4 @@ console.log('   - prf_notify_supervisor');
 console.log('   - prf_notify_approver');
 console.log('   - prf_notify_accountant');
 console.log('   - prf_process_payment');
-console.log('\n⏳ Waiting for external tasks from goflow engine...\n');
+console.log('\n⏳ Waiting for external tasks from the BpmnGo engine...\n');

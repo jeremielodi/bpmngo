@@ -34,7 +34,7 @@ public class ZeebeClientExample {
 
     public static void main(String[] args) {
         BpmnGoRestClient bpmngo = BpmnGoRestClient.fromEnv();
-        String gateway = BpmnGoRestClient.env("GOFLOW_GRPC", "127.0.0.1:26500");
+        String gateway = BpmnGoRestClient.env("BPMNGO_GRPC", "127.0.0.1:26500");
 
         // Send BpmnGo's JWT as gRPC metadata: the gateway refuses calls without
         // valid credentials (UNAUTHENTICATED), and applies this user's
@@ -125,7 +125,8 @@ public class ZeebeClientExample {
         for (JsonNode t : tasks) {
             JsonNode vars = bpmngo.post("/v2/variables/search", Map.of("filter", Map.of(
                     "processInstanceKey", t.path("processInstanceKey").asText(), "name", "orderId"))).path("items");
-            if (vars.size() == 1 && orderId.equals(vars.get(0).path("value").asText())) {
+            // As in Camunda 8, a variable's value comes as JSON: a string is quoted.
+            if (vars.size() == 1 && ("\"" + orderId + "\"").equals(vars.get(0).path("value").asText())) {
                 return Optional.of(t);
             }
         }

@@ -2,6 +2,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/jeremielodi/bpmngo/internal/models"
@@ -21,8 +22,8 @@ type TokenHistoryStep struct {
 	Action      string    `json:"action"`
 	ElementId   string    `json:"elementId,omitempty"`
 	ElementName string    `json:"elementName,omitempty"`
-	ExecutionId *int64    `json:"executionId,omitempty"`
-	TaskId      *int64    `json:"taskId,omitempty"`
+	ExecutionId *int64    `json:"executionId,string,omitempty"`
+	TaskId      *int64    `json:"taskId,string,omitempty"`
 	Detail      string    `json:"detail,omitempty"`
 }
 
@@ -41,7 +42,10 @@ func BuildTokenHistory(logs []models.AuditLog, tasks []models.Task) []TokenHisto
 	for _, log := range logs {
 		var newData map[string]interface{}
 		if len(log.NewData) > 0 {
-			_ = json.Unmarshal(log.NewData, &newData)
+			// UseNumber: an int64 executionId is past float64's exact range.
+			dec := json.NewDecoder(bytes.NewReader(log.NewData))
+			dec.UseNumber()
+			_ = dec.Decode(&newData)
 		}
 
 		step := TokenHistoryStep{
@@ -189,6 +193,9 @@ func int64Field(data map[string]interface{}, key string) (int64, bool) {
 		return 0, false
 	}
 	switch v := data[key].(type) {
+	case json.Number:
+		n, err := v.Int64()
+		return n, err == nil
 	case float64:
 		return int64(v), true
 	case string:

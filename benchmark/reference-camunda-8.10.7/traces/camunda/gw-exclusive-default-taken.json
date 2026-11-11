@@ -1,0 +1,40 @@
+{
+  "scenario": "gw-exclusive-default-taken",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "gw-small",
+        "elementId": "x_small",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "amount": 50
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "amount": 50
+    },
+    "instances": [
+      {
+        "process": "gw_exclusive",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2990,
+    "errors": [],
+    "restNotes": []
+  }
+}

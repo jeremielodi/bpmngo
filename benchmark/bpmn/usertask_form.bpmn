@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A user task with the metadata a real Tasklist deployment carries: a form,
+     candidate groups and a priority. The other fixtures use a bare user task,
+     so none of this was ever compared. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="ut_form_defs" targetNamespace="http://bpmn.io/schema/bpmn"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI">
+
+  <bpmn:collaboration id="Collaboration_ut_form">
+    <bpmn:participant id="Participant_ut_form" name="ut_form" processRef="ut_form" />
+    <bpmn:participant id="Participant_ut_assigned" name="ut_assigned" processRef="ut_assigned" />
+  </bpmn:collaboration>
+
+  <bpmn:process id="ut_form" name="Approval with a form" isExecutable="true">
+    <bpmn:startEvent id="uf_start"/>
+    <bpmn:sequenceFlow id="uf_f0" sourceRef="uf_start" targetRef="uf_approve"/>
+    <bpmn:userTask id="uf_approve" name="Approve request">
+      <bpmn:extensionElements>
+        <zeebe:userTask/>
+        <zeebe:formDefinition formId="approval-form"/>
+        <zeebe:assignmentDefinition candidateGroups="sales,managers"/>
+        <zeebe:priorityDefinition priority="80"/>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="uf_f1" sourceRef="uf_approve" targetRef="uf_after"/>
+    <bpmn:serviceTask id="uf_after" name="Book">
+      <bpmn:extensionElements><zeebe:taskDefinition type="uf-after"/></bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="uf_f2" sourceRef="uf_after" targetRef="uf_end"/>
+    <bpmn:endEvent id="uf_end"/>
+  </bpmn:process>
+
+  <!-- The same task, assigned to one user instead of a group: Camunda answers
+       a different assignee, and both engines must say so. -->
+  <bpmn:process id="ut_assigned" name="Assigned approval" isExecutable="true">
+    <bpmn:startEvent id="ua_start"/>
+    <bpmn:sequenceFlow id="ua_f0" sourceRef="ua_start" targetRef="ua_approve"/>
+    <bpmn:userTask id="ua_approve" name="Review">
+      <bpmn:extensionElements>
+        <zeebe:userTask/>
+        <zeebe:assignmentDefinition assignee="demo"/>
+        <zeebe:priorityDefinition priority="20"/>
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="ua_f1" sourceRef="ua_approve" targetRef="ua_end"/>
+    <bpmn:endEvent id="ua_end"/>
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_ut_form">
+    <bpmndi:BPMNPlane id="BPMNPlane_ut_form" bpmnElement="Collaboration_ut_form">
+      <bpmndi:BPMNShape id="Participant_ut_form_di" bpmnElement="Participant_ut_form" isHorizontal="true">
+        <dc:Bounds x="0" y="0" width="600" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="uf_start_di" bpmnElement="uf_start">
+        <dc:Bounds x="80" y="82" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="uf_approve_di" bpmnElement="uf_approve">
+        <dc:Bounds x="170" y="60" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="uf_after_di" bpmnElement="uf_after">
+        <dc:Bounds x="330" y="60" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="uf_end_di" bpmnElement="uf_end">
+        <dc:Bounds x="492" y="82" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="uf_f0_di" bpmnElement="uf_f0">
+        <di:waypoint x="116" y="100" />
+        <di:waypoint x="170" y="100" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="uf_f1_di" bpmnElement="uf_f1">
+        <di:waypoint x="270" y="100" />
+        <di:waypoint x="330" y="100" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="uf_f2_di" bpmnElement="uf_f2">
+        <di:waypoint x="430" y="100" />
+        <di:waypoint x="492" y="100" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_ut_assigned_di" bpmnElement="Participant_ut_assigned" isHorizontal="true">
+        <dc:Bounds x="0" y="230" width="600" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ua_start_di" bpmnElement="ua_start">
+        <dc:Bounds x="80" y="312" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ua_approve_di" bpmnElement="ua_approve">
+        <dc:Bounds x="170" y="290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ua_end_di" bpmnElement="ua_end">
+        <dc:Bounds x="332" y="312" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="ua_f0_di" bpmnElement="ua_f0">
+        <di:waypoint x="116" y="330" />
+        <di:waypoint x="170" y="330" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ua_f1_di" bpmnElement="ua_f1">
+        <di:waypoint x="270" y="330" />
+        <di:waypoint x="332" y="330" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

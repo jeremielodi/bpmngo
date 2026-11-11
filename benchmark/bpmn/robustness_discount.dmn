@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The decision of rb_dmn: a discount from the order amount and the
+     customer tier (UNIQUE hit policy, ranges and string inputs). -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="rb_discount_defs" name="Discount" namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="rb_discount" name="Discount">
+    <decisionTable id="rb_discount_table" hitPolicy="UNIQUE">
+      <input id="in_amount" label="Amount">
+        <inputExpression id="in_amount_expr" typeRef="number"><text>amount</text></inputExpression>
+      </input>
+      <input id="in_tier" label="Tier">
+        <inputExpression id="in_tier_expr" typeRef="string"><text>tier</text></inputExpression>
+      </input>
+      <output id="out_discount" name="discount" typeRef="number"/>
+      <rule id="r1">
+        <inputEntry id="r1_a"><text>&lt; 100</text></inputEntry>
+        <inputEntry id="r1_t"><text>-</text></inputEntry>
+        <outputEntry id="r1_o"><text>0</text></outputEntry>
+      </rule>
+      <rule id="r2">
+        <inputEntry id="r2_a"><text>[100..1000]</text></inputEntry>
+        <inputEntry id="r2_t"><text>"gold"</text></inputEntry>
+        <outputEntry id="r2_o"><text>0.15</text></outputEntry>
+      </rule>
+      <rule id="r3">
+        <inputEntry id="r3_a"><text>[100..1000]</text></inputEntry>
+        <inputEntry id="r3_t"><text>not("gold")</text></inputEntry>
+        <outputEntry id="r3_o"><text>0.05</text></outputEntry>
+      </rule>
+      <rule id="r4">
+        <inputEntry id="r4_a"><text>&gt; 1000</text></inputEntry>
+        <inputEntry id="r4_t"><text>-</text></inputEntry>
+        <outputEntry id="r4_o"><text>0.2</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

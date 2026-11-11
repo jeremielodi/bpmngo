@@ -1,0 +1,99 @@
+{
+  "scenario": "rb-parallel-five-branches",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-w1",
+        "elementId": "pw_t1",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-w2",
+        "elementId": "pw_t2",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-w3",
+        "elementId": "pw_t3",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-w4",
+        "elementId": "pw_t4",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-w5",
+        "elementId": "pw_t5",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-wide-check",
+        "elementId": "pw_check",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "w1": 1,
+          "w2": 2,
+          "w3": 3,
+          "w4": 4,
+          "w5": 5
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "w1": 1,
+      "w2": 2,
+      "w3": 3,
+      "w4": 4,
+      "w5": 5,
+      "total": 15
+    },
+    "instances": [
+      {
+        "process": "rb_parallel_wide",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3355,
+    "errors": [],
+    "restNotes": []
+  }
+}

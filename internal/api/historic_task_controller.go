@@ -145,7 +145,19 @@ func (hc *HistoricTaskController) findMergedHistoricTasks(c *fiber.Ctx, query Hi
 		return nil, err
 	}
 
-	merged := append(liveTasks, historicTasks...)
+	// Read live first, then history: a task archived between the two reads
+	// shows up in both, so keep its historic (final) row only.
+	archived := make(map[int64]bool, len(historicTasks))
+	for _, t := range historicTasks {
+		archived[t.ID] = true
+	}
+	merged := make([]repository.HistoricTask, 0, len(liveTasks)+len(historicTasks))
+	for _, t := range liveTasks {
+		if !archived[t.ID] {
+			merged = append(merged, t)
+		}
+	}
+	merged = append(merged, historicTasks...)
 
 	if userID, parseErr := uuid.Parse(common.GetUserUuid(c)); parseErr == nil {
 		visible := make([]repository.HistoricTask, 0, len(merged))

@@ -23,6 +23,7 @@ import (
 	"github.com/jeremielodi/bpmngo/internal/repository"
 	"github.com/jeremielodi/bpmngo/internal/service"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // Camunda 8 message semantics, used by the gRPC PublishMessage RPC and the
@@ -408,8 +409,12 @@ func startOneByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 		tenant = &msg.TenantID
 	}
 
-	// Serialize starts for the same route across app instances. For a kept
-	// message, recordCorrelationTx below is the actual once-per-process claim.
+	// One active instance per (process, correlation key), as in Camunda 8:
+	// a message with the key of an instance it started that is still
+	// active starts nothing. The check and the marker row are serialized by
+	// an advisory lock held until this transaction ends, across app
+	// instances too. For a kept message, recordCorrelationTx below is the
+	// once-per-process claim.
 	tx, err := db.Beginx()
 	if err != nil {
 		return uuid.Nil, err
@@ -418,6 +423,27 @@ func startOneByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 	if msg.CorrelationKey != "" {
 		if _, err := tx.Exec(`SELECT pg_advisory_xact_lock(hashtext('message_start:' || $1 || ':' || $2))`, t.ProcessKey, msg.CorrelationKey); err != nil {
 			return uuid.Nil, err
+		}
+		// Two queries rather than a join: on Citus the subscriptions and
+		// the instances may live on different nodes.
+		var started []int64
+		if err := tx.Select(&started, `
+			SELECT process_instance_key FROM event_subscriptions
+			WHERE event_type = 'message_start' AND event_name = $1
+			  AND correlation_key = $2 AND consumed_at IS NULL
+		`, t.ProcessKey, msg.CorrelationKey); err != nil {
+			return uuid.Nil, err
+		}
+		active := false
+		if len(started) > 0 {
+			if err := tx.Get(&active, `
+				SELECT EXISTS (SELECT 1 FROM process_instances WHERE engine_key = ANY($1::bigint[]) AND ended_at IS NULL)
+			`, pq.Array(started)); err != nil {
+				return uuid.Nil, err
+			}
+		}
+		if active {
+			return uuid.Nil, nil
 		}
 	}
 	// Claimed before starting, so a concurrent sweep can't start it twice;
@@ -428,6 +454,18 @@ func startOneByMessage(ctx context.Context, db *sqlx.DB, dispatcher *events.Task
 	instanceID, execID, err := service.StartProcessInstanceAt(db, &graph, def.ID, tenant, msg.Variables, t.StartNodeID)
 	if err != nil {
 		return uuid.Nil, err
+	}
+	if msg.CorrelationKey != "" {
+		instanceKey, err := repository.ProcessInstanceEngineKey(tx, instanceID)
+		if err != nil {
+			return instanceID, err
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO event_subscriptions (process_instance_key, execution_key, event_type, event_name, correlation_key)
+			VALUES ($1, $2, 'message_start', $3, $4)
+		`, instanceKey, execID, t.ProcessKey, msg.CorrelationKey); err != nil {
+			return instanceID, err
+		}
 	}
 	if storedID != nil {
 		messageKey, err := repository.PublishedMessageEngineKey(tx, *storedID)

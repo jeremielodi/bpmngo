@@ -1,9 +1,9 @@
 /**
  * Suite 59 — int64 keys in /v2 answers  (BPMN: 59_rest_int_keys.bpmn)
  *
- * Runs only when the server answers /v2 with int64 keys: start the stack
- * with REST_KEYS=int and run this suite with REST_KEYS=int in the
- * environment. Otherwise it reports itself skipped.
+ * Runs when the server answers /v2 with int64 keys, its default. Against
+ * a server started with REST_KEYS=uuid, run this suite with REST_KEYS=uuid
+ * too: it then reports itself skipped.
  *
  * Tests:
  *   A) The key gRPC returns is the key /v2 returns, as a string; the UUID
@@ -70,8 +70,8 @@ async function createdTask(instanceKey: string): Promise<any> {
 }
 
 async function run() {
-  if ((process.env.REST_KEYS ?? '').toLowerCase() !== 'int') {
-    console.log('\n  ⏭️  59 — int64 keys in /v2: skipped (set REST_KEYS=int on the server and for this suite)\n');
+  if ((process.env.REST_KEYS ?? '').toLowerCase() === 'uuid') {
+    console.log('\n  ⏭️  59 — int64 keys in /v2: skipped (REST_KEYS=uuid)\n');
     process.exit(SKIPPED_EXIT_CODE); // reported as skipped by run_all, not as passed
   }
   await rest.loginAsSuperUser();
@@ -160,14 +160,15 @@ async function run() {
 
             const vars = (await rest.api.post('/v2/variables/search', { filter: { processInstanceKey: key } })).data.items as any[];
             assert(vars.length > 0 && vars.every(v => v.processInstanceKey === key), `variables keys: ${JSON.stringify(vars)}`);
-            assert(vars.find(v => v.name === 'ref')?.value === someUUID, 'a variable holding a UUID is not rewritten');
+            // Camunda 8 answers each value as JSON.
+            assert(JSON.parse(vars.find(v => v.name === 'ref')?.value ?? 'null') === someUUID, 'a variable holding a UUID is not rewritten');
 
             const insts = (await rest.api.post('/v2/process-instances/search', { filter: { processDefinitionId: 'p59_keys' } })).data.items as any[];
             assert(insts.length > 0 && insts.every(i => isIntKey(i.processInstanceKey)), `instance search keys: ${JSON.stringify(insts.map(i => i.processInstanceKey))}`);
             assert(insts.some(i => i.processInstanceKey === key), 'the gRPC key is found by the search');
 
             const els = (await rest.api.post('/v2/element-instances/search', { filter: { processInstanceKey: key } })).data.items as any[];
-            assert(els.length > 0 && els.every(e => isIntKey(e.flowNodeInstanceKey) && e.processInstanceKey === key), `element keys: ${JSON.stringify(els)}`);
+            assert(els.length > 0 && els.every(e => isIntKey(e.elementInstanceKey) && e.processInstanceKey === key), `element keys: ${JSON.stringify(els)}`);
             await call(gw, 'CancelProcessInstance', { processInstanceKey: key });
           },
         },
@@ -210,15 +211,17 @@ async function run() {
             const waiting = String((await call(gw, 'CreateProcessInstance', {
               bpmnProcessId: 'p59_msg', version: -1, variables: JSON.stringify({ orderId: 'O-59' }), tenantId: '',
             })).processInstanceKey);
+            // A Camunda 8 publication answers with its key only: the
+            // correlation shows in the instance, which then ends.
             let pub: any;
-            for (let i = 0; i < 30; i++) {
+            let state = '';
+            for (let i = 0; i < 30 && state !== 'COMPLETED'; i++) {
               pub = (await rest.api.post('/v2/messages/publication', { name: 'p59-msg', correlationKey: 'O-59', variables: {} })).data;
-              if ((pub.correlatedProcessInstanceKeys ?? []).length) break;
               await sleep(200); // the subscription may not be open yet
+              state = (await rest.api.get(`/v2/process-instances/${waiting}`)).data.state;
             }
-            assert(isIntKey(pub.key), `message key: ${JSON.stringify(pub.key)}`);
-            assert(JSON.stringify(pub.correlatedProcessInstanceKeys) === JSON.stringify([waiting]) && pub.processInstanceKey === waiting,
-              `correlated: ${JSON.stringify(pub)} (want ${waiting})`);
+            assert(isIntKey(pub.messageKey), `message key: ${JSON.stringify(pub)}`);
+            assert(state === 'COMPLETED', `the message should reach ${waiting}, state ${state}`);
 
             const form = new FormData();
             form.append('resources', fs.createReadStream(BPMN_FILE));

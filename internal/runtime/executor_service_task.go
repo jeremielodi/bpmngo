@@ -55,8 +55,12 @@ func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository
 		return fmt.Errorf("failed to marshal variables: %w", err)
 	}
 
+	retries, err := common.JobRetries(node, payloadVars)
+	if err != nil {
+		return models.WithIncidentType(models.IncidentExtractValueError, fmt.Errorf("service task %s: %w", node.ID, err))
+	}
 	jobID := ids.NewEngineKey()
-	if err := engineRepo.CreateJobByKeyTx(tx, jobID, exec.ProcessInstanceKey, exec.ID, *node.JobType, payload); err != nil {
+	if err := engineRepo.CreateJobByKeyTx(tx, jobID, exec.ProcessInstanceKey, exec.ID, *node.JobType, payload, retries); err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
 
@@ -71,8 +75,10 @@ func (r *Runtime) executeServiceTask(ctx context.Context, engineRepo *repository
 	if err := r.armBoundaryEventsTx(tx, engineRepo, graph, exec, node); err != nil {
 		return err
 	}
-	if err := repository.NotifyJobAvailableTx(tx, *node.JobType); err != nil {
-		return fmt.Errorf("failed to queue job notification: %w", err)
+	if !deferJobWake(ctx, *node.JobType) {
+		if err := repository.NotifyJobAvailableTx(tx, *node.JobType); err != nil {
+			return fmt.Errorf("failed to queue job notification: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

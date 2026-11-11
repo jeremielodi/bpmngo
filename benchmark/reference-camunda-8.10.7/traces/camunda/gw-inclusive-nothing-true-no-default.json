@@ -1,0 +1,32 @@
+{
+  "scenario": "gw-inclusive-nothing-true-no-default",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "not completed within 6s",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "gw_inclusive_nodefault",
+        "state": "ACTIVE",
+        "activeElements": [
+          "j_fork"
+        ],
+        "incidents": [
+          {
+            "elementId": "j_fork",
+            "errorType": "CONDITION_ERROR"
+          }
+        ]
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 7361,
+    "errors": [],
+    "restNotes": []
+  }
+}

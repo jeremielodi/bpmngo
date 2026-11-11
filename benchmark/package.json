@@ -1,0 +1,23 @@
+{
+  "name": "bpmngo-benchmark",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BpmnGo ⇄ Camunda 8: behaviour (87 scenarios), load, latency per call, through the Zeebe gRPC API and REST /v2.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "compare": "ts-node --transpile-only src/main.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "load": "ts-node --transpile-only src/load.ts",
+    "latency": "ts-node --transpile-only src/latency.ts",
+    "experiment": "ts-node --transpile-only experiments/exclusive-order.ts"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "1.14.6",
+    "@grpc/proto-loader": "0.8.1",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.3",
+    "@types/node": "22.20.5"
+  }
+}

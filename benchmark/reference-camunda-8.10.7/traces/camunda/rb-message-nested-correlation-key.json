@@ -1,0 +1,71 @@
+{
+  "scenario": "rb-message-nested-correlation-key",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-prepare",
+        "elementId": "nk_prepare",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "order": {
+            "id": "N-1",
+            "total": 99
+          }
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-after-message",
+        "elementId": "nk_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "paid": true,
+          "order": {
+            "id": "N-1",
+            "total": 99
+          },
+          "prepared": true
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after job rb-prepare: publish rb-nested key=N-1",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "paid": true,
+      "order": {
+        "id": "N-1",
+        "total": 99
+      },
+      "paidSeen": true,
+      "prepared": true
+    },
+    "instances": [
+      {
+        "process": "rb_nested_key",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3992,
+    "errors": [],
+    "restNotes": []
+  }
+}

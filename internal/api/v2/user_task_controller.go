@@ -178,10 +178,12 @@ func (uc *UserTaskController) SearchUserTasks(c *fiber.Ctx) error {
 	// Only the tasks of instances the caller may VIEW, as GET /engine-rest/tasks.
 	access := newInstanceAccess(c, uc.db, "VIEW")
 	items := make([]fiber.Map, 0, len(tasks))
+	liveIndex := make(map[int64]int, len(tasks))
 	for i := range tasks {
 		if !access.allowed(tasks[i].ProcessInstanceID) {
 			continue
 		}
+		liveIndex[tasks[i].ID] = len(items)
 		items = append(items, uc.toV2UserTask(&tasks[i]))
 	}
 
@@ -210,7 +212,7 @@ func (uc *UserTaskController) SearchUserTasks(c *fiber.Ctx) error {
 					if params["status"] != nil && ht.Status != params["status"] {
 						continue
 					}
-					items = append(items, uc.toV2UserTask(&models.Task{
+					item := uc.toV2UserTask(&models.Task{
 						ID:                ht.ID,
 						ProcessInstanceID: ht.ProcessInstanceID,
 						TaskDefinitionKey: ht.TaskDefinitionKey,
@@ -221,7 +223,14 @@ func (uc *UserTaskController) SearchUserTasks(c *fiber.Ctx) error {
 						CreatedAt:         ht.CreatedAt,
 						ClaimedAt:         ht.ClaimedAt,
 						CompletedAt:       ht.CompletedAt,
-					}))
+					})
+					// Archived between the live read and this one: keep the
+					// historic (final) row, not both.
+					if i, seen := liveIndex[ht.ID]; seen {
+						items[i] = item
+						continue
+					}
+					items = append(items, item)
 				}
 			}
 		}

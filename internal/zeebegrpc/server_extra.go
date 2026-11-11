@@ -309,12 +309,17 @@ func (s *Server) DeleteResource(ctx context.Context, req *pb.DeleteResourceReque
 	}
 
 	var live int
-	if err := s.db.Get(&live, `SELECT count(*) FROM public.process_instances WHERE process_definition_id = $1`, defID); err != nil {
+	if err := s.db.Get(&live, `SELECT count(*) FROM public.process_instances WHERE process_definition_id = $1 AND status NOT IN ('completed', 'terminated')`, defID); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if live > 0 {
 		return nil, status.Errorf(codes.FailedPrecondition,
 			"process definition %s version %d still has %d process instance(s); cancel or finish them first", def.ProcessKey, def.Version, live)
+	}
+	// Finished instances the background archiver has not reached yet still
+	// reference the definition: archive them now, they belong in history.
+	if err := service.ArchiveFinishedInstancesOf(ctx, s.db, defID); err != nil {
+		return nil, status.Errorf(codes.Internal, "archiving finished instances: %v", err)
 	}
 	if _, err := s.processRepo.DeleteProcessDefinition(defID); err != nil {
 		if strings.Contains(err.Error(), "foreign key") {

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Jobs: failures and retries, headers, input/output mappings, variable types. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="jobs" targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:collaboration id="Collaboration_jobs">
+    <bpmn:participant id="Participant_job_retry" name="job_retry" processRef="job_retry" />
+    <bpmn:participant id="Participant_job_io" name="job_io" processRef="job_io" />
+    <bpmn:participant id="Participant_job_types" name="job_types" processRef="job_types" />
+  </bpmn:collaboration>
+
+  <bpmn:process id="job_retry" isExecutable="true">
+    <bpmn:startEvent id="r_start"/>
+    <bpmn:sequenceFlow id="r_f0" sourceRef="r_start" targetRef="r_work"/>
+    <bpmn:serviceTask id="r_work"><bpmn:extensionElements><zeebe:taskDefinition type="job-work" retries="3"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="r_f1" sourceRef="r_work" targetRef="r_end"/>
+    <bpmn:endEvent id="r_end"/>
+  </bpmn:process>
+
+  <!-- Headers, inputs computed from the instance, one output mapping. -->
+  <bpmn:process id="job_io" isExecutable="true">
+    <bpmn:startEvent id="io_start"/>
+    <bpmn:sequenceFlow id="io_f0" sourceRef="io_start" targetRef="io_calc"/>
+    <bpmn:serviceTask id="io_calc">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="job-calc"/>
+        <zeebe:taskHeaders>
+          <zeebe:header key="region" value="eu"/>
+          <zeebe:header key="priority" value="1"/>
+        </zeebe:taskHeaders>
+        <zeebe:ioMapping>
+          <zeebe:input source="=amount * 2" target="doubled"/>
+          <zeebe:input source="=&quot;fixed&quot;" target="label"/>
+          <zeebe:output source="=result + 1" target="total"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="io_f1" sourceRef="io_calc" targetRef="io_check"/>
+    <bpmn:serviceTask id="io_check"><bpmn:extensionElements><zeebe:taskDefinition type="job-check"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="io_f2" sourceRef="io_check" targetRef="io_end"/>
+    <bpmn:endEvent id="io_end"/>
+  </bpmn:process>
+
+  <!-- A worker sets variables of every JSON type; the next job reads them. -->
+  <bpmn:process id="job_types" isExecutable="true">
+    <bpmn:startEvent id="t_start"/>
+    <bpmn:sequenceFlow id="t_f0" sourceRef="t_start" targetRef="t_set"/>
+    <bpmn:serviceTask id="t_set"><bpmn:extensionElements><zeebe:taskDefinition type="job-set"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="t_f1" sourceRef="t_set" targetRef="t_read"/>
+    <bpmn:serviceTask id="t_read"><bpmn:extensionElements><zeebe:taskDefinition type="job-read"/></bpmn:extensionElements></bpmn:serviceTask>
+    <bpmn:sequenceFlow id="t_f2" sourceRef="t_read" targetRef="t_end"/>
+    <bpmn:endEvent id="t_end"/>
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_jobs">
+    <bpmndi:BPMNPlane id="BPMNPlane_jobs" bpmnElement="Collaboration_jobs">
+      <bpmndi:BPMNShape id="Participant_job_retry_di" bpmnElement="Participant_job_retry" isHorizontal="true">
+        <dc:Bounds x="0" y="0" width="596" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="r_start_di" bpmnElement="r_start">
+        <dc:Bounds x="70" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="r_work_di" bpmnElement="r_work">
+        <dc:Bounds x="188" y="40" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="r_end_di" bpmnElement="r_end">
+        <dc:Bounds x="370" y="62" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="r_f0_di" bpmnElement="r_f0">
+        <di:waypoint x="106" y="80" />
+        <di:waypoint x="188" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="r_f1_di" bpmnElement="r_f1">
+        <di:waypoint x="288" y="80" />
+        <di:waypoint x="370" y="80" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_job_io_di" bpmnElement="Participant_job_io" isHorizontal="true">
+        <dc:Bounds x="0" y="190" width="596" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="io_start_di" bpmnElement="io_start">
+        <dc:Bounds x="70" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="io_calc_di" bpmnElement="io_calc">
+        <dc:Bounds x="188" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="io_check_di" bpmnElement="io_check">
+        <dc:Bounds x="338" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="io_end_di" bpmnElement="io_end">
+        <dc:Bounds x="520" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="io_f0_di" bpmnElement="io_f0">
+        <di:waypoint x="106" y="270" />
+        <di:waypoint x="188" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="io_f1_di" bpmnElement="io_f1">
+        <di:waypoint x="288" y="270" />
+        <di:waypoint x="338" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="io_f2_di" bpmnElement="io_f2">
+        <di:waypoint x="438" y="270" />
+        <di:waypoint x="520" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_job_types_di" bpmnElement="Participant_job_types" isHorizontal="true">
+        <dc:Bounds x="0" y="380" width="596" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_start_di" bpmnElement="t_start">
+        <dc:Bounds x="70" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_set_di" bpmnElement="t_set">
+        <dc:Bounds x="188" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_read_di" bpmnElement="t_read">
+        <dc:Bounds x="338" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_end_di" bpmnElement="t_end">
+        <dc:Bounds x="520" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="t_f0_di" bpmnElement="t_f0">
+        <di:waypoint x="106" y="460" />
+        <di:waypoint x="188" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="t_f1_di" bpmnElement="t_f1">
+        <di:waypoint x="288" y="460" />
+        <di:waypoint x="338" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="t_f2_di" bpmnElement="t_f2">
+        <di:waypoint x="438" y="460" />
+        <di:waypoint x="520" y="460" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,38 @@
+{
+  "scenario": "msg-start-event",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "msg-start-work",
+        "elementId": "s_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "source": "message"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "no result requested",
+    "finalVariables": null,
+    "instances": [
+      {
+        "process": "msg_start",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2746,
+    "errors": [],
+    "restNotes": []
+  }
+}

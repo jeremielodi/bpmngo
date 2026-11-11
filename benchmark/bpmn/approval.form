@@ -1,0 +1,9 @@
+{
+  "type": "default",
+  "id": "approval-form",
+  "schemaVersion": 5,
+  "components": [
+    { "type": "textfield", "id": "Field_comment", "key": "comment", "label": "Comment" },
+    { "type": "checkbox", "id": "Field_approved", "key": "approved", "label": "Approved" }
+  ]
+}

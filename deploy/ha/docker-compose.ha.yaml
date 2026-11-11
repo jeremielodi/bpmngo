@@ -120,7 +120,7 @@ services:
     depends_on: [haproxy]
     environment:
       PG_SUPERUSER_PASSWORD: ${PG_SUPERUSER_PASSWORD:-postgres-ha}
-      GOFLOW_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
+      BPMNGO_PASSWORD: ${POSTGRES_PASSWORD:-goflow123}
     entrypoint: ["/bin/bash", "/ha-init.sh"]
     volumes:
       - ./deploy/ha/ha-init.sh:/ha-init.sh:ro
@@ -137,10 +137,13 @@ services:
         condition: service_healthy
         required: false
     environment:
-      DB_HOST: haproxy
-      DB_PORT: 5000
-      DB_READ_HOST: haproxy
-      DB_READ_PORT: 5001
+      # ha-init crée le rôle et la base goflow
+      POSTGRES_USER: goflow
+      POSTGRES_DB: goflow
+      POSTGRES_HOST: haproxy
+      POSTGRES_PORT: 5000
+      POSTGRES_READ_HOST: haproxy
+      POSTGRES_READ_PORT: 5001
 
 volumes:
   pg1_data:

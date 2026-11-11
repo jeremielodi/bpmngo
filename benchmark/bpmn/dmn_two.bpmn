@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Two chained business rule tasks, each calling one decision.
+     dmn_level picks the service level from amount and tier,
+     dmn_ship prices the shipping from that level and the weight:
+     the second decision reads a variable the first one produced. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="dmn_chain_defs" targetNamespace="http://bpmn.io/schema/bpmn"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI">
+
+  <bpmn:process id="dmn_chain" name="Two decisions" isExecutable="true">
+    <bpmn:startEvent id="dc_start"/>
+    <bpmn:sequenceFlow id="dc_f0" sourceRef="dc_start" targetRef="dc_level"/>
+    <bpmn:businessRuleTask id="dc_level" name="Service level">
+      <bpmn:extensionElements><zeebe:calledDecision decisionId="dmn_level" resultVariable="level"/></bpmn:extensionElements>
+    </bpmn:businessRuleTask>
+    <bpmn:sequenceFlow id="dc_f1" sourceRef="dc_level" targetRef="dc_ship"/>
+    <bpmn:businessRuleTask id="dc_ship" name="Shipping">
+      <bpmn:extensionElements><zeebe:calledDecision decisionId="dmn_ship" resultVariable="cost"/></bpmn:extensionElements>
+    </bpmn:businessRuleTask>
+    <bpmn:sequenceFlow id="dc_f2" sourceRef="dc_ship" targetRef="dc_show"/>
+    <bpmn:serviceTask id="dc_show" name="Show">
+      <bpmn:extensionElements><zeebe:taskDefinition type="dmn-show"/></bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="dc_f3" sourceRef="dc_show" targetRef="dc_end"/>
+    <bpmn:endEvent id="dc_end"/>
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_dmn_chain">
+    <bpmndi:BPMNPlane id="BPMNPlane_dmn_chain" bpmnElement="dmn_chain">
+      <bpmndi:BPMNShape id="dc_start_di" bpmnElement="dc_start">
+        <dc:Bounds x="57" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="dc_level_di" bpmnElement="dc_level">
+        <dc:Bounds x="175" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="dc_ship_di" bpmnElement="dc_ship">
+        <dc:Bounds x="325" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="dc_show_di" bpmnElement="dc_show">
+        <dc:Bounds x="475" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="dc_end_di" bpmnElement="dc_end">
+        <dc:Bounds x="657" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="dc_f0_di" bpmnElement="dc_f0">
+        <di:waypoint x="93" y="70" />
+        <di:waypoint x="175" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="dc_f1_di" bpmnElement="dc_f1">
+        <di:waypoint x="275" y="70" />
+        <di:waypoint x="325" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="dc_f2_di" bpmnElement="dc_f2">
+        <di:waypoint x="425" y="70" />
+        <di:waypoint x="475" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="dc_f3_di" bpmnElement="dc_f3">
+        <di:waypoint x="575" y="70" />
+        <di:waypoint x="657" y="70" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

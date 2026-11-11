@@ -29,6 +29,10 @@ var processAccessCache = struct {
 
 const processAccessCacheTTL = 5 * time.Second
 
+// Grants written by another BpmnGo instance invalidate this one's cache
+// too (repository.ACLChangedChannel).
+func init() { repository.OnACLChanged(InvalidateProcessAuthorization) }
+
 // InvalidateProcessAuthorization drops cached decisions after an ACL write.
 func InvalidateProcessAuthorization(processKey string) {
 	processAccessCache.Lock()

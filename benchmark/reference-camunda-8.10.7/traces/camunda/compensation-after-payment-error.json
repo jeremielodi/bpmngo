@@ -1,0 +1,76 @@
+{
+  "scenario": "compensation-after-payment-error",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "cp-book",
+        "elementId": "c_book",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "cp-charge",
+        "elementId": "c_charge",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "booking": "B-1"
+        },
+        "answer": "error(PAY)",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "cp-undo",
+        "elementId": "c_undo",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "booking": "B-1"
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "cp-failed",
+        "elementId": "c_failed",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "undone": "B-1",
+          "booking": "B-1"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "undone": "B-1",
+      "booking": "B-1"
+    },
+    "instances": [
+      {
+        "process": "cp_booking",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3581,
+    "errors": [],
+    "restNotes": []
+  }
+}

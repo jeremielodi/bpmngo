@@ -1,0 +1,65 @@
+{
+  "scenario": "msg-duplicate-message-id",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "msg-prep",
+        "elementId": "c_prep",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "orderId": "A4"
+        },
+        "answer": "after 2000 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "msg-after",
+        "elementId": "c_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "copy": 1,
+          "orderId": "A4"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after 0 ms: publish msg-paid key=A4 ttl=10000 id=m-1",
+        "result": "ok"
+      },
+      {
+        "action": "after 300 ms: publish msg-paid key=A4 ttl=10000 id=m-1",
+        "result": "ALREADY_EXISTS"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "copy": 1,
+      "orderId": "A4"
+    },
+    "instances": [
+      {
+        "process": "msg_catch",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 5142,
+    "errors": [
+      "after 300 ms: publish msg-paid key=A4 ttl=10000 id=m-1: ALREADY_EXISTS Command 'PUBLISH' rejected with code 'ALREADY_EXISTS': Expected to publish a new message with id 'm-1', but a message with that id was already published"
+    ],
+    "restNotes": []
+  }
+}

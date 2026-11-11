@@ -1,0 +1,65 @@
+{
+  "scenario": "rb-loop-retries-until-ok",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-attempt",
+        "elementId": "lo_try",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-attempt",
+        "elementId": "lo_try",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "ok": false,
+          "attempts": 1
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-attempt",
+        "elementId": "lo_try",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "ok": false,
+          "attempts": 2
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "ok": true,
+      "attempts": 3
+    },
+    "instances": [
+      {
+        "process": "rb_loop",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2635,
+    "errors": [],
+    "restNotes": []
+  }
+}

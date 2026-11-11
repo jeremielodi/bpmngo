@@ -1,0 +1,87 @@
+{
+  "scenario": "rb-modeler-export-backorder",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-md-stock",
+        "elementId": "Activity_stock",
+        "retries": 5,
+        "headers": {
+          "warehouse": "north"
+        },
+        "variables": {
+          "lines": [
+            {
+              "sku": "C",
+              "kg": 1
+            }
+          ],
+          "order": {
+            "id": "M-2",
+            "lines": [
+              {
+                "sku": "C",
+                "kg": 1
+              }
+            ]
+          }
+        },
+        "answer": "complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-md-backorder",
+        "elementId": "Activity_backorder",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "order": {
+            "id": "M-2",
+            "lines": [
+              {
+                "sku": "C",
+                "kg": 1
+              }
+            ]
+          },
+          "inStock": false
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "order": {
+        "id": "M-2",
+        "lines": [
+          {
+            "sku": "C",
+            "kg": 1
+          }
+        ]
+      },
+      "inStock": false,
+      "backordered": true
+    },
+    "instances": [
+      {
+        "process": "rb_modeler_order",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3166,
+    "errors": [],
+    "restNotes": []
+  }
+}

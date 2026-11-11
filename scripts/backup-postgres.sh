@@ -9,11 +9,11 @@
 #
 #   PGHOST=haproxy PGPORT=5000 PGPASSWORD=… ./scripts/backup-postgres.sh
 #
-# pg_dump tourne alors dans un conteneur postgres:16 jetable, sur le réseau
+# pg_dump tourne alors dans un conteneur postgres:18 jetable, sur le réseau
 # Docker de BpmnGo (DOCKER_NETWORK, goflow_bpmngo-network par défaut).
 #
 # Cron quotidien (3h du matin) :
-#   0 3 * * * cd /root/apps/goflow && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1
+#   0 3 * * * cd /root/apps/bpmngo && ./scripts/backup-postgres.sh >> backups/backup.log 2>&1
 #
 # Copier ensuite les fichiers hors du serveur (rsync, rclone, stockage
 # objet…) : une sauvegarde sur le même disque ne protège pas d'une panne de
@@ -32,7 +32,7 @@ NETWORK="${DOCKER_NETWORK:-goflow_bpmngo-network}"
 pg() {
   if [ -n "${PGHOST:-}" ]; then
     docker run --rm -i --network "$NETWORK" -e PGPASSWORD="${PGPASSWORD:-}" \
-      postgres:16 "$@" -h "$PGHOST" -p "${PGPORT:-5432}" -U "$DB_USER"
+      postgres:18 "$@" -h "$PGHOST" -p "${PGPORT:-5432}" -U "$DB_USER"
   else
     docker exec -i "$CONTAINER" "$@" -U "$DB_USER"
   fi
@@ -40,7 +40,7 @@ pg() {
 
 mkdir -p "$BACKUP_DIR"
 stamp=$(date +%Y%m%d_%H%M%S)
-file="$BACKUP_DIR/goflow_${stamp}.dump"
+file="$BACKUP_DIR/bpmngo_${stamp}.dump"
 tmp="$file.partial"
 
 source="$CONTAINER"
@@ -52,12 +52,13 @@ pg pg_dump -d "$DB_NAME" -Fc > "$tmp"
 
 # Un dump illisible ne doit jamais remplacer les bons : on vérifie avant de
 # le garder (pg_restore --list ne se connecte à aucune base).
-if ! docker run --rm -i postgres:16 pg_restore --list < "$tmp" > /dev/null; then
+if ! docker run --rm -i postgres:18 pg_restore --list < "$tmp" > /dev/null; then
   echo "ERREUR : le dump $tmp est illisible, conservé pour analyse" >&2
   exit 1
 fi
 mv "$tmp" "$file"
 echo "$(date '+%F %T') OK : $(du -h "$file" | cut -f1)"
 
-# Rotation : supprime les sauvegardes de plus de KEEP_DAYS jours.
-find "$BACKUP_DIR" -name 'goflow_*.dump' -type f -mtime +"$KEEP_DAYS" -print -delete
+# Rotation : supprime les sauvegardes de plus de KEEP_DAYS jours
+# (goflow_*.dump : nom des sauvegardes d'avant le renommage).
+find "$BACKUP_DIR" \( -name 'bpmngo_*.dump' -o -name 'goflow_*.dump' \) -type f -mtime +"$KEEP_DAYS" -print -delete

@@ -246,6 +246,7 @@ func (r *ProcessInstanceRepository) FindByID(id uuid.UUID) (*models.ProcessInsta
 	query := `
 		SELECT 
 			pi.id,
+			pi.engine_key,
 			pi.process_definition_id,
 			pi.status,
 			pi.started_by,

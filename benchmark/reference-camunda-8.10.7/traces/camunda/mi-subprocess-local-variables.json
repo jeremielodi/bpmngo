@@ -1,0 +1,132 @@
+{
+  "scenario": "mi-subprocess-local-variables",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "mi-inner",
+        "elementId": "u_inner",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 1,
+          "double": 2,
+          "loopCounter": 1,
+          "doubles": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            1,
+            2,
+            3
+          ]
+        },
+        "answer": "after 300 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-inner",
+        "elementId": "u_inner",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 2,
+          "double": 4,
+          "loopCounter": 2,
+          "doubles": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            1,
+            2,
+            3
+          ]
+        },
+        "answer": "after 600 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-inner",
+        "elementId": "u_inner",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "item": 3,
+          "double": 6,
+          "loopCounter": 3,
+          "doubles": [
+            null,
+            null,
+            null
+          ],
+          "items": [
+            1,
+            2,
+            3
+          ]
+        },
+        "answer": "after 900 ms: complete",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "mi-after",
+        "elementId": "u_after",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "bonus": 1,
+          "items": [
+            1,
+            2,
+            3
+          ],
+          "doubles": [
+            3,
+            5,
+            7
+          ]
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "bonus": 1,
+      "items": [
+        1,
+        2,
+        3
+      ],
+      "doubles": [
+        3,
+        5,
+        7
+      ]
+    },
+    "instances": [
+      {
+        "process": "mi_subprocess",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3954,
+    "errors": [],
+    "restNotes": []
+  }
+}

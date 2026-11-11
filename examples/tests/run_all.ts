@@ -19,7 +19,7 @@ import { execSync, spawn } from 'child_process';
 import * as path from 'path';
 import { BpmnGoClient, sleep, SKIPPED_EXIT_CODE } from './client';
 
-const BASE_URL = process.env.GOFLOW_URL ?? 'http://127.0.0.1:8080';
+const BASE_URL = process.env.BPMNGO_URL ?? 'http://127.0.0.1:8080';
 const noTimers = process.argv.includes('--no-timers');
 
 // ─── Wait for app to be healthy ───────────────────────────────────────────────
@@ -65,32 +65,32 @@ async function main() {
 
   // 1. Tear down existing containers + volumes, then rebuild fresh (SKIP_SETUP=1:
   // run against the stack already up).
-  if (!process.env.SKIP_SETUP) {
-    console.log('\n📦  Tearing down existing Docker volumes…');
-    try {
-      execSync('docker compose down -v --remove-orphans', {
-        cwd: path.join(__dirname, '..', '..'),
-        stdio: 'inherit',
-      });
-    } catch {
-      // nothing running — that's fine
-    }
+  // if (!process.env.SKIP_SETUP) {
+  //   console.log('\n📦  Tearing down existing Docker volumes…');
+  //   // try {
+  //   //   execSync('docker compose down -v --remove-orphans', {
+  //   //     cwd: path.join(__dirname, '..', '..'),
+  //   //     stdio: 'inherit',
+  //   //   });
+  //   // } catch {
+  //   //   // nothing running — that's fine
+  //   // }
 
-    console.log('📦  Starting Docker services (fresh build)…');
-    // GOFLOW_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
-    // runs the suites against several BpmnGo instances behind the load balancer.
-    const replicas = process.env.GOFLOW_REPLICAS ? ` --scale bpmngo=${process.env.GOFLOW_REPLICAS}` : '';
-    try {
-      execSync(`docker compose up -d --build --wait${replicas}`, {
-        cwd: path.join(__dirname, '..', '..'),
-        stdio: 'inherit',
-      });
-    } catch (err) {
-      // --wait gives up while a slow first boot (a Citus bootstrap) is still
-      // running: the health check below decides.
-      console.log('  docker compose up reported a failure — waiting for the app anyway');
-    }
-  }
+  //   console.log('📦  Starting Docker services (fresh build)…');
+  //   // BPMNGO_REPLICAS=3 (with COMPOSE_FILE including docker-compose.scale.yaml)
+  //   // runs the suites against several BpmnGo instances behind the load balancer.
+  //   const replicas = process.env.BPMNGO_REPLICAS ? ` --scale bpmngo=${process.env.BPMNGO_REPLICAS}` : '';
+  //   try {
+  //     execSync(`docker compose up -d --build --wait${replicas}`, {
+  //       cwd: path.join(__dirname, '..', '..'),
+  //       stdio: 'inherit',
+  //     });
+  //   } catch (err) {
+  //     // --wait gives up while a slow first boot (a Citus bootstrap) is still
+  //     // running: the health check below decides.
+  //     console.log('  docker compose up reported a failure — waiting for the app anyway');
+  //   }
+  // }
 
   // 2. Wait until the app responds
   await waitForApp();

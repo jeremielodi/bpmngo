@@ -246,6 +246,34 @@ const latestForTenantSQL = `
         ORDER BY (tenant_id = $2) DESC NULLS LAST, version DESC
         LIMIT 1`
 
+// definitionHeaderColumns is every column but bpmn_xml and parsed_graph:
+// starting an instance only needs the definition's identity, and reading
+// the model (often TOASTed, so decompressed) on each start costs the
+// database CPU for nothing — the graph comes from the in-process cache.
+const definitionHeaderColumns = `id, deployment_id, process_key, process_name, tenant_id, version, is_active, created_at, write_path`
+
+// FindDefinitionHeaderForStart resolves the definition a start request
+// names — by id, by key and version (version > 0), or the latest version
+// of key visible to callerTenant — without its model.
+func (r *ProcessRepository) FindDefinitionHeaderForStart(id uuid.UUID, processKey string, version int, callerTenant string) (models.ProcessDefinition, error) {
+	var def models.ProcessDefinition
+	var err error
+	switch {
+	case id != uuid.Nil:
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions WHERE id = $1`, id)
+	case version > 0:
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions WHERE process_key = $1 AND version = $2`, processKey, version)
+	case callerTenant == "":
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions WHERE process_key = $1 ORDER BY version DESC LIMIT 1`, processKey)
+	default:
+		err = r.db.Get(&def, `SELECT `+definitionHeaderColumns+` FROM public.process_definitions
+			WHERE process_key = $1 AND (tenant_id = $2 OR tenant_id IS NULL OR tenant_id = '')
+			ORDER BY (tenant_id = $2) DESC NULLS LAST, version DESC
+			LIMIT 1`, processKey, callerTenant)
+	}
+	return def, err
+}
+
 // FindLatestProcessDefinitionByKeyForTenant is FindLatestProcessDefinitionByKey
 // as seen by a caller of tenant callerTenant ("" = no tenant: any version).
 func (r *ProcessRepository) FindLatestProcessDefinitionByKeyForTenant(processKey, callerTenant string) (models.ProcessDefinition, error) {

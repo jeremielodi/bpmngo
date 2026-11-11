@@ -1,0 +1,69 @@
+{
+  "scenario": "rb-script-task-feel",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-script-show",
+        "elementId": "sc_show",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "lines": [
+            {
+              "qty": 2,
+              "price": 10.5
+            },
+            {
+              "qty": 1,
+              "price": 3
+            },
+            {
+              "qty": 4,
+              "price": 0.25
+            }
+          ],
+          "total": 25
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "seen": 25,
+      "lines": [
+        {
+          "qty": 2,
+          "price": 10.5
+        },
+        {
+          "qty": 1,
+          "price": 3
+        },
+        {
+          "qty": 4,
+          "price": 0.25
+        }
+      ],
+      "total": 25
+    },
+    "instances": [
+      {
+        "process": "rb_script",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 2467,
+    "errors": [],
+    "restNotes": []
+  }
+}

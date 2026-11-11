@@ -1,0 +1,61 @@
+{
+  "scenario": "boundary-message-interrupting",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "be-work",
+        "elementId": "mi_work",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "orderId": "O-7"
+        },
+        "answer": "after 4000 ms: complete",
+        "result": "NOT_FOUND"
+      },
+      {
+        "instance": "main",
+        "type": "be-cancelled",
+        "elementId": "mi_cancelled",
+        "retries": 3,
+        "headers": {},
+        "variables": {
+          "reason": "customer",
+          "orderId": "O-7"
+        },
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [
+      {
+        "action": "after job be-work: publish be-cancel key=O-7",
+        "result": "ok"
+      }
+    ],
+    "outcome": "completed",
+    "finalVariables": {
+      "reason": "customer",
+      "orderId": "O-7"
+    },
+    "instances": [
+      {
+        "process": "be_message_int",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 5889,
+    "errors": [
+      "answer be-work at mi_work: NOT_FOUND Command 'COMPLETE' rejected with code 'NOT_FOUND': Expected to complete job with key '2251799813685850', but no such job was found"
+    ],
+    "restNotes": []
+  }
+}

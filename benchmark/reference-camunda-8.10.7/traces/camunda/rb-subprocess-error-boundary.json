@@ -1,0 +1,48 @@
+{
+  "scenario": "rb-subprocess-error-boundary",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "rb-risky",
+        "elementId": "se_risky",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "error(RISK)",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "rb-handle",
+        "elementId": "se_handle",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {
+      "handled": "no reason"
+    },
+    "instances": [
+      {
+        "process": "rb_sub_error",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3255,
+    "errors": [],
+    "restNotes": []
+  }
+}

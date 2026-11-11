@@ -256,10 +256,12 @@ func (pc *ProcessInstanceController) SearchProcessInstances(c *fiber.Ctx) error 
 	}
 
 	items := make([]fiber.Map, 0, len(instances))
+	liveIndex := make(map[uuid.UUID]int, len(instances))
 	for i := range instances {
 		if !canView(instances[i].ProcessKey) {
 			continue
 		}
+		liveIndex[instances[i].ID] = len(items)
 		items = append(items, toV2ProcessInstance(&instances[i]))
 	}
 
@@ -275,24 +277,32 @@ func (pc *ProcessInstanceController) SearchProcessInstances(c *fiber.Ctx) error 
 			TenantID:   tenant,
 			Limit:      limit,
 		})
-		if histErr == nil {
-			for _, h := range historicRows {
-				if !canView(h.ProcessDefinitionKey) {
-					continue
-				}
-				ended := h.EndedAt
-				hi := models.ProcessInstance{
-					ID:                  h.ID,
-					ProcessDefinitionID: h.ProcessDefinitionID,
-					Status:              h.State,
-					StartedBy:           h.StartedBy,
-					StartedAt:           h.StartedAt,
-					EndedAt:             &ended,
-					ProcessKey:          h.ProcessDefinitionKey,
-					TenantID:            h.TenantID,
-				}
-				items = append(items, toV2ProcessInstance(&hi))
+		if histErr != nil {
+			// An empty answer here would read as "no finished instance".
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"title": "INTERNAL_ERROR", "detail": histErr.Error()})
+		}
+		for _, h := range historicRows {
+			if !canView(h.ProcessDefinitionKey) {
+				continue
 			}
+			ended := h.EndedAt
+			hi := models.ProcessInstance{
+				ID:                  h.ID,
+				ProcessDefinitionID: h.ProcessDefinitionID,
+				Status:              h.State,
+				StartedBy:           h.StartedBy,
+				StartedAt:           h.StartedAt,
+				EndedAt:             &ended,
+				ProcessKey:          h.ProcessDefinitionKey,
+				TenantID:            h.TenantID,
+			}
+			// Archived between the live read and this one: keep the
+			// historic (final) row, not both.
+			if i, seen := liveIndex[h.ID]; seen {
+				items[i] = toV2ProcessInstance(&hi)
+				continue
+			}
+			items = append(items, toV2ProcessInstance(&hi))
 		}
 		// Live and historic, newest first, one page.
 		sort.SliceStable(items, func(i, j int) bool {

@@ -51,7 +51,7 @@ func EnsureReferenceTables(db *sqlx.DB, workers []string) error {
 		return fmt.Errorf("citus: check for citus extension: %w", err)
 	}
 	if !hasCitus {
-		return fmt.Errorf("citus: CITUS_ENABLED is set but the citus extension is not active on this database — is DB_HOST pointed at a Citus coordinator?")
+		return fmt.Errorf("citus: CITUS_ENABLED is set but the citus extension is not active on this database — is POSTGRES_HOST pointed at a Citus coordinator?")
 	}
 	// Citus 12 refuses both reference and distributed tables that have user
 	// triggers. Repositories now always supply engine_key and id, so the
@@ -253,7 +253,7 @@ func EnsureDistributedTables(db *sqlx.DB) error {
 		return fmt.Errorf("citus: check for citus extension: %w", err)
 	}
 	if !hasCitus {
-		return fmt.Errorf("citus: CITUS_ENABLED is set but the citus extension is not active on this database — is DB_HOST pointed at a Citus coordinator?")
+		return fmt.Errorf("citus: CITUS_ENABLED is set but the citus extension is not active on this database — is POSTGRES_HOST pointed at a Citus coordinator?")
 	}
 	if err := prepareBigintColocation(db); err != nil {
 		return err

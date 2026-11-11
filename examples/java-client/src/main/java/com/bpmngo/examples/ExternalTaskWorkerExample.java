@@ -29,7 +29,7 @@ public class ExternalTaskWorkerExample {
 
     public static void main(String[] args) {
         BpmnGoRestClient bpmngo = BpmnGoRestClient.fromEnv();
-        String baseUrl = BpmnGoRestClient.env("GOFLOW_URL", "http://127.0.0.1:8080");
+        String baseUrl = BpmnGoRestClient.env("BPMNGO_URL", "http://127.0.0.1:8080");
 
         Map<String, Integer> attempts = new ConcurrentHashMap<>();
         AtomicInteger completed = new AtomicInteger();
@@ -37,10 +37,10 @@ public class ExternalTaskWorkerExample {
         // /engine-rest takes HTTP Basic (BpmnGo e-mail + password) or a BpmnGo JWT.
         // Basic needs nothing more; the JWT goes through bpmngo.accessToken(),
         // which refreshes it (it only lives 15 minutes).
-        ClientRequestInterceptor auth = "jwt".equals(BpmnGoRestClient.env("GOFLOW_WORKER_AUTH", "basic"))
+        ClientRequestInterceptor auth = "jwt".equals(BpmnGoRestClient.env("BPMNGO_WORKER_AUTH", "basic"))
                 ? request -> request.addHeader("Authorization", "Bearer " + bpmngo.accessToken())
-                : new BasicAuthProvider(BpmnGoRestClient.env("GOFLOW_USER", "admin@goflow.com"),
-                        BpmnGoRestClient.env("GOFLOW_PASSWORD", "admin123"));
+                : new BasicAuthProvider(BpmnGoRestClient.env("BPMNGO_USER", "admin@bpmngo.com"),
+                        BpmnGoRestClient.env("BPMNGO_PASSWORD", "admin123"));
 
         ExternalTaskClient client = ExternalTaskClient.create()
                 .baseUrl(baseUrl + "/engine-rest")

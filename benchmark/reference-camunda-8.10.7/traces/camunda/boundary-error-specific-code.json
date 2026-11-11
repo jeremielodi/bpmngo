@@ -1,0 +1,46 @@
+{
+  "scenario": "boundary-error-specific-code",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [
+      {
+        "instance": "main",
+        "type": "be-pay",
+        "elementId": "er_pay",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "error(CARD)",
+        "result": "ok"
+      },
+      {
+        "instance": "main",
+        "type": "be-on-card",
+        "elementId": "er_on_card",
+        "retries": 3,
+        "headers": {},
+        "variables": {},
+        "answer": "complete",
+        "result": "ok"
+      }
+    ],
+    "actions": [],
+    "outcome": "completed",
+    "finalVariables": {},
+    "instances": [
+      {
+        "process": "be_error",
+        "state": "COMPLETED",
+        "activeElements": [],
+        "incidents": []
+      }
+    ]
+  },
+  "info": {
+    "durationMs": 3000,
+    "errors": [],
+    "restNotes": []
+  }
+}

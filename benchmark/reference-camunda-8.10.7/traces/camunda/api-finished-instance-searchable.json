@@ -1,0 +1,21 @@
+{
+  "scenario": "api-finished-instance-searchable",
+  "engine": "camunda",
+  "compared": {
+    "deploy": "ok",
+    "start": "ok",
+    "jobs": [],
+    "actions": [],
+    "outcome": "COMPLETED",
+    "finalVariables": {
+      "variablesFound": true,
+      "elementsFound": true
+    },
+    "instances": []
+  },
+  "info": {
+    "durationMs": 0,
+    "errors": [],
+    "restNotes": []
+  }
+}

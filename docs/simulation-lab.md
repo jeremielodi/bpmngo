@@ -148,9 +148,18 @@ All endpoints require authentication. Analysis permissions use
 | `GET/POST /engine-rest/simulation/scenarios/:id/issues` | List or add issues |
 | `PUT/DELETE /engine-rest/simulation/issues/:issueId` | Update or remove an issue |
 
-Install migrations `020` through `023` before deploying this version to an
-existing database. New databases receive the tables from the baseline schema.
+After applying the engine migrations through `023`, manually install simulation
+migrations `024` through `027` before deploying this version to an existing
+database. New databases receive the tables from the baseline schema.
 `SIMULATION_WORKERS` controls concurrency (default `2`, maximum `16`).
+
+If an earlier experimental simulation build used migration versions `020`–`023`,
+stop its simulation workers and inspect `schema_migrations.description`: those
+numbers now identify engine migrations. Reconcile each already-applied simulation
+file's tracking entry to its corresponding version `024`–`027`, then manually
+apply the missing engine migrations `020`–`023` and any remaining simulation
+steps in order. Do not replay `025` after `026` on a database with experiment
+runs: `025` restores an intermediate constraint that excludes experiments.
 
 Projects reuse the existing versioned scenario storage; no additional schema
 migration is required. Legacy single-model scenarios remain usable and the
